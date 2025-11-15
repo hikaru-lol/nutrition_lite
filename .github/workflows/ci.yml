@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: ['main'] # main への push で実行
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Say hello
+        run: echo "Hello from GitHub Actions for Nutrition Lite!"
