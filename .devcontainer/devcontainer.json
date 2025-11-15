@@ -1,0 +1,70 @@
+{
+  "name": "nutrition_assistant_devcontainer",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "TZ": "${localEnv:TZ:Asia/Tokyo}",
+      "CLAUDE_CODE_VERSION": "1",
+      "GIT_DELTA_VERSION": "0.18.2",
+      "ZSH_IN_DOCKER_VERSION": "1.2.0"
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
+    "ghcr.io/devcontainers-extra/features/pnpm:2": { "version": "10.14.0" }
+  },
+
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"],
+
+  "forwardPorts": [1455],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "aws-scripting-guy.cdk-extensions",
+        "eamodio.gitlens",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "bash": { "path": "bash" },
+          "zsh": { "path": "zsh" }
+        }
+      }
+    }
+  },
+
+  "remoteUser": "node",
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace",
+
+  "mounts": [
+    "source=code-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=${localEnv:HOME}/.aws,target=/home/node/.aws,type=bind,consistency=cached",
+    "source=code-codex-${devcontainerId},target=/home/node/.codex,type=volume",
+    "source=${localEnv:HOME}/.ssh,target=/host-ssh,type=bind,consistency=cached"
+  ],
+
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
+  },
+
+  "envFile": "../.env",
+
+  "onCreateCommand": "git config --global --add safe.directory /workspace && git config --global --get user.name  || git config --global user.name  \"hikaru-lol\" && git config --global --get user.email || git config --global user.email \"mr.hkr0507ysd94@gmail.com\"",
+
+  "postCreateCommand": "bash -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=$HOME/.local/bin:$PATH && cd ${containerWorkspaceFolder}/backend && uv sync'",
+
+  "postStartCommand": "bash -lc 'export PATH=$HOME/.local/bin:$PATH && cd ${containerWorkspaceFolder}/backend && uv sync --frozen || true'"
+}
