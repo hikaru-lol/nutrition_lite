@@ -1,15 +1,9 @@
 {
   "name": "nutrition_assistant_devcontainer",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "..",
-    "args": {
-      "TZ": "${localEnv:TZ:Asia/Tokyo}",
-      "CLAUDE_CODE_VERSION": "1",
-      "GIT_DELTA_VERSION": "0.18.2",
-      "ZSH_IN_DOCKER_VERSION": "1.2.0"
-    }
-  },
+  // ★ docker-compose 経由で dev サービスにアタッチ
+  "dockerComposeFile": ["docker-compose.dev.yml"],
+  "service": "dev",
+  "runServices": ["dev", "db", "minio"],
 
   "features": {
     "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },

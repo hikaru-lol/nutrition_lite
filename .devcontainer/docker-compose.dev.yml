@@ -1,0 +1,78 @@
+version: '3.9'
+
+services:
+  dev:
+    build:
+      # ← compose ファイルが .devcontainer/ にあるので
+      #    プロジェクトルートをコンテキストにする
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        # devcontainer.json の build.args をこちらに移植
+        TZ: ${TZ:-Asia/Tokyo}
+        CLAUDE_CODE_VERSION: '1'
+        GIT_DELTA_VERSION: '0.18.2'
+        ZSH_IN_DOCKER_VERSION: '1.2.0'
+
+    container_name: nutrition_dev
+
+    # もともと devcontainer.json の runArgs で付けていたもの
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    # dev 用コンテナの環境変数
+    environment:
+      TZ: Asia/Tokyo
+      DATABASE_URL: postgresql+psycopg2://app:app@db:5432/app
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET_NAME: nutrition-dev
+
+    # .env を dev コンテナにも流したいならここで指定（任意）
+    env_file:
+      - ../.env
+
+    depends_on:
+      - db
+      - minio
+
+    # FastAPI をホストからも叩きたいなら公開しておく
+    ports:
+      - '8000:8000'
+
+    # /workspace のマウントは devcontainer 側（workspaceMount）に任せるので
+    # ここで volumes は書かない
+
+  db:
+    image: postgres:16
+    container_name: nutrition_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+      TZ: Asia/Tokyo
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: nutrition_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000' # S3 互換 API
+      - '9001:9001' # Web コンソール
+    volumes:
+      - minio_data:/data
+
+volumes:
+  db_data:
+  minio_data:
