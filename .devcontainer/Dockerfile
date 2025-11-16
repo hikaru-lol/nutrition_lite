@@ -85,8 +85,6 @@
     > /home/node/.ssh/config && \
     chmod 600 /home/node/.ssh/config
   
-  RUN chmod 600 /home/node/.ssh/config
-  
   # ---------- Node CLI (グローバル) ------------------------------------
   RUN npm config set fund false && \
       npm config set audit false && \
@@ -95,5 +93,4 @@
   RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
   RUN npm install -g @openai/codex
   RUN npm install -g typescript ts-node eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin aws-cdk@2
-  
   

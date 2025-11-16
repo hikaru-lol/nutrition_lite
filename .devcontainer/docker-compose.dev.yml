@@ -30,9 +30,9 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET_NAME: nutrition-dev
 
-    # .env を dev コンテナにも流したいならここで指定（任意）
-    env_file:
-      - ../.env
+    # # .env を dev コンテナにも流したいならここで指定（任意）
+    # env_file:
+    #   - ../.env
 
     depends_on:
       - db
@@ -41,6 +41,12 @@ services:
     # FastAPI をホストからも叩きたいなら公開しておく
     ports:
       - '8000:8000'
+
+    # ★ ここを追加：ホストのプロジェクトルートを /workspace にマウント
+    volumes:
+      - ..:/workspace:cached
+
+    command: sleep infinity
 
     # /workspace のマウントは devcontainer 側（workspaceMount）に任せるので
     # ここで volumes は書かない
