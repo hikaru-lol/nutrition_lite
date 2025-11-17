@@ -263,3 +263,222 @@ git branch -d feature/add-login
 # リモートブランチ削除
 git push origin --delete feature/add-login
 ```
+
+#######
+#######
+
+# 命名規則、メッセージ等
+
+Git 命名・メッセージ作成ガイド
+
+GitHub Flow（ライト版）で開発する際の、
+ブランチ名 / コミットメッセージ / PR の書き方 に関するルール集。
+
+0. 基本方針
+
+常に 「未来の自分が見て一発で分かるか？」 を基準にする。
+
+すべてのレベルで
+
+何をしたか（What）
+
+なぜそうしたか（Why）
+を意識する。
+
+英語・日本語はどちらでも良いが、プロジェクト内ではできるだけ統一する。
+
+1. ブランチ名
+   1.1 形式
+   <タイプ>/<ざっくり内容を-kebab-case で>
+
+タイプの例：
+
+機能追加: feature/
+
+バグ修正: fix/
+
+細かい調整・セットアップ: chore/
+
+挙動を変えないリファクタ: refactor/
+
+スパイク（捨ててもよい実験）: spike/
+
+1.2 例
+feature/add-login
+feature/meal-pagination
+fix/login-error-message
+chore/update-ci-workflow
+refactor/simplify-meal-service
+spike/try-new-auth-lib
+
+1.3 ポイント
+
+「このブランチで何をしたいか」 が 3〜5 語で分かる名前にする。
+
+wip/, test/, tmp/ みたいな曖昧な名前は極力避ける。
+
+原則 main からだけ生やす（他の作業ブランチからの分岐は避ける）。
+
+2. コミットメッセージ
+   2.1 形式（ヘッダ）
+
+基本形：
+
+<type>: <短い要約（命令形）>
+
+type の例（Conventional Commits ライト版）：
+
+feat: 機能追加
+
+fix: バグ修正
+
+chore: 雑多な変更（設定・依存更新など）
+
+refactor: 挙動を変えないリファクタ
+
+docs: ドキュメントのみ
+
+test: テスト関連のみ
+
+※ scope を付けたければ feat(auth): ... のようにしても OK（任意）。
+
+2.2 例
+feat: add login API endpoint
+feat: implement meal list pagination
+fix: handle invalid login error message
+refactor: extract meal service from controller
+chore: update node and python versions
+docs: add API usage examples to README
+
+2.3 ボディ（必要なとき）
+
+複雑な変更や理由を書き残したいときは、ヘッダの下に空行を入れて箇条書きで。
+
+feat: implement meal list pagination
+
+- add `page` and `limit` query params to /meals
+- return `total_count` and `has_next` in response
+- update frontend to use new API
+
+書くと便利なこと：
+
+なぜこの変更が必要だったのか（背景・問題）
+
+既知の制限・TODO
+
+関連 Issue やドキュメントのリンク（Refs: #12 など）
+
+2.4 ルールのイメージ
+
+1 コミット = 1 つの論理的な変更 を意識する。
+
+文体は「命令形」 or 「現在形」（英語なら Add, Fix…）。
+
+update / change / fix bug だけのメッセージは避ける。
+
+❌ fix: bug
+
+✅ fix: handle empty email in login form
+
+3. Pull Request（PR）のタイトルと本文
+   3.1 PR タイトル
+
+基本はコミットヘッダと同じノリで OK：
+
+feat: add login feature
+fix: correct meal total calories calculation
+chore: tweak CI workflow for backend tests
+
+もしくは、もう少し人間向けに：
+
+Add login API and basic UI
+Fix total calorie calculation in meal summary
+Adjust CI workflow to split frontend/backend tests
+
+3.2 PR 本文テンプレ
+
+## 概要
+
+- ログイン API と簡易 UI を追加
+- /api/login エンドポイントを実装
+
+## 変更内容
+
+- backend: POST /api/login を追加（メール + パスワード）
+- backend: 200 / 401 のレスポンスを定義
+- frontend: /login ページとフォームを作成
+
+## 動作確認
+
+- 正しいメール・パスワードで 200 が返ること
+- 誤ったパスワードで 401 + エラーメッセージが表示されること
+
+## 補足
+
+- バリデーションは別 PR（`feature/add-login-validation`）で対応予定
+
+ポイント：
+
+概要：一言で言うと何をした PR か
+
+変更内容：どのレイヤーにどんな変更を入れたか
+
+動作確認：最低限どんな確認をしたか
+
+補足：未対応・制限・次の PR への引き継ぎなど
+
+「将来チームになるかも」を意識するなら、
+PR 本文がそのまま変更履歴の説明になるくらいを目標にすると良いです。
+
+4. Issue（タスク）のタイトル（任意）
+
+GitHub Issues を使う場合の例：
+
+Implement login API
+
+Add pagination to meal list
+
+Fix incorrect total calories in daily summary
+
+Refactor meal repository for testability
+
+PR タイトルは、対応する Issue の文言に揃えると分かりやすいです：
+
+Issue: Add pagination to meal list
+
+PR: Add pagination to meal list (backend + frontend)
+
+5. どこまで英語にするか問題
+
+コード（クラス名 / 関数名 / 変数名）
+→ 可能なら英語に統一すると、ライブラリや他プロジェクトとの整合が取りやすい。
+
+コミット / ブランチ / PR / Issue
+→ 英語か日本語かはお好みで良いが、プロジェクト内で統一するのがおすすめ。
+
+例）
+
+すべて英語で統一：
+
+feature/add-meal-pagination
+feat: add meal list pagination
+
+日本語も混ぜつつルールだけ守る：
+
+feature/add-meal-pagination
+feat: 食事一覧にページネーションを追加
+
+## 概要
+
+- 食事一覧 API に ?page, ?limit を導入
+
+6. まとめ（運用のコア）
+
+ブランチ名
+→ <type>/<短く内容を表す名前>（feature/add-login など）
+
+コミットメッセージ
+→ type: 要約（feat: add login API など）＋必要ならボディに Why/詳細
+
+PR
+→ タイトルは一言で要約、本文に「概要 / 変更内容 / 動作確認 / 補足」
