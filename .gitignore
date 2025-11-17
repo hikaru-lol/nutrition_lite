@@ -1,0 +1,84 @@
+# --------------------
+# Python / uv 関連
+# --------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtualenv
+.venv/
+venv/
+ENV/
+env/
+
+# パッケージング関連
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+# uv
+# uv.lock はロックファイルなので「必ずコミットする」想定で、ここでは無視しない
+
+# --------------------
+# テスト / キャッシュ
+# --------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# 型チェックなど
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# --------------------
+# ログ / 一時ファイル
+# --------------------
+*.log
+tmp/
+*.tmp
+
+# --------------------
+# 環境変数ファイル・秘密情報
+# --------------------
+.env
+.env.*
+!.env.example   # サンプルだけはコミットしたい場合
+
+# --------------------
+# エディタ / IDE
+# --------------------
+.vscode/
+.idea/
+*.swp
+*~
+
+# --------------------
+# OSごとのゴミファイル
+# --------------------
+.DS_Store
+Thumbs.db
+
+# --------------------
+# Docker / Dev 用データ(作ったら適宜追加)
+# --------------------
+docker-data/
+db-data/
+minio-data/
+
+# --------------------
+# Node / Frontend (今後追加するかもしれない想定)
+# --------------------
+node_modules/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

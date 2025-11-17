@@ -21,7 +21,8 @@
         "esbenp.prettier-vscode",
         "aws-scripting-guy.cdk-extensions",
         "eamodio.gitlens",
-        "openai.chatgpt"
+        "openai.chatgpt",
+        "tamasfe.even-better-toml"
       ],
       "settings": {
         "editor.formatOnSave": true,
