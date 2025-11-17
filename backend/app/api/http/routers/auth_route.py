@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, HTTPException, status
 
+from app.api.http.dependencies.auth import get_current_user_dto
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
+
+
 from app.api.http.schemas.auth import (
     RegisterRequest,
     LoginRequest,
@@ -143,14 +147,6 @@ def logout(response: Response) -> None:
     responses={401: {"model": ErrorResponse}},
 )
 def get_me(
-    current_user_use_case: GetCurrentUserUseCase = Depends(
-        get_get_current_user_use_case),
-    token_service: TokenServicePort = Depends(get_token_service),
-    # Cookie から取り出す dependency をこれから実装
-    access_token: str | None = Depends(...),
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
 ) -> AuthUserResponse:
-    # TODO: Cookie から ACCESS_TOKEN を取り出し、token_service.verify_access_token で user_id を得る
-    # user_id = ...
-    # dto = current_user_use_case.execute(user_id)
-    # return AuthUserResponse(user=to_user_summary(dto))
-    raise NotImplementedError("get_me endpoint wiring is TODO")
+    return AuthUserResponse(user=to_user_summary(current_user))
