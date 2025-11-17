@@ -10,10 +10,12 @@ from app.application.auth.ports.token_service_port import TokenPair
 from app.api.http.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    RefreshResponse,
     AuthUserResponse,
     ErrorResponse,
     UserSummary,
 )
+from app.application.auth.dto.refresh_dto import RefreshInputDTO
 from app.application.auth.dto.register_dto import RegisterInputDTO
 from app.application.auth.dto.login_dto import LoginInputDTO
 from app.application.auth.use_cases.account.register_user import (
@@ -24,7 +26,16 @@ from app.application.auth.use_cases.session.login_user import (
     LoginUserUseCase,
     InvalidCredentialsError,
 )
+from app.application.auth.use_cases.session.refresh_token import (
+    RefreshTokenUseCase,
+    InvalidRefreshTokenError,
+)
+from app.application.auth.use_cases.account.delete_account import (
+    DeleteAccountUseCase,
+    UserNotFoundError,
+)
 from app.di.container import get_register_user_use_case, get_login_user_use_case
+from app.di.container import get_logout_user_use_case, get_delete_account_use_case, get_refresh_token_use_case
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -174,3 +185,36 @@ def delete_me(
 
     clear_auth_cookies(response)
     return None
+
+
+@router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    responses={401: {"model": ErrorResponse}},
+)
+def refresh(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None, alias="REFRESH_TOKEN"),
+    use_case: RefreshTokenUseCase = Depends(get_refresh_token_use_case),
+) -> RefreshResponse:
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is missing",
+        )
+
+    try:
+        output = use_case.execute(RefreshInputDTO(refresh_token=refresh_token))
+    except InvalidRefreshTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+
+    set_auth_cookies(response, output.tokens)
+    return RefreshResponse(ok=True, user=to_user_summary(output.user))

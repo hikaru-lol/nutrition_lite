@@ -9,7 +9,10 @@ from app.application.auth.ports.token_service_port import TokenServicePort
 from app.application.auth.ports.clock_port import ClockPort
 
 from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
+from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
 from app.application.auth.use_cases.session.login_user import LoginUserUseCase
+from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
+from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
 from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase
 
 from app.infra.db.base import get_db
@@ -31,7 +34,6 @@ def get_password_hasher() -> PasswordHasherPort:
 
 
 def get_token_service() -> TokenServicePort:
-    # 設定値は JwtTokenService 側で env から読む
     return JwtTokenService()
 
 
@@ -72,3 +74,27 @@ def get_get_current_user_use_case(
     user_repo: UserRepositoryPort = Depends(get_user_repository),
 ) -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(user_repo=user_repo)
+
+
+def get_refresh_token_use_case(
+    user_repo: UserRepositoryPort = Depends(get_user_repository),
+    token_service: TokenServicePort = Depends(get_token_service),
+) -> RefreshTokenUseCase:
+    return RefreshTokenUseCase(
+        user_repo=user_repo,
+        token_service=token_service,
+    )
+
+
+def get_logout_user_use_case() -> LogoutUserUseCase:
+    return LogoutUserUseCase()
+
+
+def get_delete_account_use_case(
+    user_repo: UserRepositoryPort = Depends(get_user_repository),
+    clock: ClockPort = Depends(get_clock),
+) -> DeleteAccountUseCase:
+    return DeleteAccountUseCase(
+        user_repo=user_repo,
+        clock=clock,
+    )
