@@ -131,7 +131,6 @@ def login(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def logout(response: Response) -> None:
-    # トークンをサーバ側で無効化する仕組みを入れるなら、ここで UseCase を呼ぶ
     clear_auth_cookies(response)
     return None
 
@@ -145,3 +144,26 @@ def get_me(
     current_user: AuthUserDTO = Depends(get_current_user_dto),
 ) -> AuthUserResponse:
     return AuthUserResponse(user=to_user_summary(current_user))
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={401: {"model": ErrorResponse}},
+)
+def delete_me(
+    response: Response,
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
+    use_case: DeleteAccountUseCase = Depends(get_delete_account_use_case),
+) -> None:
+    try:
+        use_case.execute(current_user.id)
+    except UserNotFoundError as e:
+        # すでに削除済みなどのケース → 401 でも 404 でもよいが、今回は 401
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+
+    clear_auth_cookies(response)
+    return None
