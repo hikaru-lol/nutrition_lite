@@ -1,4 +1,4 @@
-修正点、気になったところをまとめていく
+## 修正点、気になったところをまとめていく
 
 パスワードのハッシュ化
 
@@ -11,3 +11,5 @@ refresh_token / logout / delete_account の UseCase 実装
 簡単な pytest（RegisterUserUseCase / LoginUserUseCase 単体テスト）
 
 あたりを進めていくのが良さそうです。
+
+API 契約

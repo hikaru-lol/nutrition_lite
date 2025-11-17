@@ -11,7 +11,6 @@ from app.api.http.schemas.auth import (
     RegisterRequest,
     LoginRequest,
     AuthUserResponse,
-    RefreshResponse,
     ErrorResponse,
     UserSummary,
 )
@@ -25,12 +24,7 @@ from app.application.auth.use_cases.session.login_user import (
     LoginUserUseCase,
     InvalidCredentialsError,
 )
-from app.application.auth.use_cases.current_user.get_current_user import (
-    GetCurrentUserUseCase,
-    UserNotFoundError,
-)
-from app.application.auth.ports.token_service_port import TokenServicePort
-from app.di.container import get_register_user_use_case, get_login_user_use_case, get_get_current_user_use_case, get_token_service  # これから実装
+from app.di.container import get_register_user_use_case, get_login_user_use_case
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
