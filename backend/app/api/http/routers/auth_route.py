@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, HTTPException, status
+from fastapi import APIRouter, Depends, Response, HTTPException, status, Cookie
+from dataclasses import dataclass
 
 from app.api.http.dependencies.auth import get_current_user_dto
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.auth.ports.token_service_port import TokenPair
-
+from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
 
 from app.api.http.schemas.auth import (
     RegisterRequest,
@@ -15,7 +16,7 @@ from app.api.http.schemas.auth import (
     ErrorResponse,
     UserSummary,
 )
-from app.application.auth.dto.refresh_dto import RefreshInputDTO
+
 from app.application.auth.dto.register_dto import RegisterInputDTO
 from app.application.auth.dto.login_dto import LoginInputDTO
 from app.application.auth.use_cases.account.register_user import (
@@ -84,6 +85,21 @@ def to_user_summary(dto: AuthUserDTO) -> UserSummary:
         hasProfile=dto.has_profile,
         createdAt=dto.created_at,
     )
+
+
+class InvalidRefreshTokenError(Exception):
+    pass
+
+
+@dataclass
+class RefreshInputDTO:
+    refresh_token: str
+
+
+@dataclass
+class RefreshOutputDTO:
+    user: AuthUserDTO
+    tokens: TokenPair
 
 
 @router.post(
