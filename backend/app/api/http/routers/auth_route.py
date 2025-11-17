@@ -129,8 +129,15 @@ def login(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={401: {"model": ErrorResponse}},
 )
-def logout(response: Response) -> None:
+def logout(
+    response: Response,
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
+    use_case: LogoutUserUseCase = Depends(get_logout_user_use_case),
+) -> None:
+    # 現時点では No-Op だが、将来的にサーバ側セッション無効化などをここに追加
+    use_case.execute(current_user.id)
     clear_auth_cookies(response)
     return None
 
