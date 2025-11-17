@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Response, HTTPException, status
 
 from app.api.http.dependencies.auth import get_current_user_dto
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.application.auth.ports.token_service_port import TokenPair
 
 
 from app.api.http.schemas.auth import (
@@ -35,7 +36,7 @@ from app.di.container import get_register_user_use_case, get_login_user_use_case
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-def set_auth_cookies(response: Response, tokens) -> None:
+def set_auth_cookies(response: Response, tokens: TokenPair) -> None:
     # 実運用では secure / samesite 等も設定
     response.set_cookie(
         key="ACCESS_TOKEN",
@@ -68,7 +69,7 @@ def clear_auth_cookies(response: Response) -> None:
         )
 
 
-def to_user_summary(dto) -> UserSummary:
+def to_user_summary(dto: AuthUserDTO) -> UserSummary:
     return UserSummary(
         id=dto.id,
         email=dto.email,
