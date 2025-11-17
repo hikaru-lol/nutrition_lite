@@ -11,7 +11,13 @@ from app.domain.auth.value_objects import UserPlan, EmailAddress, UserId, TrialI
 from app.domain.auth.entities import User
 
 
-def test_register_user_success(user_repo, password_hasher, token_service, clock):
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.ports.password_hasher_port import PasswordHasherPort
+from app.application.auth.ports.token_service_port import TokenServicePort
+from app.application.auth.ports.clock_port import ClockPort
+
+
+def test_register_user_success(user_repo: UserRepositoryPort, password_hasher: PasswordHasherPort, token_service: TokenServicePort, clock: ClockPort):
     use_case = RegisterUserUseCase(
         user_repo=user_repo,
         password_hasher=password_hasher,
@@ -53,7 +59,7 @@ def test_register_user_success(user_repo, password_hasher, token_service, clock)
     assert output.tokens.access_token.split(":")[1] == output.user.id
 
 
-def test_register_user_email_already_used(user_repo, password_hasher, token_service, clock):
+def test_register_user_email_already_used(user_repo: UserRepositoryPort, password_hasher: PasswordHasherPort, token_service: TokenServicePort, clock: ClockPort):
     # 事前に同じメールのユーザーを 1 人入れておく
     existing_user = User(
         id=UserId("user-1"),

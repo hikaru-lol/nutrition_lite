@@ -16,7 +16,11 @@ from app.domain.auth.value_objects import (
 )
 
 
-def test_get_current_user_success(user_repo, clock):
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.ports.clock_port import ClockPort
+
+
+def test_get_current_user_success(user_repo: UserRepositoryPort, clock: ClockPort):
     user = User(
         id=UserId("uid-123"),
         email=EmailAddress("me@example.com"),
@@ -39,7 +43,7 @@ def test_get_current_user_success(user_repo, clock):
     assert dto.plan == UserPlan.FREE
 
 
-def test_get_current_user_not_found(user_repo):
+def test_get_current_user_not_found(user_repo: UserRepositoryPort):
     use_case = GetCurrentUserUseCase(user_repo=user_repo)
 
     with pytest.raises(UserNotFoundError):
