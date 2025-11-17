@@ -1,0 +1,332 @@
+openapi: 3.1.0
+info:
+  title: Nutrition App Auth API
+  version: 1.0.0
+  description: >
+    認証・ユーザー管理のためのエンドポイント群。
+    認証は HttpOnly Cookie (ACCESS_TOKEN / REFRESH_TOKEN) を利用する。
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+    description: 認証・ユーザーアカウント関連の API
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: ユーザー登録
+      description: >
+        ユーザーを新規登録し、トライアル期間 (7日間) を開始する。
+        成功時に ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie をセットする。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value:
+                  email: 'user@example.com'
+                  password: 'password123'
+                  name: 'Hikaru'
+      responses:
+        '201':
+          description: 登録成功
+          headers:
+            Set-Cookie:
+              description: >
+                ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie が設定される。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: バリデーションエラー（メール形式不正など）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 既に同じメールアドレスのユーザーが存在する
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: ログイン
+      description: >
+        メールアドレスとパスワードでログインする。
+        成功時に ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie をセットする。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  email: 'user@example.com'
+                  password: 'password123'
+      responses:
+        '200':
+          description: 認証成功
+          headers:
+            Set-Cookie:
+              description: >
+                ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie が設定される。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: メールまたはパスワードが不正
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: ログアウト
+      description: >
+        現在のセッションを終了し、ACCESS_TOKEN / REFRESH_TOKEN の Cookie を削除する。
+        現状、サーバ側のセッション状態は持たない（完全 stateless）。
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: ログアウト成功（レスポンスボディなし）
+          headers:
+            Set-Cookie:
+              description: >
+                ACCESS_TOKEN / REFRESH_TOKEN クッキーを有効期限切れにする Set-Cookie ヘッダ。
+              schema:
+                type: string
+        '401':
+          description: 認証されていない（ACCESS_TOKEN が無効/欠如）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: アクセストークンの再発行
+      description: >
+        REFRESH_TOKEN Cookie を検証し、新しい ACCESS_TOKEN および REFRESH_TOKEN を再発行する。
+        成功時に新しいトークンを Set-Cookie で返す。
+      security:
+        - RefreshTokenCookieAuth: []
+      responses:
+        '200':
+          description: トークン再発行成功
+          headers:
+            Set-Cookie:
+              description: >
+                新しい ACCESS_TOKEN / REFRESH_TOKEN を設定する Set-Cookie ヘッダ。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: リフレッシュトークンが無効/期限切れ、もしくはユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: 自分のユーザー情報取得
+      description: >
+        現在ログイン中のユーザーの基本情報を取得する。
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: ユーザー情報
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '401':
+          description: 認証されていない（ACCESS_TOKEN が無効/欠如）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Auth]
+      summary: 自分のアカウント削除
+      description: >
+        現在ログインしているユーザー自身のアカウントを削除する。
+        v1 では論理削除（deleted_at をセット）を想定。
+        削除後はログイン不可となり、AUTH Cookie も削除される。
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: 削除成功（レスポンスボディなし）
+          headers:
+            Set-Cookie:
+              description: >
+                ACCESS_TOKEN / REFRESH_TOKEN を削除する Set-Cookie ヘッダ。
+              schema:
+                type: string
+        '401':
+          description: 認証されていない or ユーザーが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AccessTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: ACCESS_TOKEN
+      description: >
+        アクセストークンを格納した HttpOnly Cookie による認証。
+    RefreshTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: REFRESH_TOKEN
+      description: >
+        リフレッシュトークンを格納した HttpOnly Cookie による認証。
+
+  schemas:
+    # リクエスト DTO
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: ログインに使用するメールアドレス（ユニーク）
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: 平文パスワード（サーバー側でハッシュ化）
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          nullable: true
+          description: 表示名（任意）
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: 登録済みのメールアドレス
+        password:
+          type: string
+          format: password
+          description: 登録時に設定したパスワード
+
+    # レスポンス DTO
+    UserPlan:
+      type: string
+      description: ユーザーの現在のプラン
+      enum: [trial, free, paid]
+
+    UserSummary:
+      type: object
+      description: 認証コンテキストで返すユーザー概要情報
+      properties:
+        id:
+          type: string
+          description: ユーザーID（UUIDなど）
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        plan:
+          $ref: '#/components/schemas/UserPlan'
+        trialEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: トライアル終了日時。trial でない場合は null でもよい。
+        hasProfile:
+          type: boolean
+          description: プロフィール（身体情報・目的）が作成済みかどうか
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - plan
+        - hasProfile
+        - createdAt
+
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+      required: [user]
+
+    RefreshResponse:
+      type: object
+      description: トークン再発行後に返すレスポンス
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/UserSummary'
+      required: [ok, user]
+
+    ErrorDetail:
+      type: object
+      properties:
+        code:
+          type: string
+          description: アプリケーション固有のエラーコード
+          example: INVALID_CREDENTIALS
+        message:
+          type: string
+          description: 人間が読むためのエラーメッセージ
+          example: 'Invalid email or password'
+      required: [code, message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      required: [error]
