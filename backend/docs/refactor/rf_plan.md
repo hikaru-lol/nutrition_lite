@@ -13,3 +13,7 @@ refresh_token / logout / delete_account の UseCase 実装
 あたりを進めていくのが良さそうです。
 
 API 契約
+
+エラーの設計
+
+ここから中身についてすこちリファクタリングを加えていく

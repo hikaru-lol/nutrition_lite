@@ -1,45 +1,35 @@
 openapi: 3.1.0
 info:
-  title: Nutrition App Auth API
-  version: 1.0.0
-  description: >
-    認証・ユーザー管理のためのエンドポイント群。
-    認証は HttpOnly Cookie (ACCESS_TOKEN / REFRESH_TOKEN) を利用する。
+  title: Nutrition Backend - Auth API
+  version: 0.1.0
 
 servers:
   - url: /api/v1
 
 tags:
   - name: Auth
-    description: 認証・ユーザーアカウント関連の API
+    description: User registration, login, session management
 
 paths:
   /auth/register:
     post:
       tags: [Auth]
-      summary: ユーザー登録
+      summary: Register a new user
       description: >
-        ユーザーを新規登録し、トライアル期間 (7日間) を開始する。
-        成功時に ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie をセットする。
+        Create a new user account and start a 7-day trial plan.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
-            examples:
-              default:
-                value:
-                  email: 'user@example.com'
-                  password: 'password123'
-                  name: 'Hikaru'
       responses:
         '201':
-          description: 登録成功
+          description: User registered successfully
           headers:
             Set-Cookie:
-              description: >
-                ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie が設定される。
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
               schema:
                 type: string
           content:
@@ -47,13 +37,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthUserResponse'
         '400':
-          description: バリデーションエラー（メール形式不正など）
+          description: Invalid input
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: 既に同じメールアドレスのユーザーが存在する
+          description: Email already in use
           content:
             application/json:
               schema:
@@ -62,28 +52,22 @@ paths:
   /auth/login:
     post:
       tags: [Auth]
-      summary: ログイン
+      summary: Login with email and password
       description: >
-        メールアドレスとパスワードでログインする。
-        成功時に ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie をセットする。
+        Authenticate a user with email and password.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
-            examples:
-              default:
-                value:
-                  email: 'user@example.com'
-                  password: 'password123'
       responses:
         '200':
-          description: 認証成功
+          description: Login successful
           headers:
             Set-Cookie:
-              description: >
-                ACCESS_TOKEN / REFRESH_TOKEN の HttpOnly Cookie が設定される。
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
               schema:
                 type: string
           content:
@@ -91,13 +75,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthUserResponse'
         '400':
-          description: バリデーションエラー
+          description: Invalid input
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: メールまたはパスワードが不正
+          description: Invalid credentials
           content:
             application/json:
               schema:
@@ -106,23 +90,22 @@ paths:
   /auth/logout:
     post:
       tags: [Auth]
-      summary: ログアウト
+      summary: Logout current user
       description: >
-        現在のセッションを終了し、ACCESS_TOKEN / REFRESH_TOKEN の Cookie を削除する。
-        現状、サーバ側のセッション状態は持たない（完全 stateless）。
+        Clear ACCESS_TOKEN and REFRESH_TOKEN cookies.
+        Server side is stateless; tokens are not stored or revoked.
       security:
         - AccessTokenCookieAuth: []
       responses:
         '204':
-          description: ログアウト成功（レスポンスボディなし）
+          description: Logged out successfully. Cookies are cleared.
           headers:
             Set-Cookie:
-              description: >
-                ACCESS_TOKEN / REFRESH_TOKEN クッキーを有効期限切れにする Set-Cookie ヘッダ。
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
               schema:
                 type: string
         '401':
-          description: 認証されていない（ACCESS_TOKEN が無効/欠如）
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -131,19 +114,17 @@ paths:
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: アクセストークンの再発行
+      summary: Refresh access token
       description: >
-        REFRESH_TOKEN Cookie を検証し、新しい ACCESS_TOKEN および REFRESH_TOKEN を再発行する。
-        成功時に新しいトークンを Set-Cookie で返す。
+        Issue a new ACCESS_TOKEN and REFRESH_TOKEN pair using the REFRESH_TOKEN cookie.
       security:
         - RefreshTokenCookieAuth: []
       responses:
         '200':
-          description: トークン再発行成功
+          description: Token refreshed successfully
           headers:
             Set-Cookie:
-              description: >
-                新しい ACCESS_TOKEN / REFRESH_TOKEN を設定する Set-Cookie ヘッダ。
+              description: New ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
               schema:
                 type: string
           content:
@@ -151,7 +132,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RefreshResponse'
         '401':
-          description: リフレッシュトークンが無効/期限切れ、もしくはユーザーが存在しない
+          description: Invalid or expired refresh token, or user not found
           content:
             application/json:
               schema:
@@ -160,20 +141,20 @@ paths:
   /auth/me:
     get:
       tags: [Auth]
-      summary: 自分のユーザー情報取得
+      summary: Get current user
       description: >
-        現在ログイン中のユーザーの基本情報を取得する。
+        Return the currently authenticated user based on ACCESS_TOKEN cookie.
       security:
         - AccessTokenCookieAuth: []
       responses:
         '200':
-          description: ユーザー情報
+          description: Current user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUserResponse'
         '401':
-          description: 認証されていない（ACCESS_TOKEN が無効/欠如）
+          description: Unauthorized (missing or invalid token, or user not found)
           content:
             application/json:
               schema:
@@ -181,24 +162,21 @@ paths:
 
     delete:
       tags: [Auth]
-      summary: 自分のアカウント削除
+      summary: Delete current user (logical delete)
       description: >
-        現在ログインしているユーザー自身のアカウントを削除する。
-        v1 では論理削除（deleted_at をセット）を想定。
-        削除後はログイン不可となり、AUTH Cookie も削除される。
+        Mark the current user as deleted (soft delete) and clear auth cookies.
       security:
         - AccessTokenCookieAuth: []
       responses:
         '204':
-          description: 削除成功（レスポンスボディなし）
+          description: Account deleted successfully
           headers:
             Set-Cookie:
-              description: >
-                ACCESS_TOKEN / REFRESH_TOKEN を削除する Set-Cookie ヘッダ。
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
               schema:
                 type: string
         '401':
-          description: 認証されていない or ユーザーが見つからない
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -210,63 +188,76 @@ components:
       type: apiKey
       in: cookie
       name: ACCESS_TOKEN
-      description: >
-        アクセストークンを格納した HttpOnly Cookie による認証。
+      description: HttpOnly access token cookie
+
     RefreshTokenCookieAuth:
       type: apiKey
       in: cookie
       name: REFRESH_TOKEN
-      description: >
-        リフレッシュトークンを格納した HttpOnly Cookie による認証。
+      description: HttpOnly refresh token cookie
 
   schemas:
-    # リクエスト DTO
+    # ==========
+    # Requests
+    # ==========
     RegisterRequest:
       type: object
-      required: [email, password]
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
           format: email
-          description: ログインに使用するメールアドレス（ユニーク）
+          description: User email address
         password:
           type: string
           format: password
           minLength: 8
-          description: 平文パスワード（サーバー側でハッシュ化）
+          description: Raw password (will be hashed server-side)
         name:
           type: string
-          minLength: 1
-          maxLength: 100
           nullable: true
-          description: 表示名（任意）
+          description: Display name of the user
 
     LoginRequest:
       type: object
-      required: [email, password]
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
           format: email
-          description: 登録済みのメールアドレス
         password:
           type: string
           format: password
-          description: 登録時に設定したパスワード
 
-    # レスポンス DTO
-    UserPlan:
-      type: string
-      description: ユーザーの現在のプラン
-      enum: [trial, free, paid]
+    # ==========
+    # Responses
+    # ==========
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    RefreshResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/UserSummary'
 
     UserSummary:
       type: object
-      description: 認証コンテキストで返すユーザー概要情報
+      description: Public auth user information
       properties:
         id:
           type: string
-          description: ユーザーID（UUIDなど）
+          format: uuid
         email:
           type: string
           format: email
@@ -274,59 +265,44 @@ components:
           type: string
           nullable: true
         plan:
-          $ref: '#/components/schemas/UserPlan'
-        trialEndsAt:
+          type: string
+          description: Current user plan
+          enum:
+            - trial
+            - free
+            - paid
+        trial_ends_at:
           type: string
           format: date-time
           nullable: true
-          description: トライアル終了日時。trial でない場合は null でもよい。
-        hasProfile:
+          description: Trial end time in UTC (null if not in trial)
+        has_profile:
           type: boolean
-          description: プロフィール（身体情報・目的）が作成済みかどうか
-        createdAt:
+          description: Whether the user has completed initial profile setup
+        created_at:
           type: string
           format: date-time
-      required:
-        - id
-        - email
-        - plan
-        - hasProfile
-        - createdAt
-
-    AuthUserResponse:
-      type: object
-      properties:
-        user:
-          $ref: '#/components/schemas/UserSummary'
-      required: [user]
-
-    RefreshResponse:
-      type: object
-      description: トークン再発行後に返すレスポンス
-      properties:
-        ok:
-          type: boolean
-          example: true
-        user:
-          $ref: '#/components/schemas/UserSummary'
-      required: [ok, user]
-
-    ErrorDetail:
-      type: object
-      properties:
-        code:
-          type: string
-          description: アプリケーション固有のエラーコード
-          example: INVALID_CREDENTIALS
-        message:
-          type: string
-          description: 人間が読むためのエラーメッセージ
-          example: 'Invalid email or password'
-      required: [code, message]
+          description: User creation time in UTC
 
     ErrorResponse:
       type: object
       properties:
         error:
-          $ref: '#/components/schemas/ErrorDetail'
-      required: [error]
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - EMAIL_ALREADY_IN_USE
+                - INVALID_CREDENTIALS
+                - UNAUTHORIZED
+                - USER_NOT_FOUND
+                - VALIDATION_ERROR
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message
