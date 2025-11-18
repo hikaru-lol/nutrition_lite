@@ -6,10 +6,7 @@ from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload
 from app.domain.auth.value_objects import EmailAddress
-
-
-class InvalidCredentialsError(Exception):
-    pass
+from app.domain.auth.errors import InvalidCredentialsError
 
 
 class LoginUserUseCase:
