@@ -16,6 +16,8 @@ from app.domain.auth.value_objects import (
     UserPlan,
     TrialInfo,
 )
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.ports.token_service_port import TokenServicePort
 
 
 def _create_user(user_id: str, email: str, plan: UserPlan, clock) -> User:
@@ -31,7 +33,7 @@ def _create_user(user_id: str, email: str, plan: UserPlan, clock) -> User:
     )
 
 
-def test_refresh_token_success(user_repo, token_service, clock):
+def test_refresh_token_success(user_repo: UserRepositoryPort, token_service: TokenServicePort, clock: ClockPort):
     # 1. 事前にユーザーを登録
     user = _create_user("uid-1", "refresh@example.com", UserPlan.TRIAL, clock)
     user_repo.save(user)
@@ -64,7 +66,7 @@ def test_refresh_token_success(user_repo, token_service, clock):
     assert output.tokens.refresh_token.startswith("refresh:")
 
 
-def test_refresh_token_invalid_token(user_repo, token_service):
+def test_refresh_token_invalid_token(user_repo: UserRepositoryPort, token_service: TokenServicePort):
     use_case = RefreshTokenUseCase(
         user_repo=user_repo,
         token_service=token_service,
@@ -78,7 +80,7 @@ def test_refresh_token_invalid_token(user_repo, token_service):
         use_case.execute(input_dto)
 
 
-def test_refresh_token_user_not_found(user_repo, token_service):
+def test_refresh_token_user_not_found(user_repo: UserRepositoryPort, token_service: TokenServicePort):
     # 存在しないユーザーIDに対するトークンを発行
     tokens = token_service.issue_tokens(
         type("payload", (), {
