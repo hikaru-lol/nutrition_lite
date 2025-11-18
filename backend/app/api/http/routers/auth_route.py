@@ -28,11 +28,9 @@ from app.application.auth.use_cases.session.login_user import (
 )
 from app.application.auth.use_cases.session.refresh_token import (
     RefreshTokenUseCase,
-    InvalidRefreshTokenError,
 )
 from app.application.auth.use_cases.account.delete_account import (
     DeleteAccountUseCase,
-    UserNotFoundError,
 )
 from app.di.container import get_register_user_use_case, get_login_user_use_case
 from app.di.container import get_logout_user_use_case, get_delete_account_use_case, get_refresh_token_use_case
@@ -94,8 +92,6 @@ def login(
 ) -> AuthUserResponse:
     input_dto = LoginInputDTO(email=request.email, password=request.password)
 
-    # ここで InvalidCredentialsError が発生したら、
-    # → auth_error_handler が 401 + ErrorResponse に変換してくれる
     output: LoginOutputDTO = use_case.execute(input_dto)
 
     set_auth_cookies(response, output.tokens)

@@ -3,10 +3,7 @@ from __future__ import annotations
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.domain.auth.value_objects import UserId
-
-
-class UserNotFoundError(Exception):
-    pass
+from app.domain.auth.errors import UserNotFoundError
 
 
 class GetCurrentUserUseCase:

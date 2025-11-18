@@ -1,4 +1,3 @@
-# backend/tests/unit/application/auth/use_cases/test_refresh_token.py
 from __future__ import annotations
 
 import pytest

@@ -13,8 +13,11 @@ from app.domain.auth.value_objects import (
     TrialInfo,
 )
 
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.ports.clock_port import ClockPort
 
-def _create_user(user_id: str, email: str, clock) -> User:
+
+def _create_user(user_id: str, email: str, clock: ClockPort) -> User:
     return User(
         id=UserId(user_id),
         email=EmailAddress(email),
@@ -27,7 +30,7 @@ def _create_user(user_id: str, email: str, clock) -> User:
     )
 
 
-def test_delete_account_success(user_repo, clock):
+def test_delete_account_success(user_repo: UserRepositoryPort, clock: ClockPort):
     user = _create_user("uid-del-1", "delete@example.com", clock)
     user_repo.save(user)
 
@@ -44,7 +47,7 @@ def test_delete_account_success(user_repo, clock):
     assert deleted.is_active is False
 
 
-def test_delete_account_user_not_found(user_repo, clock):
+def test_delete_account_user_not_found(user_repo: UserRepositoryPort, clock: ClockPort):
     use_case = DeleteAccountUseCase(
         user_repo=user_repo,
         clock=clock,
