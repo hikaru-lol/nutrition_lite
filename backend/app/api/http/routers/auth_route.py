@@ -87,7 +87,10 @@ async def register(
 @router.post(
     "/login",
     response_model=AuthUserResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},  # バリデーションエラー用
+        401: {"model": ErrorResponse},  # INVALID_CREDENTIALS
+    },
 )
 def login(
     request: LoginRequest,
@@ -95,13 +98,10 @@ def login(
     use_case: LoginUserUseCase = Depends(get_login_user_use_case),
 ) -> AuthUserResponse:
     input_dto = LoginInputDTO(email=request.email, password=request.password)
-    try:
-        output = use_case.execute(input_dto)
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+
+    # ここで InvalidCredentialsError が発生したら、
+    # → auth_error_handler が 401 + ErrorResponse に変換してくれる
+    output = use_case.execute(input_dto)
 
     set_auth_cookies(response, output.tokens)
     return AuthUserResponse(user=to_user_summary(output.user))
