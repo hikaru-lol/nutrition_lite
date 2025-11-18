@@ -43,10 +43,6 @@ from app.api.http.cookies import set_auth_cookies, clear_auth_cookies
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-class InvalidRefreshTokenError(Exception):
-    pass
-
-
 @dataclass
 class RefreshInputDTO:
     refresh_token: str
@@ -153,31 +149,23 @@ def delete_me(
 @router.post(
     "/refresh",
     response_model=RefreshResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+    },
 )
 def refresh(
     response: Response,
     refresh_token: str | None = Cookie(default=None, alias="REFRESH_TOKEN"),
     use_case: RefreshTokenUseCase = Depends(get_refresh_token_use_case),
 ) -> RefreshResponse:
-    if refresh_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token is missing",
-        )
 
-    try:
-        output = use_case.execute(RefreshInputDTO(refresh_token=refresh_token))
-    except InvalidRefreshTokenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
-    except UserNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+    if refresh_token is None:
+        from app.domain.auth.errors import InvalidRefreshTokenError
+        raise InvalidRefreshTokenError("Refresh token is missing.")
+
+    output: RefreshOutputDTO = use_case.execute(
+        RefreshInputDTO(refresh_token=refresh_token)
+    )
 
     set_auth_cookies(response, output.tokens)
     return RefreshResponse(ok=True, user=to_user_summary(output.user))
