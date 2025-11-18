@@ -7,7 +7,7 @@ from app.application.auth.dto.register_dto import RegisterInputDTO, RegisterOutp
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
-from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload
+from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload, TokenPair
 from app.application.auth.ports.clock_port import ClockPort
 from app.domain.auth.entities import User
 from app.domain.auth.value_objects import (
@@ -61,7 +61,7 @@ class RegisterUserUseCase:
         saved = self._user_repo.save(user)
 
         payload = TokenPayload(user_id=saved.id.value, plan=saved.plan)
-        tokens = self._token_service.issue_tokens(payload)
+        tokens: TokenPair = self._token_service.issue_tokens(payload)
 
         return RegisterOutputDTO(
             user=AuthUserDTO.from_entity(saved),

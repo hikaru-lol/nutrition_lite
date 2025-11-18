@@ -17,7 +17,7 @@ from app.api.http.schemas.auth import (
     UserSummary,
 )
 
-from app.application.auth.dto.register_dto import RegisterInputDTO
+from app.application.auth.dto.register_dto import RegisterInputDTO, RegisterOutputDTO
 from app.application.auth.dto.login_dto import LoginInputDTO
 from app.application.auth.use_cases.account.register_user import (
     RegisterUserUseCase,
@@ -108,12 +108,11 @@ async def register(
     response: Response,
     use_case: RegisterUserUseCase = Depends(get_register_user_use_case),
 ):
-    result = await use_case.execute(
+    result: RegisterOutputDTO = await use_case.execute(RegisterInputDTO(
         email=request.email,
         password=request.password,
         name=request.name,
-    )
-    # result: RegisterOutputDTO { user: AuthUserDTO, tokens: TokenPairDTO }
+    ))
 
     set_auth_cookies(response, result.tokens)
 
