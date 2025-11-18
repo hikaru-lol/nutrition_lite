@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
+from fastapi.testclient import TestClient
+from app.main import create_app
+
 import pytest
 
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
@@ -125,3 +128,18 @@ def token_service() -> FakeTokenService:
 @pytest.fixture
 def clock() -> FixedClock:
     return FixedClock()
+
+
+# ---------- API クライアント ----------
+
+
+@pytest.fixture(scope="session")
+def app():
+    # 本番と同じ create_app を利用
+    return create_app()
+
+
+@pytest.fixture(scope="function")
+def client(app):
+    # 各テストごとにクリーンなクライアントを渡す
+    return TestClient(app)
