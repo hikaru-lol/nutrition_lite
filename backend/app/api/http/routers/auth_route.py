@@ -102,32 +102,22 @@ class RefreshOutputDTO:
     tokens: TokenPair
 
 
-@router.post(
-    "/register",
-    response_model=AuthUserResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={409: {"model": ErrorResponse}},
-)
-def register(
+@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthUserResponse)
+async def register(
     request: RegisterRequest,
     response: Response,
     use_case: RegisterUserUseCase = Depends(get_register_user_use_case),
-) -> AuthUserResponse:
-    input_dto = RegisterInputDTO(
+):
+    result = await use_case.execute(
         email=request.email,
         password=request.password,
         name=request.name,
     )
-    try:
-        output = use_case.execute(input_dto)
-    except EmailAlreadyUsedError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    # result: RegisterOutputDTO { user: AuthUserDTO, tokens: TokenPairDTO }
 
-    set_auth_cookies(response, output.tokens)
-    return AuthUserResponse(user=to_user_summary(output.user))
+    set_auth_cookies(response, result.tokens)
+
+    return AuthUserResponse(user=to_user_summary(result.user))
 
 
 @router.post(
