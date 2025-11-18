@@ -1,38 +1,29 @@
+# app/infra/db/base.py
+
 from __future__ import annotations
 
-import os
-from typing import Generator
-
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+from app.settings import settings
 
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg2://app:app@localhost:5432/app",
-)
+# SQLAlchemy Base（全モデルが継承するやつ）
+Base = declarative_base()
 
+
+# Engine（DB接続）
 engine = create_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
     future=True,
-    echo=False,   # 必要なら True に
 )
 
+
+# Session factory
 SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
     autocommit=False,
+    autoflush=False,
+    bind=engine,
     expire_on_commit=False,
 )
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

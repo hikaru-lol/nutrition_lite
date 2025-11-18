@@ -1,9 +1,12 @@
+# app/infra/db/models/user.py
+
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import String, Boolean, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Column, DateTime, String
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.infra.db.base import Base
 
@@ -11,22 +14,14 @@ from app.infra.db.base import Base
 class UserModel(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    email: Mapped[str] = mapped_column(
-        String, unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
-    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    name = Column(String, nullable=True)
 
-    plan: Mapped[str] = mapped_column(
-        String, nullable=False)  # "trial" / "free" / "paid"
+    plan = Column(String, nullable=False)  # "trial" / "free" / "paid"
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    has_profile = Column(Boolean, nullable=False, default=False)
 
-    trial_ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True)
-    has_profile: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
-    )
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
