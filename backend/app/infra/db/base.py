@@ -1,26 +1,31 @@
-# app/infra/db/base.py
-
 from __future__ import annotations
+
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.settings import settings
+# ----------------------------
+# DB URL の決定
+# ----------------------------
 
+# 優先順位:
+# 1. 環境変数 DATABASE_URL
+# 2. なければテスト・ローカル用に sqlite in-memory
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 
-# SQLAlchemy Base（全モデルが継承するやつ）
+# ----------------------------
+# SQLAlchemy 基本セットアップ
+# ----------------------------
+
 Base = declarative_base()
 
-
-# Engine（DB接続）
 engine = create_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     pool_pre_ping=True,
     future=True,
 )
 
-
-# Session factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
