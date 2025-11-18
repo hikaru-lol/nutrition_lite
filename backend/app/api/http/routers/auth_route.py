@@ -136,22 +136,16 @@ def get_me(
 @router.delete(
     "/me",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={401: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+    },
 )
 def delete_me(
     response: Response,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: DeleteAccountUseCase = Depends(get_delete_account_use_case),
 ) -> None:
-    try:
-        use_case.execute(current_user.id)
-    except UserNotFoundError as e:
-        # すでに削除済みなどのケース → 401 でも 404 でもよいが、今回は 401
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
-
+    use_case.execute(current_user.id)
     clear_auth_cookies(response)
     return None
 

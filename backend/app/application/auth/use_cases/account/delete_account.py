@@ -1,11 +1,7 @@
-from __future__ import annotations
-
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.clock_port import ClockPort
 from app.domain.auth.value_objects import UserId
-from app.application.auth.use_cases.current_user.get_current_user import (
-    UserNotFoundError,
-)
+from app.domain.auth.errors import UserNotFoundError
 
 
 class DeleteAccountUseCase:
@@ -19,8 +15,9 @@ class DeleteAccountUseCase:
 
     def execute(self, user_id: str) -> None:
         user = self._user_repo.get_by_id(UserId(user_id))
-        if user is None or not user.is_active:
-            raise UserNotFoundError("User not found")
+        if user is None:
+            raise UserNotFoundError("User not found.")
 
-        user.mark_deleted(self._clock.now())
+        now = self._clock.now()
+        user.mark_deleted(now)
         self._user_repo.save(user)
