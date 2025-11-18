@@ -59,7 +59,15 @@ class RefreshOutputDTO:
     tokens: TokenPair
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthUserResponse)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AuthUserResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
+)
 async def register(
     request: RegisterRequest,
     response: Response,
