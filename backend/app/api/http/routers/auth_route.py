@@ -19,13 +19,12 @@ from app.api.http.schemas.auth import (
 from app.api.http.mappers.auth import to_user_summary
 
 from app.application.auth.dto.register_dto import RegisterInputDTO, RegisterOutputDTO
-from app.application.auth.dto.login_dto import LoginInputDTO
+from app.application.auth.dto.login_dto import LoginInputDTO, LoginOutputDTO
 from app.application.auth.use_cases.account.register_user import (
     RegisterUserUseCase,
 )
 from app.application.auth.use_cases.session.login_user import (
     LoginUserUseCase,
-    InvalidCredentialsError,
 )
 from app.application.auth.use_cases.session.refresh_token import (
     RefreshTokenUseCase,
@@ -101,7 +100,7 @@ def login(
 
     # ここで InvalidCredentialsError が発生したら、
     # → auth_error_handler が 401 + ErrorResponse に変換してくれる
-    output = use_case.execute(input_dto)
+    output: LoginOutputDTO = use_case.execute(input_dto)
 
     set_auth_cookies(response, output.tokens)
     return AuthUserResponse(user=to_user_summary(output.user))
