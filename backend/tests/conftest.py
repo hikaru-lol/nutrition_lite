@@ -1,145 +1,115 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
-
+import pytest
 from fastapi.testclient import TestClient
+
 from app.main import create_app
 
-import pytest
-
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
-from app.application.auth.ports.password_hasher_port import PasswordHasherPort
-from app.application.auth.ports.token_service_port import (
-    TokenServicePort,
-    TokenPair,
-    TokenPayload,
-)
-from app.application.auth.ports.clock_port import ClockPort
-from app.domain.auth.entities import User
-from app.domain.auth.value_objects import (
-    EmailAddress,
-    HashedPassword,
-    TrialInfo,
-    UserId,
-    UserPlan,
+# 本番 DI（router / dependencies が Depends しているのはこっち）
+from app.di.container import (
+    get_register_user_use_case,
+    get_login_user_use_case,
+    get_logout_user_use_case,
+    get_delete_account_use_case,
+    get_refresh_token_use_case,
+    get_get_current_user_use_case,  # ★ 追加
+    get_token_service,              # ★ get_current_user_dto 用
 )
 
+# UseCase 本体
+from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
+from app.application.auth.use_cases.session.login_user import LoginUserUseCase
+from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
+from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
+from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
+from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase  # ★ 追加
 
-# ---------- Fake 実装 ----------
-
-class InMemoryUserRepository(UserRepositoryPort):
-    def __init__(self) -> None:
-        self._by_id: Dict[str, User] = {}
-        self._by_email: Dict[str, User] = {}
-
-    def get_by_id(self, user_id: UserId) -> User | None:
-        return self._by_id.get(user_id.value)
-
-    def get_by_email(self, email: EmailAddress) -> User | None:
-        return self._by_email.get(email.value)
-
-    def save(self, user: User) -> User:
-        self._by_id[user.id.value] = user
-        self._by_email[user.email.value] = user
-        return user
+# テスト用 Fake 実装
+from tests.fakes.auth_repositories import InMemoryUserRepository
+from tests.fakes.auth_services import FakePasswordHasher, FakeTokenService, FixedClock
 
 
-class SimplePasswordHasher(PasswordHasherPort):
-    """
-    テスト用の適当なハッシュ。
-    実運用の bcrypt とは関係なく、動作だけをテストする。
-    """
-
-    def hash(self, raw_password: str) -> HashedPassword:
-        # めちゃ適当: "hashed:" をつけるだけ
-        return HashedPassword(f"hashed:{raw_password}")
-
-    def verify(self, raw_password: str, hashed_password: HashedPassword) -> bool:
-        return hashed_password.value == f"hashed:{raw_password}"
-
-
-@dataclass(frozen=True)
-class FixedTokenPair(TokenPair):
-    pass
-
-
-class FakeTokenService(TokenServicePort):
-    """
-    実際の JWT ではなく、固定フォーマットの文字列を返すだけ。
-    """
-
-    def issue_tokens(self, payload: TokenPayload) -> TokenPair:
-        now = datetime(2025, 1, 1, tzinfo=timezone.utc)
-        access_exp = now + timedelta(minutes=15)
-        refresh_exp = now + timedelta(days=7)
-        access = f"access:{payload.user_id}:{payload.plan.value}"
-        refresh = f"refresh:{payload.user_id}:{payload.plan.value}"
-        return TokenPair(
-            access_token=access,
-            refresh_token=refresh,
-            access_expires_at=access_exp,
-            refresh_expires_at=refresh_exp,
-        )
-
-    def verify_access_token(self, token: str) -> TokenPayload:
-        # "access:user_id:plan" の形を想定
-        try:
-            prefix, user_id, plan_str = token.split(":")
-        except ValueError:
-            raise ValueError("invalid token format")
-        if prefix != "access":
-            raise ValueError("not an access token")
-        return TokenPayload(user_id=user_id, plan=UserPlan(plan_str))
-
-    def verify_refresh_token(self, token: str) -> TokenPayload:
-        prefix, user_id, plan_str = token.split(":")
-        if prefix != "refresh":
-            raise ValueError("not a refresh token")
-        return TokenPayload(user_id=user_id, plan=UserPlan(plan_str))
-
-
-class FixedClock(ClockPort):
-    def __init__(self, now: Optional[datetime] = None) -> None:
-        self._now = now or datetime(2025, 1, 1, tzinfo=timezone.utc)
-
-    def now(self) -> datetime:
-        return self._now
-
-
-# ---------- pytest fixtures ----------
-
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_repo() -> InMemoryUserRepository:
     return InMemoryUserRepository()
 
 
-@pytest.fixture
-def password_hasher() -> SimplePasswordHasher:
-    return SimplePasswordHasher()
+@pytest.fixture(scope="session")
+def password_hasher() -> FakePasswordHasher:
+    return FakePasswordHasher()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def token_service() -> FakeTokenService:
     return FakeTokenService()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def clock() -> FixedClock:
     return FixedClock()
 
 
-# ---------- API クライアント ----------
-
-
 @pytest.fixture(scope="session")
-def app():
-    # 本番と同じ create_app を利用
-    return create_app()
+def app(
+    user_repo: InMemoryUserRepository,
+    password_hasher: FakePasswordHasher,
+    token_service: FakeTokenService,
+    clock: FixedClock,
+):
+    """
+    本番と同じ create_app() を使いつつ、
+    auth 周りの UseCase / TokenService を Fake 依存で組み立てたものに差し替える。
+    """
+    app = create_app()
+
+    # --- UseCase オーバーライド ----------------------------------
+
+    app.dependency_overrides[get_register_user_use_case] = lambda: RegisterUserUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=token_service,
+        clock=clock,
+    )
+
+    app.dependency_overrides[get_login_user_use_case] = lambda: LoginUserUseCase(
+        user_repo=user_repo,
+        password_hasher=password_hasher,
+        token_service=token_service,
+    )
+
+    app.dependency_overrides[get_logout_user_use_case] = lambda: LogoutUserUseCase(
+    )
+
+    app.dependency_overrides[get_delete_account_use_case] = lambda: DeleteAccountUseCase(
+        user_repo=user_repo,
+        clock=clock,
+    )
+
+    app.dependency_overrides[get_refresh_token_use_case] = lambda: RefreshTokenUseCase(
+        token_service=token_service,
+        user_repo=user_repo,
+    )
+
+    # ★ /auth/me, /auth/logout, /auth/me[DELETE] が利用する current_user 用
+    app.dependency_overrides[get_get_current_user_use_case] = (
+        lambda: GetCurrentUserUseCase(user_repo=user_repo)
+    )
+
+    # --- Port オーバーライド（get_current_user_dto 用） -----------
+
+    # get_current_user_dto の token_service も Fake にする
+    app.dependency_overrides[get_token_service] = lambda: token_service
+
+    return app
+
+
+@pytest.fixture(autouse=True)
+def _reset_fakes(user_repo: InMemoryUserRepository, clock: FixedClock):
+    user_repo.clear()
+    clock.reset()
+    yield
 
 
 @pytest.fixture(scope="function")
-def client(app):
-    # 各テストごとにクリーンなクライアントを渡す
+def client(app) -> TestClient:
     return TestClient(app)

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
+from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -21,13 +22,16 @@ UserPlanLiteral = Literal["trial", "free", "paid"]
 
 
 class UserSummary(BaseModel):
-    id: str
+    id: UUID
     email: EmailStr
-    name: str | None = None
-    plan: UserPlanLiteral
-    trialEndsAt: datetime | None = None
-    hasProfile: bool
-    createdAt: datetime
+    name: Optional[str] = None
+
+    # trial / free / paid の 3 パターンに絞る
+    plan: Literal["trial", "free", "paid"]
+
+    trial_ends_at: Optional[datetime] = None
+    has_profile: bool
+    created_at: datetime
 
 
 class AuthUserResponse(BaseModel):

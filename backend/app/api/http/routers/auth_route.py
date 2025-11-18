@@ -61,16 +61,19 @@ class RefreshOutputDTO:
         409: {"model": ErrorResponse},
     },
 )
-async def register(
+def register(
     request: RegisterRequest,
     response: Response,
     use_case: RegisterUserUseCase = Depends(get_register_user_use_case),
-):
-    result: RegisterOutputDTO = await use_case.execute(RegisterInputDTO(
+) -> AuthUserResponse:
+    input_dto = RegisterInputDTO(
         email=request.email,
         password=request.password,
         name=request.name,
-    ))
+    )
+
+    # ★ await を外して普通に呼ぶ
+    result: RegisterOutputDTO = use_case.execute(input_dto)
 
     set_auth_cookies(response, result.tokens)
 
