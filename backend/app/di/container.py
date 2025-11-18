@@ -25,8 +25,9 @@ from app.infra.time.system_clock import SystemClock
 # --- Port 実装の DI ---
 
 
-def get_user_repository(db: Session = Depends(get_db)) -> UserRepositoryPort:
-    return SqlAlchemyUserRepository(db)
+def get_user_repository() -> UserRepositoryPort:
+    # session スコープによっては Depends でラップする
+    return SqlAlchemyUserRepository()
 
 
 def get_password_hasher() -> PasswordHasherPort:
@@ -44,17 +45,12 @@ def get_clock() -> ClockPort:
 # --- UseCase の DI ---
 
 
-def get_register_user_use_case(
-    user_repo: UserRepositoryPort = Depends(get_user_repository),
-    password_hasher: PasswordHasherPort = Depends(get_password_hasher),
-    token_service: TokenServicePort = Depends(get_token_service),
-    clock: ClockPort = Depends(get_clock),
-) -> RegisterUserUseCase:
+def get_register_user_use_case() -> RegisterUserUseCase:
     return RegisterUserUseCase(
-        user_repo=user_repo,
-        password_hasher=password_hasher,
-        token_service=token_service,
-        clock=clock,
+        user_repo=get_user_repository(),
+        password_hasher=get_password_hasher(),
+        token_service=get_token_service(),
+        clock=get_clock(),
     )
 
 
