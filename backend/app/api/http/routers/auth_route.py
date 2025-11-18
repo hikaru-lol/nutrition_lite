@@ -14,14 +14,14 @@ from app.api.http.schemas.auth import (
     RefreshResponse,
     AuthUserResponse,
     ErrorResponse,
-    UserSummary,
 )
+
+from app.api.http.mappers.auth import to_user_summary
 
 from app.application.auth.dto.register_dto import RegisterInputDTO, RegisterOutputDTO
 from app.application.auth.dto.login_dto import LoginInputDTO
 from app.application.auth.use_cases.account.register_user import (
     RegisterUserUseCase,
-    EmailAlreadyUsedError,
 )
 from app.application.auth.use_cases.session.login_user import (
     LoginUserUseCase,
@@ -38,53 +38,10 @@ from app.application.auth.use_cases.account.delete_account import (
 from app.di.container import get_register_user_use_case, get_login_user_use_case
 from app.di.container import get_logout_user_use_case, get_delete_account_use_case, get_refresh_token_use_case
 
+from app.api.http.cookies import set_auth_cookies, clear_auth_cookies
+
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
-
-def set_auth_cookies(response: Response, tokens: TokenPair) -> None:
-    # 実運用では secure / samesite 等も設定
-    response.set_cookie(
-        key="ACCESS_TOKEN",
-        value=tokens.access_token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        path="/",
-    )
-    response.set_cookie(
-        key="REFRESH_TOKEN",
-        value=tokens.refresh_token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        path="/",
-    )
-
-
-def clear_auth_cookies(response: Response) -> None:
-    for key in ("ACCESS_TOKEN", "REFRESH_TOKEN"):
-        response.set_cookie(
-            key=key,
-            value="",
-            httponly=True,
-            secure=False,
-            samesite="lax",
-            path="/",
-            max_age=0,
-        )
-
-
-def to_user_summary(dto: AuthUserDTO) -> UserSummary:
-    return UserSummary(
-        id=dto.id,
-        email=dto.email,
-        name=dto.name,
-        plan=dto.plan.value,
-        trialEndsAt=dto.trial_ends_at,
-        hasProfile=dto.has_profile,
-        createdAt=dto.created_at,
-    )
 
 
 class InvalidRefreshTokenError(Exception):

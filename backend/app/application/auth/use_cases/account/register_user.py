@@ -18,9 +18,7 @@ from app.domain.auth.value_objects import (
     TrialInfo,
 )
 
-
-class EmailAlreadyUsedError(Exception):
-    pass
+from app.domain.auth.errors import EmailAlreadyUsedError
 
 
 class RegisterUserUseCase:
