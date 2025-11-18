@@ -1,5 +1,4 @@
-
-from app.application.auth.dto import AuthUserDTO
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.api.http.schemas.auth import UserSummary
 
 
