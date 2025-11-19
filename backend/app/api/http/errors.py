@@ -5,6 +5,10 @@ from fastapi.exceptions import RequestValidationError
 
 from app.domain.auth import errors as auth_errors
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def error_response(code: str, message: str, status_code: int) -> JSONResponse:
     return JSONResponse(
@@ -18,7 +22,16 @@ def error_response(code: str, message: str, status_code: int) -> JSONResponse:
     )
 
 
-async def auth_error_handler(_: Request, exc: auth_errors.AuthError):
+async def auth_error_handler(request: Request, exc: auth_errors.AuthError):
+    # 簡易的な監査ログ
+    logger.warning(
+        "AuthError: type=%s path=%s code_maybe=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        getattr(exc, "code", None),
+        str(exc),
+    )
+
     if isinstance(exc, auth_errors.EmailAlreadyUsedError):
         return error_response(
             "EMAIL_ALREADY_IN_USE",
@@ -44,6 +57,7 @@ async def auth_error_handler(_: Request, exc: auth_errors.AuthError):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    logger.exception("Unhandled AuthError: %s", exc)
     # fallback
     return error_response(
         "INTERNAL_ERROR",

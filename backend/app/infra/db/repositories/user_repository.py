@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.domain.auth.entities import User
 from app.domain.auth.value_objects import EmailAddress, UserId
+from app.domain.auth.errors import EmailAlreadyUsedError
 from app.domain.auth.value_objects import UserPlan, TrialInfo  # など
 from app.infra.db.models.user import UserModel
 
@@ -78,4 +80,18 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
     def save(self, user: User) -> User:
         model = self._from_entity(user)
         self._session.add(model)
+
+        try:
+            # commit は UoW がやるので flush まで
+            self._session.flush()
+        except IntegrityError as e:
+            self._session.rollback()
+            # DB の UNIQUE 制約違反 → ドメインエラーに変換
+            msg = str(e.orig)
+            if "uq_users_email" in msg or "UNIQUE constraint failed: users.email" in msg:
+                raise EmailAlreadyUsedError(
+                    "Email is already registered.") from e
+            raise
+
+        # flush 時点で PK などは振られているので entity に戻す
         return self._to_entity(model)

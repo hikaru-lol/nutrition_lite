@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt, JWTError
@@ -11,61 +10,62 @@ from app.application.auth.ports.token_service_port import (
     TokenPair,
 )
 from app.domain.auth.value_objects import UserPlan
-
-
-class InvalidTokenError(Exception):
-    pass
+from app.domain.auth.errors import InvalidRefreshTokenError, InvalidCredentialsError
+from app.settings import settings
 
 
 class JwtTokenService(TokenServicePort):
+    """
+    JWT ベースの TokenServicePort 実装。
+
+    - HS256 + シークレットキー
+    - access / refresh で TTL を分ける
+    """
+
     def __init__(
         self,
         secret_key: str | None = None,
         algorithm: str | None = None,
-        access_token_ttl_minutes: int | None = None,
-        refresh_token_ttl_days: int | None = None,
+        access_ttl_minutes: int | None = None,
+        refresh_ttl_days: int | None = None,
     ) -> None:
-        self._secret_key = secret_key or os.getenv(
-            "JWT_SECRET", "dev-secret-change-me")
-        self._algorithm = algorithm or os.getenv("JWT_ALGORITHM", "HS256")
-        self._access_token_ttl_minutes = access_token_ttl_minutes or int(
-            os.getenv("ACCESS_TOKEN_TTL_MINUTES", "15")
+        self._secret_key = secret_key or settings.JWT_SECRET_KEY
+        self._algorithm = algorithm or settings.JWT_ALGORITHM
+        self._access_ttl = timedelta(
+            minutes=access_ttl_minutes or settings.ACCESS_TOKEN_TTL_MINUTES
         )
-        self._refresh_token_ttl_days = refresh_token_ttl_days or int(
-            os.getenv("REFRESH_TOKEN_TTL_DAYS", "7")
+        self._refresh_ttl = timedelta(
+            days=refresh_ttl_days or settings.REFRESH_TOKEN_TTL_DAYS
         )
 
-    def _now(self) -> datetime:
-        # UTC timezone-aware にしておく
-        return datetime.now(timezone.utc)
+    # ------------------------------------------------------------------
+    # ヘルパー
+    # ------------------------------------------------------------------
+
+    def _encode(self, payload: dict, expires_in: timedelta) -> tuple[str, datetime]:
+        now = datetime.now(timezone.utc)
+        exp = now + expires_in
+        to_encode = {**payload, "exp": exp}
+        token = jwt.encode(to_encode, self._secret_key,
+                           algorithm=self._algorithm)
+        return token, exp
+
+    def _decode(self, token: str) -> dict:
+        return jwt.decode(token, self._secret_key, algorithms=[self._algorithm])
+
+    # ------------------------------------------------------------------
+    # Port 実装
+    # ------------------------------------------------------------------
 
     def issue_tokens(self, payload: TokenPayload) -> TokenPair:
-        now = self._now()
-        access_exp = now + timedelta(minutes=self._access_token_ttl_minutes)
-        refresh_exp = now + timedelta(days=self._refresh_token_ttl_days)
-
-        base_claims = {
+        base_payload = {
             "sub": payload.user_id,
-            "plan": payload.plan.value,
-            "iat": int(now.timestamp()),
+            "plan": getattr(payload.plan, "value", str(payload.plan)),
         }
 
-        access_claims = {
-            **base_claims,
-            "type": "access",
-            "exp": int(access_exp.timestamp()),
-        }
-
-        refresh_claims = {
-            **base_claims,
-            "type": "refresh",
-            "exp": int(refresh_exp.timestamp()),
-        }
-
-        access_token = jwt.encode(
-            access_claims, self._secret_key, algorithm=self._algorithm)
-        refresh_token = jwt.encode(
-            refresh_claims, self._secret_key, algorithm=self._algorithm)
+        access_token, access_exp = self._encode(base_payload, self._access_ttl)
+        refresh_token, refresh_exp = self._encode(
+            base_payload, self._refresh_ttl)
 
         return TokenPair(
             access_token=access_token,
@@ -74,31 +74,29 @@ class JwtTokenService(TokenServicePort):
             refresh_expires_at=refresh_exp,
         )
 
-    def _decode_and_validate(self, token: str, expected_type: str) -> TokenPayload:
+    def _payload_from_claims(self, claims: dict) -> TokenPayload:
+        user_id = str(claims.get("sub"))
+        plan_raw = claims.get("plan")
         try:
-            claims = jwt.decode(token, self._secret_key,
-                                algorithms=[self._algorithm])
-        except JWTError as e:
-            raise InvalidTokenError("Invalid token") from e
-
-        token_type = claims.get("type")
-        if token_type != expected_type:
-            raise InvalidTokenError("Invalid token type")
-
-        user_id = claims.get("sub")
-        plan_str = claims.get("plan")
-        if not user_id or not plan_str:
-            raise InvalidTokenError("Invalid token payload")
-
-        try:
-            plan = UserPlan(plan_str)
-        except ValueError as e:
-            raise InvalidTokenError("Invalid plan in token") from e
-
+            plan = UserPlan(plan_raw)
+        except Exception:
+            plan = plan_raw  # 何かおかしくてもとりあえずそのまま
         return TokenPayload(user_id=user_id, plan=plan)
 
     def verify_access_token(self, token: str) -> TokenPayload:
-        return self._decode_and_validate(token, expected_type="access")
+        try:
+            claims = self._decode(token)
+        except JWTError as e:
+            # access token の場合は「認証エラー」として扱う
+            raise InvalidCredentialsError(
+                "Invalid or expired access token") from e
+        return self._payload_from_claims(claims)
 
     def verify_refresh_token(self, token: str) -> TokenPayload:
-        return self._decode_and_validate(token, expected_type="refresh")
+        try:
+            claims = self._decode(token)
+        except JWTError as e:
+            # refresh token は InvalidRefreshTokenError を使う
+            raise InvalidRefreshTokenError(
+                "Invalid or expired refresh token") from e
+        return self._payload_from_claims(claims)

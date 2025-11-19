@@ -36,20 +36,10 @@ from app.di.container import get_register_user_use_case, get_login_user_use_case
 from app.di.container import get_logout_user_use_case, get_delete_account_use_case, get_refresh_token_use_case
 
 from app.api.http.cookies import set_auth_cookies, clear_auth_cookies
+from app.application.auth.dto.refresh_dto import RefreshInputDTO, RefreshOutputDTO
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
-
-@dataclass
-class RefreshInputDTO:
-    refresh_token: str
-
-
-@dataclass
-class RefreshOutputDTO:
-    user: AuthUserDTO
-    tokens: TokenPair
 
 
 @router.post(
