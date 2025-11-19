@@ -1,29 +1,42 @@
 from __future__ import annotations
 
-from datetime import timedelta, timezone, datetime
+import pytest
+from datetime import timedelta
 
 from app.application.auth.dto.register_dto import RegisterInputDTO
-from app.application.auth.use_cases.account.register_user import (
-    RegisterUserUseCase,
-    EmailAlreadyUsedError,
-)
-from app.domain.auth.value_objects import UserPlan, EmailAddress, UserId, TrialInfo
-from app.domain.auth.entities import User
-
-
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
+from app.application.auth.ports.clock_port import ClockPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort
-from app.application.auth.ports.clock_port import ClockPort
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.domain.auth.entities import User
+from app.domain.auth.errors import EmailAlreadyUsedError
+from app.domain.auth.value_objects import EmailAddress, UserId, UserPlan, TrialInfo
 
 
-def test_register_user_success(user_repo: UserRepositoryPort, password_hasher: PasswordHasherPort, token_service: TokenServicePort, clock: ClockPort):
-    use_case = RegisterUserUseCase(
-        user_repo=user_repo,
+def _make_use_case(
+    auth_uow: AuthUnitOfWorkPort,
+    password_hasher: PasswordHasherPort,
+    token_service: TokenServicePort,
+    clock: ClockPort,
+) -> RegisterUserUseCase:
+    return RegisterUserUseCase(
+        uow=auth_uow,
         password_hasher=password_hasher,
         token_service=token_service,
         clock=clock,
     )
+
+
+def test_register_user_success(
+    auth_uow: AuthUnitOfWorkPort,
+    user_repo: UserRepositoryPort,
+    password_hasher: PasswordHasherPort,
+    token_service: TokenServicePort,
+    clock: ClockPort,
+) -> None:
+    use_case = _make_use_case(auth_uow, password_hasher, token_service, clock)
 
     input_dto = RegisterInputDTO(
         email="test@example.com",
@@ -31,9 +44,9 @@ def test_register_user_success(user_repo: UserRepositoryPort, password_hasher: P
         name="Hikaru",
     )
 
+    base_now = clock.now()
     output = use_case.execute(input_dto)
 
-    # user_repo に保存されているか
     saved = user_repo.get_by_email(EmailAddress("test@example.com"))
     assert saved is not None
     assert saved.email.value == "test@example.com"
@@ -41,26 +54,25 @@ def test_register_user_success(user_repo: UserRepositoryPort, password_hasher: P
     assert saved.plan == UserPlan.TRIAL
     assert saved.has_profile is False
 
-    # Trial の終了日時が「固定 now + 7日」になっているか
-    expected_trial_end = clock.now() + timedelta(days=7)
+    expected_trial_end = base_now + timedelta(days=7)
     assert saved.trial_info.trial_ends_at == expected_trial_end
-
-    # パスワードがハッシュされているか（SimplePasswordHasher の仕様に従う）
     assert saved.hashed_password.value.startswith("hashed:")
 
-    # 戻り値の DTO も同じ情報を持っているか
     assert output.user.email == "test@example.com"
     assert output.user.plan == UserPlan.TRIAL
     assert output.user.trial_ends_at == expected_trial_end
-
-    # トークンが fake token service の仕様通りか
     assert output.tokens.access_token.startswith("access:")
     assert output.tokens.refresh_token.startswith("refresh:")
     assert output.tokens.access_token.split(":")[1] == output.user.id
 
 
-def test_register_user_email_already_used(user_repo: UserRepositoryPort, password_hasher: PasswordHasherPort, token_service: TokenServicePort, clock: ClockPort):
-    # 事前に同じメールのユーザーを 1 人入れておく
+def test_register_user_email_already_used(
+    auth_uow: AuthUnitOfWorkPort,
+    user_repo: UserRepositoryPort,
+    password_hasher: PasswordHasherPort,
+    token_service: TokenServicePort,
+    clock: ClockPort,
+) -> None:
     existing_user = User(
         id=UserId("user-1"),
         email=EmailAddress("dup@example.com"),
@@ -73,21 +85,13 @@ def test_register_user_email_already_used(user_repo: UserRepositoryPort, passwor
     )
     user_repo.save(existing_user)
 
-    use_case = RegisterUserUseCase(
-        user_repo=user_repo,
-        password_hasher=password_hasher,
-        token_service=token_service,
-        clock=clock,
-    )
+    use_case = _make_use_case(auth_uow, password_hasher, token_service, clock)
 
     input_dto = RegisterInputDTO(
         email="dup@example.com",
         password="newpass",
         name="NewUser",
     )
-
-    # 例外が投げられることを確認
-    import pytest
 
     with pytest.raises(EmailAlreadyUsedError):
         use_case.execute(input_dto)

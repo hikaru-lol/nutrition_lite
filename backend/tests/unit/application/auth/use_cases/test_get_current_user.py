@@ -2,25 +2,26 @@ from __future__ import annotations
 
 import pytest
 
-from app.application.auth.use_cases.current_user.get_current_user import (
-    GetCurrentUserUseCase,
-    UserNotFoundError,
-)
+from app.application.auth.ports.clock_port import ClockPort
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase
 from app.domain.auth.entities import User
+from app.domain.auth.errors import UserNotFoundError
 from app.domain.auth.value_objects import (
     EmailAddress,
-    UserId,
     HashedPassword,
-    UserPlan,
     TrialInfo,
+    UserId,
+    UserPlan,
 )
 
 
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
-from app.application.auth.ports.clock_port import ClockPort
-
-
-def test_get_current_user_success(user_repo: UserRepositoryPort, clock: ClockPort):
+def test_get_current_user_success(
+    auth_uow: AuthUnitOfWorkPort,
+    user_repo: UserRepositoryPort,
+    clock: ClockPort,
+) -> None:
     user = User(
         id=UserId("uid-123"),
         email=EmailAddress("me@example.com"),
@@ -33,7 +34,7 @@ def test_get_current_user_success(user_repo: UserRepositoryPort, clock: ClockPor
     )
     user_repo.save(user)
 
-    use_case = GetCurrentUserUseCase(user_repo=user_repo)
+    use_case = GetCurrentUserUseCase(uow=auth_uow)
 
     dto = use_case.execute("uid-123")
 
@@ -43,8 +44,8 @@ def test_get_current_user_success(user_repo: UserRepositoryPort, clock: ClockPor
     assert dto.plan == UserPlan.FREE
 
 
-def test_get_current_user_not_found(user_repo: UserRepositoryPort):
-    use_case = GetCurrentUserUseCase(user_repo=user_repo)
+def test_get_current_user_not_found(auth_uow: AuthUnitOfWorkPort) -> None:
+    use_case = GetCurrentUserUseCase(uow=auth_uow)
 
     with pytest.raises(UserNotFoundError):
         use_case.execute("unknown-id")

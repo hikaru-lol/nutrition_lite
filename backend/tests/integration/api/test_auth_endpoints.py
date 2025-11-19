@@ -16,9 +16,19 @@ def _make_email(prefix: str) -> str:
 
 def _assert_auth_cookies_in_response(resp) -> None:
     """レスポンスに認証クッキーが含まれていることを確認。"""
-    # resp.cookies は Set-Cookie ヘッダから構築された CookieJar
-    assert "ACCESS_TOKEN" in resp.cookies
-    assert "REFRESH_TOKEN" in resp.cookies
+    access = resp.cookies.get("ACCESS_TOKEN")
+    refresh = resp.cookies.get("REFRESH_TOKEN")
+    assert access is not None
+    assert refresh is not None
+    assert access.startswith("access:")
+    assert refresh.startswith("refresh:")
+
+
+def _assert_error_response(resp, status_code: int, code: str) -> None:
+    """共通的なエラーレスポンス検証。"""
+    assert resp.status_code == status_code
+    body = resp.json()
+    assert body["error"]["code"] == code
 
 
 # 共通ヘルパー：ユーザー登録 + レスポンス返却
@@ -70,12 +80,7 @@ def test_register_duplicate_email_returns_409(client: TestClient) -> None:
 
     # 2回目は 409 想定（EMAIL_ALREADY_IN_USE）
     resp2 = client.post(f"{BASE_URL}/register", json=payload)
-    assert resp2.status_code == 409
-    body = resp2.json()
-
-    # ErrorResponse { error: { code, message } } を想定
-    if "error" in body:
-        assert body["error"]["code"] == "EMAIL_ALREADY_IN_USE"
+    _assert_error_response(resp2, 409, "EMAIL_ALREADY_IN_USE")
 
 
 def test_register_validation_error_returns_400(client: TestClient) -> None:
@@ -87,11 +92,7 @@ def test_register_validation_error_returns_400(client: TestClient) -> None:
         },
     )
 
-    # 契約どおりなら 400 + ErrorResponse(VALIDATION_ERROR)
-    assert resp.status_code == 400
-    body = resp.json()
-    if "error" in body:
-        assert body["error"]["code"] == "VALIDATION_ERROR"
+    _assert_error_response(resp, 400, "VALIDATION_ERROR")
 
 
 # ============================================================
@@ -123,11 +124,7 @@ def test_login_invalid_credentials_returns_401(client: TestClient) -> None:
         json={"email": email, "password": password + "_wrong"},
     )
 
-    assert resp.status_code == 401
-    body = resp.json()
-    # auth_error_handler を実装済みなら INVALID_CREDENTIALS が返る想定
-    if "error" in body:
-        assert body["error"]["code"] == "INVALID_CREDENTIALS"
+    _assert_error_response(resp, 401, "INVALID_CREDENTIALS")
 
 
 def test_login_validation_error_returns_400(client: TestClient) -> None:
@@ -136,10 +133,7 @@ def test_login_validation_error_returns_400(client: TestClient) -> None:
         json={"email": "invalid-email-format"},
     )
 
-    assert resp.status_code == 400
-    body = resp.json()
-    if "error" in body:
-        assert body["error"]["code"] == "VALIDATION_ERROR"
+    _assert_error_response(resp, 400, "VALIDATION_ERROR")
 
 
 # ============================================================
@@ -164,11 +158,7 @@ def test_get_me_returns_current_user(client: TestClient) -> None:
 def test_get_me_without_auth_returns_401(client: TestClient) -> None:
     # Cookie を送らずに叩く
     resp = client.get(f"{BASE_URL}/me")
-    assert resp.status_code == 401
-
-    body = resp.json()
-    # ErrorResponse に寄せていく予定だが、現時点では detail のみの可能性もあるので緩めに
-    assert "error" in body or "detail" in body
+    _assert_error_response(resp, 401, "INVALID_CREDENTIALS")
 
 
 # ============================================================
@@ -191,10 +181,7 @@ def test_logout_clears_cookies_and_returns_204(client: TestClient) -> None:
 
 def test_logout_without_auth_returns_401(client: TestClient) -> None:
     resp = client.post(f"{BASE_URL}/logout")
-    assert resp.status_code == 401
-
-    body = resp.json()
-    assert "error" in body or "detail" in body
+    _assert_error_response(resp, 401, "INVALID_CREDENTIALS")
 
 
 # ============================================================
@@ -219,10 +206,7 @@ def test_delete_me_marks_deleted_and_clears_cookies(client: TestClient) -> None:
 
 def test_delete_me_without_auth_returns_401(client: TestClient) -> None:
     resp = client.delete(f"{BASE_URL}/me")
-    assert resp.status_code == 401
-
-    body = resp.json()
-    assert "error" in body or "detail" in body
+    _assert_error_response(resp, 401, "INVALID_CREDENTIALS")
 
 
 # ============================================================
@@ -250,9 +234,4 @@ def test_refresh_issues_new_tokens(client: TestClient) -> None:
 
 def test_refresh_without_cookie_returns_401(client: TestClient) -> None:
     resp = client.post(f"{BASE_URL}/refresh")
-    assert resp.status_code == 401
-
-    body = resp.json()
-    # Missing / invalid refresh token → UNAUTHORIZED などを想定
-    if "error" in body:
-        assert body["error"]["code"] in ("UNAUTHORIZED", "INVALID_CREDENTIALS")
+    _assert_error_response(resp, 401, "UNAUTHORIZED")

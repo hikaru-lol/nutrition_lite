@@ -86,12 +86,12 @@ def get_delete_account_use_case() -> DeleteAccountUseCase:
 
 def get_refresh_token_use_case() -> RefreshTokenUseCase:
     return RefreshTokenUseCase(
+        uow=get_auth_uow(),
         token_service=get_token_service(),
-        user_repo=get_user_repository(),
     )
 
 
 def get_get_current_user_use_case() -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(
-        user_repo=get_user_repository(),
+        uow=get_auth_uow(),
     )

@@ -5,7 +5,6 @@ from uuid import uuid4
 
 from app.application.auth.dto.register_dto import RegisterInputDTO, RegisterOutputDTO
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload, TokenPair
 from app.application.auth.ports.clock_port import ClockPort
