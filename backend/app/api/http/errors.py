@@ -23,12 +23,12 @@ def error_response(code: str, message: str, status_code: int) -> JSONResponse:
 
 
 async def auth_error_handler(request: Request, exc: auth_errors.AuthError):
-    # 簡易的な監査ログ
+    # 監査用ログ（warning レベル）
     logger.warning(
-        "AuthError: type=%s path=%s code_maybe=%s msg=%s",
+        "AuthError: type=%s path=%s client=%s msg=%s",
         exc.__class__.__name__,
         request.url.path,
-        getattr(exc, "code", None),
+        request.client.host if request.client else None,
         str(exc),
     )
 
@@ -57,8 +57,8 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    # 想定外の AuthError（基本ないはずだが念のため）
     logger.exception("Unhandled AuthError: %s", exc)
-    # fallback
     return error_response(
         "INTERNAL_ERROR",
         "予期しないエラーが発生しました。",

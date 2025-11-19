@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Response, HTTPException, status, Cookie
 from dataclasses import dataclass
 
+import logging
+
 from app.api.http.dependencies.auth import get_current_user_dto
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.auth.ports.token_service_port import TokenPair
@@ -40,6 +42,8 @@ from app.application.auth.dto.refresh_dto import RefreshInputDTO, RefreshOutputD
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+logger = logging.getLogger("auth_route")
 
 
 @router.post(
@@ -86,6 +90,10 @@ def login(
     input_dto = LoginInputDTO(email=request.email, password=request.password)
 
     output: LoginOutputDTO = use_case.execute(input_dto)
+
+    # ★ ログイン成功ログ
+    logger.info("Login success: user_id=%s email=%s",
+                output.user.id, output.user.email)
 
     set_auth_cookies(response, output.tokens)
     return AuthUserResponse(user=to_user_summary(output.user))

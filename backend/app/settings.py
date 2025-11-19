@@ -1,3 +1,5 @@
+# app/settings.py
+
 from __future__ import annotations
 
 import os
@@ -16,9 +18,10 @@ class Settings:
     # 環境名: local / dev / prod など
     ENV: str = os.getenv("ENV", "local")
 
-    # Cookie / CORS 用（必要に応じて後で拡張）
+    # Cookie / CORS 用（後で必要に応じて拡張）
     BACKEND_DOMAIN: str = os.getenv("BACKEND_DOMAIN", "localhost")
-    COOKIE_SECURE: bool = _env_bool("COOKIE_SECURE", False)  # prod では True に
+    COOKIE_SECURE: bool = _env_bool(
+        "COOKIE_SECURE", False)  # prod では True にする想定
     COOKIE_SAMESITE: str = os.getenv(
         "COOKIE_SAMESITE", "lax")  # "lax" or "none"
 
@@ -29,7 +32,9 @@ class Settings:
         os.getenv("ACCESS_TOKEN_TTL_MINUTES", "15"))
     REFRESH_TOKEN_TTL_DAYS: int = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "7"))
 
-    # DB（他の場所でも使えるようにここに出しておく）
+    # DB
+    # NOTE: 本番では必ず env で上書きする前提。
+    # CI / ローカルでは env がなければ sqlite in-memory で動くようにしている。
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", "sqlite+pysqlite:///:memory:")
 

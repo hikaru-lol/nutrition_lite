@@ -78,20 +78,30 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         return self._to_entity(model)
 
     def save(self, user: User) -> User:
+        """
+        新規 or 更新を抽象化。
+        commit は UoW が行う前提で、ここでは flush まで。
+        UNIQUE 制約違反の場合は EmailAlreadyUsedError に変換する。
+        """
         model = self._from_entity(user)
         self._session.add(model)
 
         try:
-            # commit は UoW がやるので flush まで
+            # commit は UoW の __exit__ で行うので、ここでは flush までにとどめる
             self._session.flush()
         except IntegrityError as e:
+            # DB の UNIQUE 制約違反などをドメインエラーに変換
+            # ここでは email UNIQUE だけを扱う想定
             self._session.rollback()
-            # DB の UNIQUE 制約違反 → ドメインエラーに変換
-            msg = str(e.orig)
-            if "uq_users_email" in msg or "UNIQUE constraint failed: users.email" in msg:
+
+            msg = str(e.orig) if hasattr(e, "orig") else str(e)
+            # 制約名やメッセージに応じて判定（Postgres / SQLite 両対応のざっくり例）
+            if "uq_users_email" in msg or "users.email" in msg:
                 raise EmailAlreadyUsedError(
                     "Email is already registered.") from e
+
+            # 他の IntegrityError はそのまま上に投げる
             raise
 
-        # flush 時点で PK などは振られているので entity に戻す
+        # flush に成功していれば PK などは振られているので entity に戻して返す
         return self._to_entity(model)

@@ -12,21 +12,27 @@ REFRESH_COOKIE_NAME = "REFRESH_TOKEN"
 
 
 def _max_age_from_expires_at(expires_at: datetime) -> int:
+    """
+    TokenPair の expires_at から max_age 秒を計算。
+    マイナスにならないように 0 でクリップ。
+    """
     now = datetime.now(timezone.utc)
     return max(int((expires_at - now).total_seconds()), 0)
 
 
 def set_auth_cookies(response: Response, tokens: TokenPair) -> None:
     """
-    HttpOnly Cookie に access / refresh トークンをセットする。
-    本番では settings.COOKIE_SECURE=True にする前提。
+    認証用の ACCESS_TOKEN / REFRESH_TOKEN クッキーをレスポンスにセットする。
+    - HttpOnly
+    - path="/"
+    - secure / samesite は settings から制御
     """
     cookie_common = {
         "httponly": True,
         "secure": settings.COOKIE_SECURE,
         "samesite": settings.COOKIE_SAMESITE,
         "path": "/",
-        # 必要になったら domain もここで管理:
+        # 必要になったら domain もここで集中管理:
         # "domain": settings.BACKEND_DOMAIN,
     }
 
@@ -46,7 +52,7 @@ def set_auth_cookies(response: Response, tokens: TokenPair) -> None:
 
 def clear_auth_cookies(response: Response) -> None:
     """
-    認証用 Cookie を削除する。
+    認証用クッキーを削除する。
     """
     response.delete_cookie(key=ACCESS_COOKIE_NAME, path="/")
     response.delete_cookie(key=REFRESH_COOKIE_NAME, path="/")

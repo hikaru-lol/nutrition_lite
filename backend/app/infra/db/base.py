@@ -3,14 +3,17 @@ from __future__ import annotations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.settings import settings
+from app.settings import settings  # ← ここが効くようになった
 
-DATABASE_URL = settings.DATABASE_URL  # ここ経由にしておく
+
+# ----------------------------
+# SQLAlchemy 基本セットアップ
+# ----------------------------
 
 Base = declarative_base()
 
 engine = create_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,  # ← env or デフォルト sqlite
     pool_pre_ping=True,
     future=True,
 )
