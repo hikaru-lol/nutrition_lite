@@ -78,6 +78,4 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
     def save(self, user: User) -> User:
         model = self._from_entity(user)
         self._session.add(model)
-        self._session.commit()
-        self._session.refresh(model)
         return self._to_entity(model)
