@@ -1,5 +1,3 @@
-# app/infra/db/models/user.py
-
 from __future__ import annotations
 
 from datetime import datetime

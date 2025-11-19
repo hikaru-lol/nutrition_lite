@@ -19,6 +19,7 @@ from app.domain.auth.value_objects import (
 )
 
 from app.domain.auth.errors import EmailAlreadyUsedError
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
 
 
 class RegisterUserUseCase:
