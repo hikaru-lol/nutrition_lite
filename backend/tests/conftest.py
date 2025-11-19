@@ -98,7 +98,8 @@ def app(
         token_service=token_service,
     )
 
-    app.dependency_overrides[get_logout_user_use_case] = lambda: LogoutUserUseCase()
+    app.dependency_overrides[get_logout_user_use_case] = lambda: LogoutUserUseCase(
+    )
 
     app.dependency_overrides[get_delete_account_use_case] = lambda: DeleteAccountUseCase(
         uow=make_auth_uow(),
@@ -167,20 +168,20 @@ def auth_uow(user_repo: InMemoryUserRepository) -> FakeAuthUnitOfWork:
     return FakeAuthUnitOfWork(user_repo=user_repo)
 
 
-@pytest.fixture
-def register_use_case(
-    auth_uow: FakeAuthUnitOfWork,
-    password_hasher: FakePasswordHasher,
-    token_service: FakeTokenService,
-    clock: FixedClock,
-) -> RegisterUserUseCase:
-    """
-    RegisterUserUseCase のユニットテスト用。
-    API 統合テストでは使わず、tests/unit/... から使う想定。
-    """
-    return RegisterUserUseCase(
-        uow=auth_uow,
-        password_hasher=password_hasher,
-        token_service=token_service,
-        clock=clock,
-    )
+# @pytest.fixture
+# def register_use_case(
+#     auth_uow: FakeAuthUnitOfWork,
+#     password_hasher: FakePasswordHasher,
+#     token_service: FakeTokenService,
+#     clock: FixedClock,
+# ) -> RegisterUserUseCase:
+#     """
+#     RegisterUserUseCase のユニットテスト用。
+#     API 統合テストでは使わず、tests/unit/... から使う想定。
+#     """
+#     return RegisterUserUseCase(
+#         uow=auth_uow,
+#         password_hasher=password_hasher,
+#         token_service=token_service,
+#         clock=clock,
+#     )
