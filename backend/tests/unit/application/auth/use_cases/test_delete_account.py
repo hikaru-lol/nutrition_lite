@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+import pytest
+
+from app.application.auth.ports.clock_port import ClockPort
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
+from app.domain.auth.entities import User
+from app.domain.auth.errors import UserNotFoundError
+from app.domain.auth.value_objects import (
+    EmailAddress,
+    HashedPassword,
+    TrialInfo,
+    UserId,
+    UserPlan,
+)
+
+
+def _create_user(user_id: str, email: str, clock: ClockPort) -> User:
+    return User(
+        id=UserId(user_id),
+        email=EmailAddress(email),
+        hashed_password=HashedPassword("hashed:dummy"),
+        name="Hikaru",
+        plan=UserPlan.FREE,
+        trial_info=TrialInfo(trial_ends_at=None),
+        has_profile=True,
+        created_at=clock.now(),
+    )
+
+
+def test_delete_account_success(
+    auth_uow: AuthUnitOfWorkPort,
+    user_repo: UserRepositoryPort,
+    clock: ClockPort,
+) -> None:
+    user = _create_user("uid-del-1", "delete@example.com", clock)
+    user_repo.save(user)
+
+    use_case = DeleteAccountUseCase(
+        uow=auth_uow,
+        clock=clock,
+    )
+
+    use_case.execute(user_id="uid-del-1")
+
+    deleted = user_repo.get_by_id(UserId("uid-del-1"))
+    assert deleted is not None
+    assert deleted.deleted_at is not None
+    assert deleted.is_active is False
+
+
+def test_delete_account_user_not_found(
+    auth_uow: AuthUnitOfWorkPort,
+    clock: ClockPort,
+) -> None:
+    use_case = DeleteAccountUseCase(
+        uow=auth_uow,
+        clock=clock,
+    )
+
+    with pytest.raises(UserNotFoundError):
+        use_case.execute(user_id="unknown-id")
