@@ -1,0 +1,747 @@
+openapi: 3.1.0
+info:
+  title: Nutrition Backend - Auth API
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+    description: User registration, login, session management
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: >
+        Create a new user account and start a 7-day trial plan.openapi: 3.1.0
+info:
+  title: Nutrition Backend - Auth & Profile API
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+    description: User registration, login, session management
+  - name: Profile
+    description: User basic profile (sex, birthdate, height, weight, optional image)
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: >
+        Create a new user account and start a 7-day trial plan.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      description: >
+        Authenticate a user with email and password.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current user
+      description: >
+        Clear ACCESS_TOKEN and REFRESH_TOKEN cookies.
+        Server side is stateless; tokens are not stored or revoked.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Logged out successfully. Cookies are cleared.
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: >
+        Issue a new ACCESS_TOKEN and REFRESH_TOKEN pair using the REFRESH_TOKEN cookie.
+      security:
+        - RefreshTokenCookieAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          headers:
+            Set-Cookie:
+              description: New ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: Invalid or expired refresh token, or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: >
+        Return the currently authenticated user based on ACCESS_TOKEN cookie.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '401':
+          description: Unauthorized (missing or invalid token, or user not found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Auth]
+      summary: Delete current user (logical delete)
+      description: >
+        Mark the current user as deleted (soft delete) and clear auth cookies.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Account deleted successfully
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /profile/me:
+    get:
+      tags: [Profile]
+      summary: Get current user's profile
+      description: >
+        Return the basic profile of the currently authenticated user.
+        Includes sex, birthdate, height, weight, and optional profile image id.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Current user's profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token, or profile not found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Profile]
+      summary: Upsert current user's profile
+      description: >
+        Create or update the basic profile of the currently authenticated user.
+        This endpoint only handles basic fields (sex, birthdate, height, weight).
+        Profile image upload will be handled by a separate endpoint or extended later.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileRequest'
+      responses:
+        '200':
+          description: Profile upserted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AccessTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: ACCESS_TOKEN
+      description: HttpOnly access token cookie
+
+    RefreshTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: REFRESH_TOKEN
+      description: HttpOnly refresh token cookie
+
+  schemas:
+    # ==========
+    # Auth Requests
+    # ==========
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Raw password (will be hashed server-side)
+        name:
+          type: string
+          nullable: true
+          description: Display name of the user
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    # ==========
+    # Auth Responses
+    # ==========
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    RefreshResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserSummary:
+      type: object
+      description: Public auth user information
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          description: Current user plan
+          enum:
+            - trial
+            - free
+            - paid
+        trial_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Trial end time in UTC (null if not in trial)
+        has_profile:
+          type: boolean
+          description: Whether the user has completed initial profile setup
+        created_at:
+          type: string
+          format: date-time
+          description: User creation time in UTC
+
+    # ==========
+    # Profile
+    # ==========
+    Sex:
+      type: string
+      description: Biological or self-identified sex of the user
+      enum:
+        - male
+        - female
+        - other
+        - undisclosed
+
+    ProfileRequest:
+      type: object
+      required:
+        - sex
+        - birthdate
+        - height_cm
+        - weight_kg
+      properties:
+        sex:
+          $ref: '#/components/schemas/Sex'
+        birthdate:
+          type: string
+          format: date
+          description: Date of birth (YYYY-MM-DD)
+        height_cm:
+          type: number
+          format: float
+          description: Height in centimeters
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 300
+        weight_kg:
+          type: number
+          format: float
+          description: Weight in kilograms
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 500
+
+    ProfileResponse:
+      type: object
+      description: Basic profile information for a user
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        sex:
+          $ref: '#/components/schemas/Sex'
+        birthdate:
+          type: string
+          format: date
+        height_cm:
+          type: number
+          format: float
+        weight_kg:
+          type: number
+          format: float
+        image_id:
+          type: string
+          nullable: true
+          description: >
+            Optional profile image identifier in the storage backend
+            (object key, file name, etc.)
+        created_at:
+          type: string
+          format: date-time
+          description: Profile creation timestamp (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          description: Profile last update timestamp (UTC)
+
+    # ==========
+    # Common Error
+    # ==========
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - EMAIL_ALREADY_IN_USE
+                - INVALID_CREDENTIALS
+                - UNAUTHORIZED
+                - USER_NOT_FOUND
+                - VALIDATION_ERROR
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message
+
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      description: >
+        Authenticate a user with email and password.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current user
+      description: >
+        Clear ACCESS_TOKEN and REFRESH_TOKEN cookies.
+        Server side is stateless; tokens are not stored or revoked.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Logged out successfully. Cookies are cleared.
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: >
+        Issue a new ACCESS_TOKEN and REFRESH_TOKEN pair using the REFRESH_TOKEN cookie.
+      security:
+        - RefreshTokenCookieAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          headers:
+            Set-Cookie:
+              description: New ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: Invalid or expired refresh token, or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: >
+        Return the currently authenticated user based on ACCESS_TOKEN cookie.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '401':
+          description: Unauthorized (missing or invalid token, or user not found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Auth]
+      summary: Delete current user (logical delete)
+      description: >
+        Mark the current user as deleted (soft delete) and clear auth cookies.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Account deleted successfully
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AccessTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: ACCESS_TOKEN
+      description: HttpOnly access token cookie
+
+    RefreshTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: REFRESH_TOKEN
+      description: HttpOnly refresh token cookie
+
+  schemas:
+    # ==========
+    # Requests
+    # ==========
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Raw password (will be hashed server-side)
+        name:
+          type: string
+          nullable: true
+          description: Display name of the user
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    # ==========
+    # Responses
+    # ==========
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    RefreshResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserSummary:
+      type: object
+      description: Public auth user information
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          description: Current user plan
+          enum:
+            - trial
+            - free
+            - paid
+        trial_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Trial end time in UTC (null if not in trial)
+        has_profile:
+          type: boolean
+          description: Whether the user has completed initial profile setup
+        created_at:
+          type: string
+          format: date-time
+          description: User creation time in UTC
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - EMAIL_ALREADY_IN_USE
+                - INVALID_CREDENTIALS
+                - UNAUTHORIZED
+                - USER_NOT_FOUND
+                - VALIDATION_ERROR
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message
