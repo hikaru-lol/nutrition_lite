@@ -113,6 +113,7 @@ def get_current_user_use_case() -> GetCurrentUserUseCase:
 
 # InMemory ストレージはプロセス内で共有したいので、シングルトン的に1インスタンスを持つ
 _profile_image_storage_instance: InMemoryProfileImageStorage | None = None
+_profile_image_storage_singleton: ProfileImageStoragePort | None = None
 
 
 def get_profile_image_storage() -> ProfileImageStoragePort:
