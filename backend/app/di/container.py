@@ -99,7 +99,7 @@ def get_refresh_token_use_case() -> RefreshTokenUseCase:
     )
 
 
-def get_get_current_user_use_case() -> GetCurrentUserUseCase:
+def get_current_user_use_case() -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(
         uow=get_auth_uow(),
     )

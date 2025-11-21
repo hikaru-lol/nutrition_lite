@@ -57,6 +57,13 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    if isinstance(exc, auth_errors.InvalidEmailFormatError):
+        return error_response(
+            "INVALID_EMAIL_FORMAT",
+            "メールアドレスの形式が正しくありません。",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     # 想定外の AuthError（基本ないはずだが念のため）
     logger.exception("Unhandled AuthError: %s", exc)
     return error_response(
