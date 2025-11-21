@@ -1,7 +1,15 @@
 name: Backend Real Integration Tests
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-real-*'
   pull_request:
+    branches:
+      - main
     paths:
       - 'backend/**'
       - '.github/workflows/backend-real-*'
