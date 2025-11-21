@@ -28,3 +28,20 @@ dev = [
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+# ここから下を追加 👇
+
+[tool.setuptools]
+# 「カレントディレクトリ (backend) 直下をパッケージ探索の起点にする」
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+# どこを探すか
+where = ["."]
+# 見つけたいパッケージ（app 配下だけを対象）
+include = ["app*"]
+# 配布から除外したいパッケージ / ディレクトリ
+exclude = [
+  "alembic*",
+  "tests*",
+]
