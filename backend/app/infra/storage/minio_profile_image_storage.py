@@ -25,7 +25,7 @@ class MinioProfileImageStorage(ProfileImageStoragePort):
             secret_key=settings.MINIO_SECRET_KEY,
             secure=settings.MINIO_USE_SSL,
         )
-        self._bucket = settings.MINIO_BUCKET_PROFILE_IMAGES
+        self._bucket = settings.MINIO_BUCKET_NAME
 
         # バケットがなければ作成
         if not self._client.bucket_exists(self._bucket):

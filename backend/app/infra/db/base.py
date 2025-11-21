@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, DeclarativeMeta
 
 from app.settings import settings  # ← ここが効くようになった
 
@@ -10,7 +10,7 @@ from app.settings import settings  # ← ここが効くようになった
 # SQLAlchemy 基本セットアップ
 # ----------------------------
 
-Base = declarative_base()
+Base: DeclarativeMeta = declarative_base()
 
 engine = create_engine(
     settings.DATABASE_URL,  # ← env or デフォルト sqlite
