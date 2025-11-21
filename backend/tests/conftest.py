@@ -12,7 +12,7 @@ from app.di.container import (
     get_logout_user_use_case,
     get_delete_account_use_case,
     get_refresh_token_use_case,
-    get_get_current_user_use_case,
+    get_current_user_use_case,
     get_token_service,
 )
 
@@ -135,7 +135,7 @@ def app(
     )
 
     # /auth/me, /auth/logout, /auth/me[DELETE] で使われる current_user 用 UseCase
-    app.dependency_overrides[get_get_current_user_use_case] = (
+    app.dependency_overrides[get_current_user_use_case] = (
         lambda: GetCurrentUserUseCase(uow=make_auth_uow())
     )
 
