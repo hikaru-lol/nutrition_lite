@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import os
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
 
-# 本番 DI（router / dependencies が Depends しているのはこっち）
 from app.di.container import (
     get_register_user_use_case,
     get_login_user_use_case,
@@ -16,7 +16,6 @@ from app.di.container import (
     get_token_service,
 )
 
-# UseCase 本体（auth 用）
 from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
 from app.application.auth.use_cases.session.login_user import LoginUserUseCase
 from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
@@ -24,13 +23,11 @@ from app.application.auth.use_cases.account.delete_account import DeleteAccountU
 from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
 from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase
 
-# テスト用 Fake 実装
 from tests.fakes.auth_repositories import InMemoryUserRepository
 from tests.fakes.auth_services import FakePasswordHasher, FakeTokenService, FixedClock
 from tests.fakes.auth_uow import FakeAuthUnitOfWork
 
 
-# ★ 追加：profile 用 UseCase / DI
 from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.di.container import (
@@ -38,10 +35,13 @@ from app.di.container import (
     get_get_my_profile_use_case,
 )
 
-# profile 用 Fake
 from tests.fakes.profile_repositories import InMemoryProfileRepository
 from tests.fakes.profile_uow import FakeProfileUnitOfWork
 from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
+
+USE_FAKE_INFRA = os.getenv("USE_FAKE_INFRA", "true").lower() in (
+    "1", "true", "yes", "on")
+
 
 # ============================================================
 # 共通の Fake ポート（Repo / Hasher / TokenService / Clock）
@@ -102,59 +102,69 @@ def app(
     """
     app = create_app()
 
-    def make_auth_uow() -> FakeAuthUnitOfWork:
-        # 各 UseCase 解決時に新しい UoW を生成（Repo は共有）
-        return FakeAuthUnitOfWork(user_repo=user_repo)
+    if USE_FAKE_INFRA:
+        def make_auth_uow() -> FakeAuthUnitOfWork:
+            return FakeAuthUnitOfWork(user_repo=user_repo)
 
-    # --- UseCase オーバーライド ----------------------------------
+        app.dependency_overrides[get_register_user_use_case] = (
+            lambda: RegisterUserUseCase(
+                uow=make_auth_uow(),
+                password_hasher=password_hasher,
+                token_service=token_service,
+                clock=clock,
+            )
+        )
 
-    app.dependency_overrides[get_register_user_use_case] = lambda: RegisterUserUseCase(
-        uow=make_auth_uow(),
-        password_hasher=password_hasher,
-        token_service=token_service,
-        clock=clock,
-    )
+        app.dependency_overrides[get_login_user_use_case] = (
+            lambda: LoginUserUseCase(
+                uow=make_auth_uow(),
+                password_hasher=password_hasher,
+                token_service=token_service,
+            )
+        )
 
-    app.dependency_overrides[get_login_user_use_case] = lambda: LoginUserUseCase(
-        uow=make_auth_uow(),
-        password_hasher=password_hasher,
-        token_service=token_service,
-    )
+        app.dependency_overrides[get_logout_user_use_case] = (
+            lambda: LogoutUserUseCase()
+        )
 
-    app.dependency_overrides[get_logout_user_use_case] = lambda: LogoutUserUseCase(
-    )
+        app.dependency_overrides[get_delete_account_use_case] = (
+            lambda: DeleteAccountUseCase(
+                uow=make_auth_uow(),
+                clock=clock,
+            )
+        )
 
-    app.dependency_overrides[get_delete_account_use_case] = lambda: DeleteAccountUseCase(
-        uow=make_auth_uow(),
-        clock=clock,
-    )
+        app.dependency_overrides[get_refresh_token_use_case] = (
+            lambda: RefreshTokenUseCase(
+                uow=make_auth_uow(),
+                token_service=token_service,
+            )
+        )
 
-    app.dependency_overrides[get_refresh_token_use_case] = lambda: RefreshTokenUseCase(
-        uow=make_auth_uow(),
-        token_service=token_service,
-    )
+        app.dependency_overrides[get_current_user_use_case] = (
+            lambda: GetCurrentUserUseCase(uow=make_auth_uow())
+        )
 
-    # /auth/me, /auth/logout, /auth/me[DELETE] で使われる current_user 用 UseCase
-    app.dependency_overrides[get_current_user_use_case] = (
-        lambda: GetCurrentUserUseCase(uow=make_auth_uow())
-    )
+        def make_profile_uow() -> FakeProfileUnitOfWork:
+            return FakeProfileUnitOfWork(profile_repo=profile_repo)
 
-    # --- Port オーバーライド（get_current_user_dto 内など） ------
-    def make_profile_uow() -> FakeProfileUnitOfWork:
-        # 各 UseCase 解決時に新しい UoW を作るが、profile_repo は共有
-        return FakeProfileUnitOfWork(profile_repo=profile_repo)
+        app.dependency_overrides[get_upsert_profile_use_case] = (
+            lambda: UpsertProfileUseCase(
+                uow=make_profile_uow(),
+                image_storage=profile_image_storage,
+            )
+        )
 
-    app.dependency_overrides[get_upsert_profile_use_case] = lambda: UpsertProfileUseCase(
-        uow=make_profile_uow(),
-        image_storage=profile_image_storage,
-    )
+        app.dependency_overrides[get_get_my_profile_use_case] = (
+            lambda: GetMyProfileUseCase(
+                uow=make_profile_uow(),
+            )
+        )
 
-    app.dependency_overrides[get_get_my_profile_use_case] = lambda: GetMyProfileUseCase(
-        uow=make_profile_uow(),
-    )
-
-    # get_current_user_dto の token_service も Fake にする
-    app.dependency_overrides[get_token_service] = lambda: token_service
+        app.dependency_overrides[get_token_service] = lambda: token_service
+    else:
+        # 実インフラで動かす場合はオーバーライドしない
+        pass
 
     return app
 
@@ -173,7 +183,6 @@ def _reset_fakes(user_repo: InMemoryUserRepository, profile_repo: InMemoryProfil
     profile_repo.clear()
     clock.reset()
     yield
-    # 後処理があればここに（今は特になし）
 
 
 # ============================================================

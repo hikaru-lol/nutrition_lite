@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.settings import settings
+
 # --- auth 用 imports はそのまま ---
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
@@ -30,6 +32,7 @@ from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCas
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.infra.db.uow import SqlAlchemyProfileUnitOfWork
 from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
+from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
 
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
@@ -113,10 +116,13 @@ _profile_image_storage_instance: InMemoryProfileImageStorage | None = None
 
 
 def get_profile_image_storage() -> ProfileImageStoragePort:
-    global _profile_image_storage_instance
-    if _profile_image_storage_instance is None:
-        _profile_image_storage_instance = InMemoryProfileImageStorage()
-    return _profile_image_storage_instance
+    global _profile_image_storage_singleton
+    if _profile_image_storage_singleton is None:
+        if settings.USE_FAKE_INFRA:
+            _profile_image_storage_singleton = InMemoryProfileImageStorage()
+        else:
+            _profile_image_storage_singleton = MinioProfileImageStorage()
+    return _profile_image_storage_singleton
 
 
 def get_profile_uow() -> ProfileUnitOfWorkPort:

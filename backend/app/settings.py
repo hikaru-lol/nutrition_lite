@@ -32,11 +32,29 @@ class Settings:
         os.getenv("ACCESS_TOKEN_TTL_MINUTES", "15"))
     REFRESH_TOKEN_TTL_DAYS: int = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "7"))
 
+    # MinIO / S3 互換ストレージ
+    raw_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
+    if raw_endpoint.startswith("http://"):
+        raw_endpoint = raw_endpoint[len("http://"):]
+    elif raw_endpoint.startswith("https://"):
+        raw_endpoint = raw_endpoint[len("https://"):]
+    MINIO_ENDPOINT: str = raw_endpoint
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_USE_SSL: bool = _env_bool("MINIO_USE_SSL", False)
+    MINIO_BUCKET_NAME: str = os.getenv(
+        "MINIO_BUCKET_NAME",
+        "nutrition-dev",
+    )
+
     # DB
     # NOTE: 本番では必ず env で上書きする前提。
     # CI / ローカルでは env がなければ sqlite in-memory で動くようにしている。
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", "sqlite+pysqlite:///:memory:")
+
+    # テストで Fake を使うかどうか切り替えるためのフラグ
+    USE_FAKE_INFRA: bool = _env_bool("USE_FAKE_INFRA", True)
 
 
 settings = Settings()
