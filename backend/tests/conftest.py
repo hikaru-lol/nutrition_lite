@@ -202,22 +202,3 @@ def auth_uow(user_repo: InMemoryUserRepository) -> FakeAuthUnitOfWork:
     RegisterUserUseCase などを直接テストするときに利用。
     """
     return FakeAuthUnitOfWork(user_repo=user_repo)
-
-
-# @pytest.fixture
-# def register_use_case(
-#     auth_uow: FakeAuthUnitOfWork,
-#     password_hasher: FakePasswordHasher,
-#     token_service: FakeTokenService,
-#     clock: FixedClock,
-# ) -> RegisterUserUseCase:
-#     """
-#     RegisterUserUseCase のユニットテスト用。
-#     API 統合テストでは使わず、tests/unit/... から使う想定。
-#     """
-#     return RegisterUserUseCase(
-#         uow=auth_uow,
-#         password_hasher=password_hasher,
-#         token_service=token_service,
-#         clock=clock,
-#     )
