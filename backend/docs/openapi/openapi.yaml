@@ -1,24 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Nutrition Backend - Auth API
-  version: 0.1.0
-
-servers:
-  - url: /api/v1
-
-tags:
-  - name: Auth
-    description: User registration, login, session management
-
-paths:
-  /auth/register:
-    post:
-      tags: [Auth]
-      summary: Register a new user
-      description: >
-        Create a new user account and start a 7-day trial plan.openapi: 3.1.0
-info:
-  title: Nutrition Backend - Auth & Profile API
+  title: Nutrition Backend - Auth, Profile & Target API
   version: 0.1.0
 
 servers:
@@ -29,8 +11,13 @@ tags:
     description: User registration, login, session management
   - name: Profile
     description: User basic profile (sex, birthdate, height, weight, optional image)
+  - name: Target
+    description: Nutrition target (daily recommended intake for 17 nutrients)
 
 paths:
+  # ==========
+  # Auth
+  # ==========
   /auth/register:
     post:
       tags: [Auth]
@@ -202,13 +189,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ==========
+  # Profile
+  # ==========
   /profile/me:
     get:
       tags: [Profile]
       summary: Get current user's profile
       description: >
         Return the basic profile of the currently authenticated user.
-        Includes sex, birthdate, height, weight, and optional profile image id.
+        Includes sex, birthdate, height, weight, and optional profile image ID.
       security:
         - AccessTokenCookieAuth: []
       responses:
@@ -227,10 +217,11 @@ paths:
 
     put:
       tags: [Profile]
-      summary: Upsert current user's profile
+      summary: Create or update current user's profile
       description: >
         Create or update the basic profile of the currently authenticated user.
         This endpoint only handles basic fields (sex, birthdate, height, weight).
+        Additional target-related preferences (e.g., goal, activity level) are provided when creating targets.
         Profile image upload will be handled by a separate endpoint or extended later.
       security:
         - AccessTokenCookieAuth: []
@@ -247,8 +238,241 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Target
+  # ==========
+  /targets:
+    get:
+      tags: [Target]
+      summary: List current user's targets
+      description: >
+        Return all nutrition targets for the currently authenticated user.
+        Each target represents a daily set of 17 nutrient goals.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: List of targets for the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Target]
+      summary: Create a new nutrition target
+      description: >
+        Create a new daily nutrition target for the current user.
+
+        The server uses the user's Profile (sex, birthdate, height, weight) plus
+        the provided goal information (goal_type, activity_level, etc.) to generate
+        a set of recommended daily intakes for 17 nutrients using a model (e.g., LLM or rules).
+
+        If this is the first target for the user, it becomes the active target.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TargetCreateRequest'
+      responses:
+        '201':
+          description: Target created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '400':
+          description: Invalid input (e.g., missing required fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Profile not found for current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Maximum number of targets reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/lighting:
+    get:
+      tags: [Target]
+      summary: Get current active target
+      description: >
+        Return the active nutrition target for the currently authenticated user.
+        If no target is active or if no targets exist, an error is returned.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Active target for the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No active target or no targets exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/{targetId}:
+    get:
+      tags: [Target]
+      summary: Get a specific target
+      description: >
+        Return a specific target by ID if it belongs to the current user.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Target found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Target]
+      summary: Update a target
+      description: >
+        Update an existing target for the current user.
+
+        This endpoint is mainly used for manual adjustments of the generated target,
+        e.g., changing specific nutrient amounts or modifying the goal description.
+        Nutrient values provided here will be treated as manually set (source="manual").
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TargetUpdateRequest'
+      responses:
+        '200':
+          description: Updated target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/{targetId}/activate:
+    post:
+      tags: [Target]
+      summary: Activate a target
+      description: >
+        Mark the specified target as the active target for the current user.
+        Any previously active target will be deactivated.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Target activated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found
           content:
             application/json:
               schema:
@@ -431,298 +655,163 @@ components:
           description: Profile last update timestamp (UTC)
 
     # ==========
-    # Common Error
+    # Target
     # ==========
-    ErrorResponse:
+    GoalType:
+      type: string
+      enum:
+        - weight_loss
+        - weight_maintain
+        - weight_gain
+        - health_improve
+
+    ActivityLevel:
+      type: string
+      enum: [low, normal, high]
+
+    NutrientCode:
+      type: string
+      description: 'Identifier for a nutrient'
+      enum:
+        - carbohydrate
+        - fat
+        - protein
+        - vitamin_a
+        - vitamin_b_complex
+        - vitamin_c
+        - vitamin_d
+        - vitamin_e
+        - vitamin_k
+        - calcium
+        - iron
+        - magnesium
+        - zinc
+        - sodium
+        - potassium
+        - fiber
+        - water
+
+    NutrientSource:
+      type: string
+      enum:
+        - llm
+        - manual
+        - user_input
+
+    TargetNutrient:
       type: object
       properties:
-        error:
-          type: object
-          required:
-            - code
-            - message
-          properties:
-            code:
-              type: string
-              description: Machine-readable error code
-              enum:
-                - EMAIL_ALREADY_IN_USE
-                - INVALID_CREDENTIALS
-                - UNAUTHORIZED
-                - USER_NOT_FOUND
-                - VALIDATION_ERROR
-                - INTERNAL_ERROR
-            message:
-              type: string
-              description: Human-readable error message
-
-        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterRequest'
-      responses:
-        '201':
-          description: User registered successfully
-          headers:
-            Set-Cookie:
-              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthUserResponse'
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Email already in use
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Login with email and password
-      description: >
-        Authenticate a user with email and password.
-        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
-      responses:
-        '200':
-          description: Login successful
-          headers:
-            Set-Cookie:
-              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthUserResponse'
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Invalid credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /auth/logout:
-    post:
-      tags: [Auth]
-      summary: Logout current user
-      description: >
-        Clear ACCESS_TOKEN and REFRESH_TOKEN cookies.
-        Server side is stateless; tokens are not stored or revoked.
-      security:
-        - AccessTokenCookieAuth: []
-      responses:
-        '204':
-          description: Logged out successfully. Cookies are cleared.
-          headers:
-            Set-Cookie:
-              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
-              schema:
-                type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /auth/refresh:
-    post:
-      tags: [Auth]
-      summary: Refresh access token
-      description: >
-        Issue a new ACCESS_TOKEN and REFRESH_TOKEN pair using the REFRESH_TOKEN cookie.
-      security:
-        - RefreshTokenCookieAuth: []
-      responses:
-        '200':
-          description: Token refreshed successfully
-          headers:
-            Set-Cookie:
-              description: New ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshResponse'
-        '401':
-          description: Invalid or expired refresh token, or user not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /auth/me:
-    get:
-      tags: [Auth]
-      summary: Get current user
-      description: >
-        Return the currently authenticated user based on ACCESS_TOKEN cookie.
-      security:
-        - AccessTokenCookieAuth: []
-      responses:
-        '200':
-          description: Current user
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthUserResponse'
-        '401':
-          description: Unauthorized (missing or invalid token, or user not found)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-    delete:
-      tags: [Auth]
-      summary: Delete current user (logical delete)
-      description: >
-        Mark the current user as deleted (soft delete) and clear auth cookies.
-      security:
-        - AccessTokenCookieAuth: []
-      responses:
-        '204':
-          description: Account deleted successfully
-          headers:
-            Set-Cookie:
-              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
-              schema:
-                type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-components:
-  securitySchemes:
-    AccessTokenCookieAuth:
-      type: apiKey
-      in: cookie
-      name: ACCESS_TOKEN
-      description: HttpOnly access token cookie
-
-    RefreshTokenCookieAuth:
-      type: apiKey
-      in: cookie
-      name: REFRESH_TOKEN
-      description: HttpOnly refresh token cookie
-
-  schemas:
-    # ==========
-    # Requests
-    # ==========
-    RegisterRequest:
-      type: object
-      required:
-        - email
-        - password
-      properties:
-        email:
+        code:
+          $ref: '#/components/schemas/NutrientCode'
+        amount:
+          type: number
+        unit:
           type: string
-          format: email
-          description: User email address
-        password:
-          type: string
-          format: password
-          minLength: 8
-          description: Raw password (will be hashed server-side)
-        name:
-          type: string
-          nullable: true
-          description: Display name of the user
+          description: 'Unit of the nutrient (e.g., g, mg, µg, kcal)'
+        source:
+          $ref: '#/components/schemas/NutrientSource'
 
-    LoginRequest:
+    Target:
       type: object
-      required:
-        - email
-        - password
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
-
-    # ==========
-    # Responses
-    # ==========
-    AuthUserResponse:
-      type: object
-      properties:
-        user:
-          $ref: '#/components/schemas/UserSummary'
-
-    RefreshResponse:
-      type: object
-      properties:
-        ok:
-          type: boolean
-          example: true
-        user:
-          $ref: '#/components/schemas/UserSummary'
-
-    UserSummary:
-      type: object
-      description: Public auth user information
+      description: 'Nutrition target for a specific user and goal.'
       properties:
         id:
           type: string
           format: uuid
-        email:
+        user_id:
           type: string
-          format: email
-        name:
+          format: uuid
+        title:
+          type: string
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
           type: string
           nullable: true
-        plan:
-          type: string
-          description: Current user plan
-          enum:
-            - trial
-            - free
-            - paid
-        trial_ends_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Trial end time in UTC (null if not in trial)
-        has_profile:
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+        is_active:
           type: boolean
-          description: Whether the user has completed initial profile setup
+        nutrients:
+          type: array
+          items:
+            $ref: '#/components/schemas/TargetNutrient'
+        llm_rationale:
+          type: string
+          nullable: true
+        disclaimer:
+          type: string
+          nullable: true
         created_at:
           type: string
           format: date-time
-          description: User creation time in UTC
+        updated_at:
+          type: string
+          format: date-time
 
+    TargetResponse:
+      type: object
+      properties:
+        target:
+          $ref: '#/components/schemas/Target'
+
+    TargetsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Target'
+
+    TargetCreateRequest:
+      type: object
+      required:
+        - title
+        - goal_type
+        - activity_level
+      properties:
+        title:
+          type: string
+          description: Short title for the target (e.g., "Cutting phase")
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+          description: Free-text description of the user's goal
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+
+    TargetUpdateRequest:
+      type: object
+      description: >
+        Fields to update for an existing target. All properties are optional.
+        Provided nutrient values will be treated as manual overrides.
+      properties:
+        title:
+          type: string
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+        nutrients:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                $ref: '#/components/schemas/NutrientCode'
+              amount:
+                type: number
+              unit:
+                type: string
+
+    # ==========
+    # Error
+    # ==========
     ErrorResponse:
       type: object
       properties:
@@ -740,6 +829,9 @@ components:
                 - INVALID_CREDENTIALS
                 - UNAUTHORIZED
                 - USER_NOT_FOUND
+                - PROFILE_NOT_FOUND
+                - TARGET_NOT_FOUND
+                - MAX_TARGETS_REACHED
                 - VALIDATION_ERROR
                 - INTERNAL_ERROR
             message:
