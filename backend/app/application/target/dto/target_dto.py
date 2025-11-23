@@ -2,137 +2,172 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
-
-from app.domain.target.entities import TargetDefinition, TargetNutrient
-from app.domain.target.value_objects import GoalType, ActivityLevel, NutrientCode
+from typing import Optional, List
 
 
-@dataclass
+# =====================================================================
+# 共通 DTO（エンドポイントのレスポンスにも使う形）
+# =====================================================================
+
+
+@dataclass(slots=True)
 class TargetNutrientDTO:
-    """1つの栄養素に対するターゲット値を表す DTO。"""
+    """
+    1つの栄養素に対するターゲット値（DTO）。
 
-    code: NutrientCode
+    - code   : NutrientCode.value （例: "protein"）
+    - amount : NutrientAmount.value
+    - unit   : NutrientAmount.unit （例: "g", "mg", "kcal"）
+    - source : NutrientSource.value （"llm" / "manual" / "user_input"）
+    """
+
+    code: str
     amount: float
     unit: str
     source: str
 
-    @classmethod
-    def from_entity(cls, entity: TargetNutrient) -> "TargetNutrientDTO":
-        return cls(
-            code=entity.code,
-            amount=entity.amount.value,
-            unit=entity.amount.unit,
-            source=entity.source.value,
-        )
 
-
-@dataclass
+@dataclass(slots=True)
 class TargetDTO:
     """
-    ターゲット定義の DTO。
+    1つのターゲット定義の DTO。
 
-    - アプリケーション層と API 層の間のデータ受け渡しに使用。
+    Domain: TargetDefinition を API / UseCase 用にフラットにしたもの。
     """
 
     id: str
     user_id: str
+
     title: str
-    goal_type: GoalType
+    goal_type: str                 # GoalType.value
     goal_description: Optional[str]
-    activity_level: ActivityLevel
-    nutrients: List[TargetNutrientDTO]
+    activity_level: str            # ActivityLevel.value
+
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+
+    nutrients: List[TargetNutrientDTO]
+
     llm_rationale: Optional[str]
     disclaimer: Optional[str]
 
-    @classmethod
-    def from_entity(cls, entity: TargetDefinition) -> "TargetDTO":
-        return cls(
-            id=entity.id.value,
-            user_id=entity.user_id.value,
-            title=entity.title,
-            goal_type=entity.goal_type,
-            goal_description=entity.goal_description,
-            activity_level=entity.activity_level,
-            nutrients=[TargetNutrientDTO.from_entity(
-                n) for n in entity.nutrients],
-            is_active=entity.is_active,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-            llm_rationale=entity.llm_rationale,
-            disclaimer=entity.disclaimer,
-        )
+    created_at: datetime
+    updated_at: datetime
 
 
-@dataclass
+# =====================================================================
+# UseCase 入力 DTO
+# =====================================================================
+
+# --- CreateTarget -----------------------------------------------------
+
+
+@dataclass(slots=True)
 class CreateTargetInputDTO:
     """
-    新しいターゲットを作成する際の入力 DTO。
+    新しい TargetDefinition を作成するための入力 DTO。
 
-    - 栄養素の具体的な値は TargetGeneratorPort で決定する。
+    - user_id は認証済みユーザー
+    - 栄養素の中身は TargetGeneratorPort に任せる前提で、
+      ここでは「目標情報（タイトル / 目的 / 活動レベル）」のみを受け取る。
     """
 
     user_id: str
+
     title: str
-    goal_type: GoalType
+    goal_type: str                 # GoalType.value ("weight_loss" など)
     goal_description: Optional[str]
-    activity_level: ActivityLevel
+    # ActivityLevel.value ("low" / "normal" / "high")
+    activity_level: str
 
 
-@dataclass
-class ActivateTargetInputDTO:
-    """
-    指定ターゲットをアクティブ化する際の入力 DTO。
-    """
-
-    user_id: str
-    target_id: str
-
-# --- GetTarget 用 ------------------------------------------------------
+# --- GetTarget / GetActive / List ------------------------------------
 
 
 @dataclass(slots=True)
 class GetTargetInputDTO:
-    """1件取得用の入力 DTO（認証済みユーザーの target_id ）"""
+    """
+    特定の TargetDefinition を1件取得するための入力 DTO。
+    """
 
     user_id: str
     target_id: str
 
 
-# --- UpdateTarget 用 ---------------------------------------------------
+@dataclass(slots=True)
+class GetActiveTargetInputDTO:
+    """
+    現在 Active な TargetDefinition を取得するための入力 DTO。
+    """
+
+    user_id: str
+
+
+@dataclass(slots=True)
+class ListTargetsInputDTO:
+    """
+    ユーザーに紐づく TargetDefinition 一覧を取得するための入力 DTO。
+
+    - limit / offset はページング用（省略時は実装側のデフォルトに任せる）
+    """
+
+    user_id: str
+    limit: Optional[int] = None
+    offset: int = 0
+
+
+# --- UpdateTarget -----------------------------------------------------
 
 
 @dataclass(slots=True)
 class UpdateTargetNutrientDTO:
-    """栄養素1つ分のパッチ情報"""
+    """
+    TargetDefinition の nutrients を部分更新するためのパッチ DTO。
+
+    - code   : 更新対象の NutrientCode.value
+    - amount : None の場合は量を変更しない
+    - unit   : None の場合は単位を変更しない
+    """
 
     code: str
     amount: Optional[float] = None
     unit: Optional[str] = None
-    # source は UC 側で "manual" に変更するので、ここからは受け取らない
 
 
 @dataclass(slots=True)
 class UpdateTargetInputDTO:
     """
-    Target の部分更新用 DTO。
+    TargetDefinition の「部分更新（PATCH 的）」の入力 DTO。
 
-    - None のフィールドは「その項目は更新しない」
-    - 値が入っているフィールドだけを更新する（PATCH 的な挙動）
+    - None のフィールドは「更新しない」
+    - 値が入っているフィールドだけを更新する
+    - nutrients は、指定した code に対して amount/unit を上書きするためのパッチ。
     """
 
     user_id: str
     target_id: str
 
     title: Optional[str] = None
-    goal_type: Optional[str] = None
+    goal_type: Optional[str] = None           # GoalType.value
     goal_description: Optional[str] = None
-    activity_level: Optional[str] = None
+    activity_level: Optional[str] = None      # ActivityLevel.value
 
     llm_rationale: Optional[str] = None
     disclaimer: Optional[str] = None
 
-    nutrients: Optional[list[UpdateTargetNutrientDTO]] = None
+    nutrients: Optional[List[UpdateTargetNutrientDTO]] = None
+
+
+# --- ActivateTarget ---------------------------------------------------
+
+
+@dataclass(slots=True)
+class ActivateTargetInputDTO:
+    """
+    指定した TargetDefinition を Active にするための入力 DTO。
+
+    - ユースケース内で、同一ユーザーの既存ターゲットをすべて inactive にしてから
+      この target_id を active にする。
+    """
+
+    user_id: str
+    target_id: str

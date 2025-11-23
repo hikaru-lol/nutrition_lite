@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from app.application.target.dto.target_dto import (
     GetTargetInputDTO,
     TargetDTO,
     TargetNutrientDTO,
 )
-from app.domain.target.errors import TargetNotFoundError
+from app.application.target.errors import TargetNotFoundError
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 from app.domain.auth.value_objects import UserId
+from app.domain.target.entities import TargetDefinition
 from app.domain.target.value_objects import TargetId
-
-if TYPE_CHECKING:
-    from app.domain.target.entities import TargetDefinition
 
 
 class GetTargetUseCase:
@@ -26,31 +22,21 @@ class GetTargetUseCase:
     def __init__(self, uow: TargetUnitOfWorkPort) -> None:
         self._uow = uow
 
-    def __call__(self, input_dto: GetTargetInputDTO) -> TargetDTO:
+    def execute(self, input_dto: GetTargetInputDTO) -> TargetDTO:
         user_id = UserId(input_dto.user_id)
         target_id = TargetId(input_dto.target_id)
 
         with self._uow as uow:
-            # TargetRepositoryPort 側のシグネチャ想定:
-            #   get_by_id(user_id: UserId, target_id: TargetId) -> TargetDefinition | None
             target = uow.target_repo.get_by_id(
-                user_id=user_id,
-                target_id=target_id,
-            )
-
+                user_id=user_id, target_id=target_id)
             if target is None:
                 raise TargetNotFoundError(
                     "Target not found or does not belong to the current user."
                 )
-
             return _to_dto(target)
 
 
-def _to_dto(target: "TargetDefinition") -> TargetDTO:
-    """
-    Domain TargetDefinition -> TargetDTO 変換。
-    """
-
+def _to_dto(target: TargetDefinition) -> TargetDTO:
     nutrients_dto = [
         TargetNutrientDTO(
             code=n.code.value,

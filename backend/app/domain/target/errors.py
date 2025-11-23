@@ -11,12 +11,6 @@ class MaxTargetsReachedError(TargetError):
     """
 
 
-class TargetNotFoundError(TargetError):
-    """
-    指定されたターゲットが存在しない、またはユーザーに属していない場合。
-    """
-
-
 class NoActiveTargetError(TargetError):
     """
     ユーザーにアクティブなターゲットが存在しない場合。

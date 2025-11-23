@@ -1,157 +1,159 @@
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime
+from datetime import datetime, date
+from uuid import uuid4
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Date,
-    DateTime,
-    Float,
-    ForeignKey,
-    String,
-    UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID
+import sqlalchemy as sa
+import sqlalchemy.dialects.postgresql as pg
 from sqlalchemy.orm import relationship
 
-from app.infra.db.base import Base
+from app.infra.db.base import Base  # プロジェクトの Base に合わせて調整
 
 
 class TargetModel(Base):
     """
-    targets テーブルの SQLAlchemy モデル。
+    TargetDefinition に対応するテーブル。
 
-    - 1レコードが 1 つの TargetDefinition に対応する。
+    - 1 ユーザーは複数の Target を持てる
+    - nutrients は TargetNutrientModel で別テーブル管理
     """
 
     __tablename__ = "targets"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
+    id = sa.Column(
+        pg.UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
-    title = Column(String, nullable=False)
-    goal_type = Column(String, nullable=False)         # GoalType の value
-    goal_description = Column(String, nullable=True)
-    activity_level = Column(String, nullable=False)    # ActivityLevel の value
+    title = sa.Column(sa.String(length=255), nullable=False)
+    goal_type = sa.Column(sa.String(length=50),
+                          nullable=False)       # GoalType.value
+    goal_description = sa.Column(sa.Text, nullable=True)
+    activity_level = sa.Column(
+        sa.String(length=50), nullable=False)  # ActivityLevel.value
 
-    is_active = Column(Boolean, nullable=False, default=False)
+    is_active = sa.Column(sa.Boolean, nullable=False,
+                          default=False, index=True)
 
-    llm_rationale = Column(String, nullable=True)
-    disclaimer = Column(String, nullable=True)
+    llm_rationale = sa.Column(sa.Text, nullable=True)
+    disclaimer = sa.Column(sa.Text, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
+    updated_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
 
-    # 1:多 の関係 - TargetNutrientModel
-    nutrients = relationship(
+    # nutrients との 1:N 関係
+    nutrients: list[TargetNutrientModel] = relationship(
         "TargetNutrientModel",
         back_populates="target",
         cascade="all, delete-orphan",
-        lazy="joined",
-    )
-
-    __table_args__ = (
-        # 1ユーザーにつき最大1アクティブにするための制約はアプリ側で担保する。
-        # 必要なら部分索引や CHECK 制約も検討。
+        order_by="TargetNutrientModel.code",
     )
 
 
 class TargetNutrientModel(Base):
     """
-    target_nutrients テーブル。
+    TargetDefinition の 1 栄養素分。
 
-    - 1つの TargetDefinition に対する 17 種の栄養素ごとのターゲット値。
+    - (target_id, code) で一意になる想定。
     """
 
     __tablename__ = "target_nutrients"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    target_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("targets.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+    target_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("targets.id", ondelete="CASCADE"),
+        primary_key=True,
     )
+    # NutrientCode.value
+    code = sa.Column(sa.String(length=50), primary_key=True)
 
-    code = Column(String, nullable=False)   # NutrientCode の value
-    amount = Column(Float, nullable=False)
-    unit = Column(String, nullable=False)   # g, mg, µg, kcal, etc.
-    source = Column(String, nullable=False)  # "llm" / "manual" / "user_input"
+    amount_value = sa.Column(sa.Float, nullable=False)  # NutrientAmount.value
+    amount_unit = sa.Column(sa.String(length=20),
+                            nullable=False)  # NutrientAmount.unit
+    # NutrientSource.value
+    source = sa.Column(sa.String(length=20), nullable=False)
 
-    target = relationship("TargetModel", back_populates="nutrients")
-
-    __table_args__ = (
-        UniqueConstraint("target_id", "code",
-                         name="uq_target_nutrient_code_per_target"),
+    target: TargetModel = relationship(
+        "TargetModel",
+        back_populates="nutrients",
     )
 
 
 class DailyTargetSnapshotModel(Base):
     """
-    daily_target_snapshots テーブル。
+    DailyTargetSnapshot に対応するテーブル。
 
-    - 特定ユーザーの特定日付に対して確定されたターゲットスナップショット。
-    - 過去日のみ作成し、以後更新しない想定。
+    - id は内部用のサロゲートキー
+    - (user_id, date) はユニーク制約（1日1スナップショット）
     """
 
     __tablename__ = "daily_target_snapshots"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
-    date = Column(Date, nullable=False)
-
-    # どの TargetDefinition からコピーされたか
-    target_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("targets.id", ondelete="SET NULL"),
-        nullable=True,
+    id = sa.Column(
+        pg.UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    date = sa.Column(sa.Date, nullable=False, index=True)
+    target_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("targets.id", ondelete="SET NULL"),
+        nullable=False,
     )
 
-    created_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
 
-    # 1:多 の関係 - DailyTargetSnapshotNutrientModel
-    nutrients = relationship(
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "user_id",
+            "date",
+            name="uq_daily_target_snapshot_user_date",
+        ),
+    )
+
+    nutrients: list[DailyTargetSnapshotNutrientModel] = relationship(
         "DailyTargetSnapshotNutrientModel",
         back_populates="snapshot",
         cascade="all, delete-orphan",
-        lazy="joined",
-    )
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "date", name="uq_snapshot_user_date"),
+        order_by="DailyTargetSnapshotNutrientModel.code",
     )
 
 
 class DailyTargetSnapshotNutrientModel(Base):
     """
-    daily_target_snapshot_nutrients テーブル。
+    DailyTargetSnapshot の時点の栄養素情報。
 
-    - DailyTargetSnapshot ごとの 17 栄養素のスナップショット値。
+    - (snapshot_id, code) で一意。
     """
 
     __tablename__ = "daily_target_snapshot_nutrients"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    snapshot_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("daily_target_snapshots.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+    snapshot_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("daily_target_snapshots.id", ondelete="CASCADE"),
+        primary_key=True,
     )
+    # NutrientCode.value
+    code = sa.Column(sa.String(length=50), primary_key=True)
 
-    code = Column(String, nullable=False)
-    amount = Column(Float, nullable=False)
-    unit = Column(String, nullable=False)
-    source = Column(String, nullable=False)
+    amount_value = sa.Column(sa.Float, nullable=False)
+    amount_unit = sa.Column(sa.String(length=20), nullable=False)
+    source = sa.Column(sa.String(length=20), nullable=False)
 
-    snapshot = relationship("DailyTargetSnapshotModel",
-                            back_populates="nutrients")
-
-    __table_args__ = (
-        UniqueConstraint("snapshot_id", "code",
-                         name="uq_snapshot_nutrient_code_per_snapshot"),
+    snapshot: DailyTargetSnapshotModel = relationship(
+        "DailyTargetSnapshotModel",
+        back_populates="nutrients",
     )

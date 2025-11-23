@@ -3,90 +3,122 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.application.auth.ports.clock_port import ClockPort
-from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
-from app.application.target.dto.target_dto import CreateTargetInputDTO, TargetDTO
+from app.application.target.dto.target_dto import (
+    CreateTargetInputDTO,
+    TargetDTO,
+    TargetNutrientDTO,
+)
+from app.application.target.errors import TargetLimitExceededError
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
-from app.application.target.ports.target_generator_port import TargetGeneratorPort
-from app.domain.auth.errors import UserNotFoundError
+from app.application.target.ports.target_generator_port import (
+    TargetGeneratorPort,
+    TargetGenerationContext,
+)
 from app.domain.auth.value_objects import UserId
-from app.domain.profile.entities import Profile
-from app.domain.target import errors as target_errors
 from app.domain.target.entities import TargetDefinition
-from app.domain.target.value_objects import TargetId
+from app.domain.target.value_objects import (
+    TargetId,
+    GoalType,
+    ActivityLevel,
+)
+
+
+MAX_TARGETS_PER_USER = 5
 
 
 class CreateTargetUseCase:
     """
-    新しいターゲットを作成するユースケース。
+    新しい TargetDefinition を作成するユースケース。
 
-    - プロフィール情報 + 目標情報 (GoalType / ActivityLevel / 説明) を元に、
-      TargetGeneratorPort (LLM / ルールベース) を用いて 17栄養素のターゲット値を決定する。
-    - ユーザーごとのターゲット数は最大 MAX_TARGETS_PER_USER 件まで。
-    - まだアクティブなターゲットが無ければ、このターゲットを is_active=True にする。
+    - プロフィール + 目標情報から TargetGeneratorPort を使って 17 栄養素を生成
+    - 初めての Target なら is_active=True、それ以外は is_active=False
+    - 将来的には Profile 情報を ctx に詰めて渡す想定（いまは未使用部分は None）
     """
-
-    MAX_TARGETS_PER_USER = 5
 
     def __init__(
         self,
         uow: TargetUnitOfWorkPort,
-        profile_repo: ProfileRepositoryPort,
         generator: TargetGeneratorPort,
-        clock: ClockPort,
     ) -> None:
         self._uow = uow
-        self._profile_repo = profile_repo
         self._generator = generator
-        self._clock = clock
 
     def execute(self, input_dto: CreateTargetInputDTO) -> TargetDTO:
-        user_id_vo = UserId(input_dto.user_id)
-
-        # プロフィールの存在確認
-        profile: Profile | None = self._profile_repo.get_by_user_id(user_id_vo)
-        if profile is None:
-            # プロフィールが無い状態でターゲットは作らせない
-            raise UserNotFoundError("Profile is required to create a target.")
-
-        now = self._clock.now()
+        user_id = UserId(input_dto.user_id)
 
         with self._uow as uow:
-            # 上限チェック
-            current_count = uow.target_repo.count_for_user(user_id_vo)
-            if current_count >= self.MAX_TARGETS_PER_USER:
-                raise target_errors.MaxTargetsReachedError(
-                    f"User {user_id_vo.value} cannot have more than {self.MAX_TARGETS_PER_USER} targets."
+            # --- 上限チェック（5個まで） ------------------------------
+            existing_targets = uow.target_repo.list_by_user(
+                user_id=user_id,
+                limit=MAX_TARGETS_PER_USER + 1,
+            )
+            if len(existing_targets) >= MAX_TARGETS_PER_USER:
+                raise TargetLimitExceededError(
+                    f"User already has {MAX_TARGETS_PER_USER} targets."
                 )
 
-            # 17栄養素のターゲット値を Generator から生成
-            generated = self._generator.generate(
-                profile=profile,
-                goal_type=input_dto.goal_type,
-                activity_level=input_dto.activity_level,
-                goal_description=input_dto.goal_description,
+            # --- ターゲット生成（LLM or Stub） ------------------------
+            ctx = TargetGenerationContext(
+                user_id=user_id,
+                sex=None,
+                birthdate=None,
+                height_cm=None,
+                weight_kg=None,
+                goal_type=GoalType(input_dto.goal_type),
+                activity_level=ActivityLevel(input_dto.activity_level),
             )
+            gen_result = self._generator.generate(ctx)
 
-            # 既存のアクティブターゲットの有無
-            has_active = uow.target_repo.get_active_for_user(
-                user_id_vo) is not None
+            already_active = uow.target_repo.get_active(user_id)
+            is_active = already_active is None
 
+            now = datetime.now(timezone.utc)
             target = TargetDefinition(
                 id=TargetId(str(uuid4())),
-                user_id=user_id_vo,
+                user_id=user_id,
                 title=input_dto.title,
-                goal_type=input_dto.goal_type,
+                goal_type=GoalType(input_dto.goal_type),
                 goal_description=input_dto.goal_description,
-                activity_level=input_dto.activity_level,
-                nutrients=generated.nutrients,
-                is_active=not has_active,  # まだアクティブが無ければ True
+                activity_level=ActivityLevel(input_dto.activity_level),
+                nutrients=gen_result.nutrients,
+                is_active=is_active,
                 created_at=now,
                 updated_at=now,
-                llm_rationale=generated.rationale,
-                disclaimer=generated.disclaimer,
+                llm_rationale=gen_result.llm_rationale,
+                disclaimer=gen_result.disclaimer,
             )
 
-            saved = uow.target_repo.save(target)
-            # commit は UoW の __exit__ で行われる
+            uow.target_repo.add(target)
+            uow.commit()
 
-        return TargetDTO.from_entity(saved)
+            return _to_dto(target)
+
+
+# --- Domain -> DTO 変換ヘルパー ----------------------------------------
+
+
+def _to_dto(target: TargetDefinition) -> TargetDTO:
+    nutrients_dto = [
+        TargetNutrientDTO(
+            code=n.code.value,
+            amount=n.amount.value,
+            unit=n.amount.unit,
+            source=n.source.value,
+        )
+        for n in target.nutrients
+    ]
+
+    return TargetDTO(
+        id=target.id.value,
+        user_id=target.user_id.value,
+        title=target.title,
+        goal_type=target.goal_type.value,
+        goal_description=target.goal_description,
+        activity_level=target.activity_level.value,
+        is_active=target.is_active,
+        nutrients=nutrients_dto,
+        llm_rationale=target.llm_rationale,
+        disclaimer=target.disclaimer,
+        created_at=target.created_at,
+        updated_at=target.updated_at,
+    )

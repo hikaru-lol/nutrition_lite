@@ -1,69 +1,69 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 
-from app.application.auth.ports.clock_port import ClockPort
+from app.application.target.errors import TargetNotFoundError
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 from app.domain.auth.value_objects import UserId
-from app.domain.target.entities import DailyTargetSnapshot, TargetNutrient
-from app.domain.target import errors as target_errors
+from app.domain.target.entities import DailyTargetSnapshot
+from app.domain.target.value_objects import TargetId  # 型参照だけならなくてもよいが、明示のため
+
+
+@dataclass(slots=True)
+class EnsureDailySnapshotInputDTO:
+    """
+    DailyTargetSnapshot を「その日付について必ず1件存在する状態」にするための入力 DTO。
+
+    - date を省略した場合は今日の日付を使う想定。
+    """
+
+    user_id: str
+    target_date: date | None = None
 
 
 class EnsureDailySnapshotUseCase:
     """
-    特定日に対して DailyTargetSnapshot を確定させるユースケース。
+    指定ユーザー + 日付について DailyTargetSnapshot を「存在させる」ユースケース。
 
-    ルール:
-    - target_date が「今日以降」の場合は何もしない（スナップショットは過去日だけ）。
-    - すでにスナップショットが存在する場合は何もしない（idempotent）。
-    - スナップショットが無い過去日については、その日時点の active target をコピーして固定する。
-    - active target が存在しなければ何もしない（または NoActiveTargetError を投げるのも選択肢）。
+    ロジック:
+      1. (user_id, date) の Snapshot が既にあれば、それをそのまま返す
+      2. なければ、その時点で Active な TargetDefinition を取得
+      3. Active Target がなければ TargetNotFoundError
+      4. TargetDefinition から DailyTargetSnapshot を生成し、保存して返す
     """
 
-    def __init__(self, uow: TargetUnitOfWorkPort, clock: ClockPort) -> None:
+    def __init__(self, uow: TargetUnitOfWorkPort) -> None:
         self._uow = uow
-        self._clock = clock
 
-    def execute(self, user_id: str, target_date: date) -> None:
-        today = self._clock.now().date()
-        if target_date >= today:
-            # 今日以降はスナップショットを作らないポリシー
-            return
-
-        user_id_vo = UserId(user_id)
+    def execute(
+        self,
+        input_dto: EnsureDailySnapshotInputDTO,
+    ) -> DailyTargetSnapshot:
+        target_date = input_dto.target_date or date.today()
+        user_id = UserId(input_dto.user_id)
 
         with self._uow as uow:
-            existing = uow.snapshot_repo.get_by_user_and_date(
-                user_id_vo, target_date)
+            existing = uow.target_snapshot_repo.get_by_user_and_date(
+                user_id=user_id,
+                snapshot_date=target_date,
+            )
             if existing is not None:
-                # すでにスナップショットがある場合は何もしない（idempotent）
-                return
+                return existing
 
-            active = uow.target_repo.get_active_for_user(user_id_vo)
-            if active is None:
-                # アクティブなターゲットが無い場合の扱い：
-                # - 何も作らない（以後の処理が snapshot の有無を考慮する前提）
-                # - もしくは target_errors.NoActiveTargetError を投げる設計もあり。
-                return
-
-            # active の nutrients をコピーして snapshot を作成
-            snapshot_nutrients = [
-                TargetNutrient(
-                    code=n.code,
-                    amount=deepcopy(n.amount),
-                    source=n.source,
+            active_target = uow.target_repo.get_active(user_id)
+            if active_target is None:
+                raise TargetNotFoundError(
+                    "Cannot create DailyTargetSnapshot because no active target exists."
                 )
-                for n in active.nutrients
-            ]
 
-            snapshot = DailyTargetSnapshot(
-                user_id=user_id_vo,
-                date=target_date,
-                target_id=active.id,
-                nutrients=snapshot_nutrients,
-                created_at=self._clock.now(),
+            snapshot = DailyTargetSnapshot.from_target(
+                target=active_target,
+                snapshot_date=target_date,
+                created_at=datetime.now(timezone.utc),
             )
 
-            uow.snapshot_repo.save(snapshot)
-            # commit は UoW の __exit__ で行われる
+            uow.target_snapshot_repo.add(snapshot)
+            uow.commit()
+
+            return snapshot

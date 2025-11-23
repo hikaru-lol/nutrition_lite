@@ -94,40 +94,53 @@ class SqlAlchemyProfileUnitOfWork(ProfileUnitOfWorkPort):
 
 class SqlAlchemyTargetUnitOfWork(TargetUnitOfWorkPort):
     """
-    target ドメイン用の SQLAlchemy ベースの Unit of Work 実装。
+    Target 用の Unit of Work 実装。
 
-    - target_repo / snapshot_repo をまとめて管理する。
+    - 1 UseCase 呼び出し毎に新しい Session を開き、
+      with ブロックの終了時に commit/rollback を行う。
     """
 
     def __init__(self, session_factory: Callable[[], Session] = create_session) -> None:
         self._session_factory = session_factory
         self._session: Session | None = None
 
-        self.target_repo: TargetRepositoryPort  # type: ignore[assignment]
-        # type: ignore[assignment]
-        self.snapshot_repo: TargetSnapshotRepositoryPort
+        # Port 型として公開されるリポジトリ
+        self.target_repo: TargetRepositoryPort
+        self.target_snapshot_repo: TargetSnapshotRepositoryPort
+
+    # ------------------------------------------------------------------
+    # Context manager
+    # ------------------------------------------------------------------
 
     def __enter__(self) -> "SqlAlchemyTargetUnitOfWork":
         self._session = self._session_factory()
+
+        # DI: この UoW 経由で Repo を取得する
         self.target_repo = SqlAlchemyTargetRepository(self._session)
-        self.snapshot_repo = SqlAlchemyTargetSnapshotRepository(self._session)
+        self.target_snapshot_repo = SqlAlchemyTargetSnapshotRepository(
+            self._session)
+
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        assert self._session is not None
         try:
             if exc_type is None:
-                self._session.commit()
+                self.commit()
             else:
-                self._session.rollback()
+                self.rollback()
         finally:
-            self._session.close()
-            self._session = None
+            if self._session is not None:
+                self._session.close()
+                self._session = None
+
+    # ------------------------------------------------------------------
+    # Transaction control
+    # ------------------------------------------------------------------
 
     def commit(self) -> None:
-        assert self._session is not None
-        self._session.commit()
+        if self._session is not None:
+            self._session.commit()
 
     def rollback(self) -> None:
-        assert self._session is not None
-        self._session.rollback()
+        if self._session is not None:
+            self._session.rollback()

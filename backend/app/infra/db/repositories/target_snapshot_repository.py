@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import List
+from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
-from app.application.target.ports.target_snapshot_repository_port import TargetSnapshotRepositoryPort
+from app.application.target.ports.target_snapshot_repository_port import (
+    TargetSnapshotRepositoryPort,
+)
 from app.domain.auth.value_objects import UserId
 from app.domain.target.entities import DailyTargetSnapshot, TargetNutrient
 from app.domain.target.value_objects import (
@@ -22,96 +25,100 @@ from app.infra.db.models.target import (
 
 class SqlAlchemyTargetSnapshotRepository(TargetSnapshotRepositoryPort):
     """
-    TargetSnapshotRepositoryPort の SQLAlchemy 実装。
+    DailyTargetSnapshot 用の SQLAlchemy リポジトリ。
     """
 
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    # --- Entity <-> Model 変換 ---------------------------------------
-
-    def _nutrient_model_to_entity(self, model: DailyTargetSnapshotNutrientModel) -> TargetNutrient:
-        return TargetNutrient(
-            code=NutrientCode(model.code),
-            amount=NutrientAmount(value=model.amount, unit=model.unit),
-            source=NutrientSource(model.source),
-        )
-
-    def _nutrient_entity_to_model(
-        self,
-        entity: TargetNutrient,
-        snapshot_id: str,
-    ) -> DailyTargetSnapshotNutrientModel:
-        return DailyTargetSnapshotNutrientModel(
-            snapshot_id=snapshot_id,
-            code=entity.code.value,
-            amount=entity.amount.value,
-            unit=entity.amount.unit,
-            source=entity.source.value,
-        )
+    # ------------------------------------------------------------------
+    # Entity <-> Model
+    # ------------------------------------------------------------------
 
     def _to_entity(self, model: DailyTargetSnapshotModel) -> DailyTargetSnapshot:
-        nutrients = [self._nutrient_model_to_entity(
-            nm) for nm in model.nutrients]
+        nutrients = tuple(
+            TargetNutrient(
+                code=NutrientCode(n.code),
+                amount=NutrientAmount(
+                    value=n.amount_value,
+                    unit=n.amount_unit,
+                ),
+                source=NutrientSource(n.source),
+            )
+            for n in model.nutrients
+        )
+
         return DailyTargetSnapshot(
             user_id=UserId(str(model.user_id)),
             date=model.date,
-            # type: ignore[arg-type]
-            target_id=TargetId(str(model.target_id)
-                               ) if model.target_id is not None else None,
+            target_id=TargetId(str(model.target_id)),
             nutrients=nutrients,
             created_at=model.created_at,
         )
 
-    def _from_entity(self, entity: DailyTargetSnapshot) -> DailyTargetSnapshotModel:
-        # (user_id, date) はユニークなので、それで既存を検索する
-        existing: DailyTargetSnapshotModel | None = (
-            self._session.query(DailyTargetSnapshotModel)
-            .filter(
-                DailyTargetSnapshotModel.user_id == entity.user_id.value,
-                DailyTargetSnapshotModel.date == entity.date,
-            )
-            .one_or_none()
+    def _from_entity(self, snapshot: DailyTargetSnapshot) -> DailyTargetSnapshotModel:
+        model = DailyTargetSnapshotModel(
+            user_id=UUID(snapshot.user_id.value),
+            date=snapshot.date,
+            target_id=UUID(snapshot.target_id.value),
+            created_at=snapshot.created_at,
         )
-        if existing is None:
-            model = DailyTargetSnapshotModel(
-                user_id=entity.user_id.value,
-                date=entity.date,
-            )
-        else:
-            model = existing
 
-        model.target_id = entity.target_id.value
-        model.created_at = entity.created_at
-
-        # nutrients を差し替え
-        model.nutrients.clear()
-        for n in entity.nutrients:
+        for n in snapshot.nutrients:
             model.nutrients.append(
-                # id は新規時は None → flush 後に振られる
-                self._nutrient_entity_to_model(n, model.id or None)
+                DailyTargetSnapshotNutrientModel(
+                    code=n.code.value,
+                    amount_value=n.amount.value,
+                    amount_unit=n.amount.unit,
+                    source=n.source.value,
+                )
             )
 
         return model
 
-    # --- Port 実装 ---------------------------------------------------
+    # ------------------------------------------------------------------
+    # Port 実装
+    # ------------------------------------------------------------------
 
-    def get_by_user_and_date(self, user_id: UserId, target_date: date) -> DailyTargetSnapshot | None:
-        model: DailyTargetSnapshotModel | None = (
-            self._session.query(DailyTargetSnapshotModel)
-            .options(joinedload(DailyTargetSnapshotModel.nutrients))
-            .filter(
-                DailyTargetSnapshotModel.user_id == user_id.value,
-                DailyTargetSnapshotModel.date == target_date,
+    def add(self, snapshot: DailyTargetSnapshot) -> None:
+        model = self._from_entity(snapshot)
+        self._session.add(model)
+
+    def get_by_user_and_date(
+        self,
+        user_id: UserId,
+        snapshot_date: date,
+    ) -> DailyTargetSnapshot | None:
+        stmt = (
+            select(DailyTargetSnapshotModel)
+            .options(selectinload(DailyTargetSnapshotModel.nutrients))
+            .where(
+                DailyTargetSnapshotModel.user_id == UUID(user_id.value),
+                DailyTargetSnapshotModel.date == snapshot_date,
             )
-            .one_or_none()
         )
+        model = self._session.execute(stmt).scalar_one_or_none()
         if model is None:
             return None
         return self._to_entity(model)
 
-    def save(self, snapshot: DailyTargetSnapshot) -> DailyTargetSnapshot:
-        model = self._from_entity(snapshot)
-        self._session.add(model)
-        self._session.flush()
-        return self._to_entity(model)
+    def list_by_user(
+        self,
+        user_id: UserId,
+        *,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[DailyTargetSnapshot]:
+        stmt = (
+            select(DailyTargetSnapshotModel)
+            .options(selectinload(DailyTargetSnapshotModel.nutrients))
+            .where(DailyTargetSnapshotModel.user_id == UUID(user_id.value))
+            .order_by(DailyTargetSnapshotModel.date.asc())
+        )
+        if start_date is not None:
+            stmt = stmt.where(DailyTargetSnapshotModel.date >= start_date)
+        if end_date is not None:
+            stmt = stmt.where(DailyTargetSnapshotModel.date <= end_date)
+
+        models = self._session.execute(stmt).scalars().all()
+        return [self._to_entity(m) for m in models]
