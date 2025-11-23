@@ -1,123 +1,130 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, status
+import logging
+from typing import List
 
-from app.api.http.schemas.auth import ErrorResponse
-from app.api.http.schemas.target import (
-    TargetCreateRequest,
-    TargetUpdateRequest,
-    TargetResponse,
-    TargetsResponse,
-    Target,
-    TargetNutrient,
-)
+from fastapi import APIRouter, Depends, status
+
 from app.api.http.dependencies.auth import get_current_user_dto
+from app.api.http.schemas.auth import ErrorResponse, AuthUserResponse  # ErrorResponseだけ使う
+from app.api.http.schemas.target import (
+    CreateTargetRequest,
+    UpdateTargetRequest,
+    TargetResponse,
+    TargetListResponse,
+    target_dto_to_schema,
+    target_list_dto_to_schema,
+)
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
+
 from app.application.target.dto.target_dto import (
-    TargetDTO,
-    TargetNutrientDTO,
     CreateTargetInputDTO,
+    ListTargetsInputDTO,
+    GetTargetInputDTO,
+    GetActiveTargetInputDTO,
     UpdateTargetInputDTO,
     UpdateTargetNutrientDTO,
     ActivateTargetInputDTO,
 )
 from app.application.target.use_cases.create_target import CreateTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
-from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
 from app.application.target.use_cases.get_target import GetTargetUseCase
+from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
 from app.application.target.use_cases.activate_target import ActivateTargetUseCase
+
+# DI コンテナ（Auth ルーターに合わせて container から取得する想定）
 from app.di.container import (
     get_create_target_use_case,
     get_list_targets_use_case,
-    get_get_active_target_use_case,
     get_get_target_use_case,
+    get_get_active_target_use_case,
     get_update_target_use_case,
     get_activate_target_use_case,
 )
 
 router = APIRouter(prefix="/targets", tags=["Target"])
 
-
-def _to_target_schema(dto: TargetDTO) -> Target:
-    """
-    application層の TargetDTO から API用 Target スキーマへ変換するヘルパ。
-    """
-    return Target(
-        id=dto.id,
-        user_id=dto.user_id,
-        title=dto.title,
-        goal_type=dto.goal_type,
-        goal_description=dto.goal_description,
-        activity_level=dto.activity_level,
-        is_active=dto.is_active,
-        nutrients=[
-            TargetNutrient(
-                code=n.code,
-                amount=n.amount,
-                unit=n.unit,
-                source=n.source,
-            )
-            for n in dto.nutrients
-        ],
-        llm_rationale=dto.llm_rationale,
-        disclaimer=dto.disclaimer,
-        created_at=dto.created_at,
-        updated_at=dto.updated_at,
-    )
+logger = logging.getLogger("target_route")
 
 
-@router.get(
-    "",
-    response_model=TargetsResponse,
-    responses={401: {"model": ErrorResponse}},
-)
-def list_targets(
-    current_user: AuthUserDTO = Depends(get_current_user_dto),
-    use_case: ListTargetsUseCase = Depends(get_list_targets_use_case),
-) -> TargetsResponse:
-    """
-    現在ログイン中のユーザーのターゲット一覧を取得する。
-    """
-    dtos = use_case.execute(current_user.id)
-    items = [_to_target_schema(dto) for dto in dtos]
-    return TargetsResponse(items=items)
+# ---------------------------------------------------------------------
+# POST /targets  ターゲット作成
+# ---------------------------------------------------------------------
 
 
 @router.post(
     "",
-    response_model=TargetResponse,
     status_code=status.HTTP_201_CREATED,
+    response_model=TargetResponse,
     responses={
         400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},  # プロフィールがない場合など
-        409: {"model": ErrorResponse},  # MAX_TARGETS_REACHED など
+        409: {"model": ErrorResponse},  # 上限超えなどドメインエラーを想定
     },
 )
 def create_target(
-    body: TargetCreateRequest,
+    request: CreateTargetRequest,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: CreateTargetUseCase = Depends(get_create_target_use_case),
 ) -> TargetResponse:
     """
     新しいターゲットを作成する。
-
-    - Profile 情報は UseCase 内で ProfileRepositoryPort を通じて取得。
+    17栄養素はサーバ側で TargetGenerator により決定される。
     """
     input_dto = CreateTargetInputDTO(
-        user_id=current_user.id,
-        sex=None,           # プロフィールから取る設計なら DTO から外してOK
-        birthdate=None,
-        height_cm=None,
-        weight_kg=None,
-        goal_type=body.goal_type,
-        activity_level=body.activity_level,
-        goal_description=body.goal_description,
-        title=body.title,
+        user_id=str(current_user.id),
+        title=request.title,
+        goal_type=request.goal_type,           # Literal[str] -> str
+        goal_description=request.goal_description,
+        activity_level=request.activity_level,
     )
-    dto: TargetDTO = use_case.execute(input_dto)
-    return TargetResponse(target=_to_target_schema(dto))
+
+    result = use_case.execute(input_dto)
+
+    logger.info(
+        "Target created: user_id=%s target_id=%s",
+        current_user.id,
+        result.id,
+    )
+
+    return target_dto_to_schema(result)
+
+
+# ---------------------------------------------------------------------
+# GET /targets  ターゲット一覧
+# ---------------------------------------------------------------------
+
+
+@router.get(
+    "",
+    response_model=TargetListResponse,
+    responses={
+        401: {"model": ErrorResponse},
+    },
+)
+def list_targets(
+    limit: int | None = None,
+    offset: int = 0,
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
+    use_case: ListTargetsUseCase = Depends(get_list_targets_use_case),
+) -> TargetListResponse:
+    """
+    現在のユーザーのターゲット一覧を取得する。
+    """
+    input_dto = ListTargetsInputDTO(
+        user_id=str(current_user.id),
+        limit=limit,
+        offset=offset,
+    )
+
+    result = use_case.execute(input_dto)
+    return target_list_dto_to_schema(result)
+
+
+# ---------------------------------------------------------------------
+# GET /targets/active  アクティブターゲット取得
+# ---------------------------------------------------------------------
 
 
 @router.get(
@@ -133,10 +140,16 @@ def get_active_target(
     use_case: GetActiveTargetUseCase = Depends(get_get_active_target_use_case),
 ) -> TargetResponse:
     """
-    現在のアクティブなターゲットを取得する。
+    現在アクティブなターゲットを取得する。
     """
-    dto: TargetDTO = use_case.execute(current_user.id)
-    return TargetResponse(target=_to_target_schema(dto))
+    input_dto = GetActiveTargetInputDTO(user_id=str(current_user.id))
+    result = use_case.execute(input_dto)
+    return target_dto_to_schema(result)
+
+
+# ---------------------------------------------------------------------
+# GET /targets/{target_id}  ターゲット1件取得
+# ---------------------------------------------------------------------
 
 
 @router.get(
@@ -148,19 +161,28 @@ def get_active_target(
     },
 )
 def get_target(
-    target_id: str = Path(..., description="Target ID (UUID)"),
+    target_id: str,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: GetTargetUseCase = Depends(get_get_target_use_case),
 ) -> TargetResponse:
     """
-    指定されたターゲットを取得する。
+    指定 ID のターゲットを1件取得する。
     """
-    dto: TargetDTO = use_case.execute(
-        user_id=current_user.id, target_id=target_id)
-    return TargetResponse(target=_to_target_schema(dto))
+    input_dto = GetTargetInputDTO(
+        user_id=str(current_user.id),
+        target_id=target_id,
+    )
+
+    result = use_case.execute(input_dto)
+    return target_dto_to_schema(result)
 
 
-@router.put(
+# ---------------------------------------------------------------------
+# PATCH /targets/{target_id}  ターゲット部分更新
+# ---------------------------------------------------------------------
+
+
+@router.patch(
     "/{target_id}",
     response_model=TargetResponse,
     responses={
@@ -170,41 +192,51 @@ def get_target(
     },
 )
 def update_target(
-    target_id: str = Path(..., description="Target ID (UUID)"),
-    body: TargetUpdateRequest = ...,
+    target_id: str,
+    request: UpdateTargetRequest,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: UpdateTargetUseCase = Depends(get_update_target_use_case),
 ) -> TargetResponse:
     """
-    既存のターゲットを更新する。
-
-    - 減量／増量の目標や活動量の変更
-    - 特定の栄養素の amount/unit の手動調整 など
+    ターゲットの部分更新（PATCH）。
     """
-
-    nutrient_updates: list[NutrientUpdateDTO] | None = None
-    if body.nutrients:
-        nutrient_updates = [
-            NutrientUpdateDTO(
+    nutrients_dto: list[UpdateTargetNutrientDTO] | None = None
+    if request.nutrients is not None:
+        nutrients_dto = [
+            UpdateTargetNutrientDTO(
                 code=n.code,
                 amount=n.amount,
                 unit=n.unit,
             )
-            for n in body.nutrients
+            for n in request.nutrients
         ]
 
     input_dto = UpdateTargetInputDTO(
-        user_id=current_user.id,
+        user_id=str(current_user.id),
         target_id=target_id,
-        title=body.title,
-        goal_type=body.goal_type,
-        goal_description=body.goal_description,
-        activity_level=body.activity_level,
-        nutrients=nutrient_updates,
+        title=request.title,
+        goal_type=request.goal_type,
+        goal_description=request.goal_description,
+        activity_level=request.activity_level,
+        llm_rationale=request.llm_rationale,
+        disclaimer=request.disclaimer,
+        nutrients=nutrients_dto,
     )
 
-    dto: TargetDTO = use_case.execute(input_dto)
-    return TargetResponse(target=_to_target_schema(dto))
+    result = use_case.execute(input_dto)
+
+    logger.info(
+        "Target updated: user_id=%s target_id=%s",
+        current_user.id,
+        target_id,
+    )
+
+    return target_dto_to_schema(result)
+
+
+# ---------------------------------------------------------------------
+# POST /targets/{target_id}/activate  ターゲットをアクティブ化
+# ---------------------------------------------------------------------
 
 
 @router.post(
@@ -216,17 +248,25 @@ def update_target(
     },
 )
 def activate_target(
-    target_id: str = Path(..., description="Target ID (UUID)"),
+    target_id: str,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: ActivateTargetUseCase = Depends(get_activate_target_use_case),
 ) -> TargetResponse:
     """
-    指定したターゲットをアクティブなターゲットとしてマークする。
-    以前アクティブだったターゲットは非アクティブになる。
+    指定したターゲットをアクティブ化する。
+    （同一ユーザーの他のターゲットは非アクティブになる）
     """
     input_dto = ActivateTargetInputDTO(
-        user_id=current_user.id,
+        user_id=str(current_user.id),
         target_id=target_id,
     )
-    dto: TargetDTO = use_case.execute(input_dto)
-    return TargetResponse(target=_to_target_schema(dto))
+
+    result = use_case.execute(input_dto)
+
+    logger.info(
+        "Target activated: user_id=%s target_id=%s",
+        current_user.id,
+        target_id,
+    )
+
+    return target_dto_to_schema(result)

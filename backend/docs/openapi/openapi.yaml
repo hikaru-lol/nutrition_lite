@@ -259,19 +259,38 @@ paths:
       tags: [Target]
       summary: List current user's targets
       description: >
-        Return all nutrition targets for the currently authenticated user.
-        Each target represents a daily set of 17 nutrient goals.
+        List all nutrition targets of the currently authenticated user
+        (optionally paginated with limit/offset). The newest targets
+        (by created_at) are returned first. Each target represents a
+        daily set of 17 nutrient goals.
       security:
         - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          required: false
+          description: Maximum number of targets to return (default is implementation-defined)
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          required: false
+          description: Number of items to skip before starting to collect the result set
       responses:
         '200':
-          description: List of targets for the current user
+          description: List of user's targets
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TargetsResponse'
+                $ref: '#/components/schemas/TargetListResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized (missing or invalid access token)
           content:
             application/json:
               schema:
@@ -281,13 +300,13 @@ paths:
       tags: [Target]
       summary: Create a new nutrition target
       description: >
-        Create a new daily nutrition target for the current user.
+        Create a new daily nutrition target definition for the current user.
 
         The server uses the user's Profile (sex, birthdate, height, weight) plus
         the provided goal information (goal_type, activity_level, etc.) to generate
-        a set of recommended daily intakes for 17 nutrients using a model (e.g., LLM or rules).
-
-        If this is the first target for the user, it becomes the active target.
+        a set of recommended daily intakes for 17 nutrients using a model
+        (e.g., LLM or rules). If this is the first target for the user,
+        it becomes the active target.
       security:
         - AccessTokenCookieAuth: []
       requestBody:
@@ -295,7 +314,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TargetCreateRequest'
+              $ref: '#/components/schemas/CreateTargetRequest'
       responses:
         '201':
           description: Target created successfully
@@ -328,10 +347,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /targets/lighting:
+  /targets/active:
     get:
       tags: [Target]
-      summary: Get current active target
+      summary: Get active target
       description: >
         Return the active nutrition target for the currently authenticated user.
         If no target is active or if no targets exist, an error is returned.
@@ -339,7 +358,7 @@ paths:
         - AccessTokenCookieAuth: []
       responses:
         '200':
-          description: Active target for the user
+          description: Active target of the current user
           content:
             application/json:
               schema:
@@ -357,56 +376,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /targets/{targetId}:
+  /targets/{target_id}:
     get:
       tags: [Target]
-      summary: Get a specific target
+      summary: Get target by ID
       description: >
-        Return a specific target by ID if it belongs to the current user.
+        Get a specific nutrition target of the current user by its ID.
       security:
         - AccessTokenCookieAuth: []
       parameters:
-        - name: targetId
-          in: path
+        - in: path
+          name: target_id
           required: true
+          description: Target ID (UUID)
           schema:
             type: string
             format: uuid
       responses:
         '200':
-          description: Target found
+          description: Target detail
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TargetResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized (missing or invalid access token)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Target not found
+          description: Target not found or does not belong to the current user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    put:
+    patch:
       tags: [Target]
-      summary: Update a target
+      summary: Partially update a target
       description: >
-        Update an existing target for the current user.
-
-        This endpoint is mainly used for manual adjustments of the generated target,
-        e.g., changing specific nutrient amounts or modifying the goal description.
-        Nutrient values provided here will be treated as manually set (source="manual").
+        Partially update fields of an existing nutrition target.
+        Only fields present in the request body are updated.
+        When nutrient values are updated, their source is changed to "manual".
       security:
         - AccessTokenCookieAuth: []
       parameters:
-        - name: targetId
-          in: path
+        - in: path
+          name: target_id
           required: true
+          description: Target ID (UUID)
           schema:
             type: string
             format: uuid
@@ -415,7 +434,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TargetUpdateRequest'
+              $ref: '#/components/schemas/UpdateTargetRequest'
       responses:
         '200':
           description: Updated target
@@ -424,55 +443,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/TargetResponse'
         '400':
-          description: Invalid input
+          description: Invalid nutrient code or invalid input
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized (missing or invalid access token)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Target not found
+          description: Target not found or does not belong to the current user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /targets/{targetId}/activate:
+  /targets/{target_id}/activate:
     post:
       tags: [Target]
       summary: Activate a target
       description: >
-        Mark the specified target as the active target for the current user.
-        Any previously active target will be deactivated.
+        Activate the specified target for the current user.
+        Any other targets of the same user will be set to inactive.
       security:
         - AccessTokenCookieAuth: []
       parameters:
-        - name: targetId
-          in: path
+        - in: path
+          name: target_id
           required: true
+          description: Target ID (UUID)
           schema:
             type: string
             format: uuid
       responses:
         '200':
-          description: Target activated successfully
+          description: Activated target
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TargetResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized (missing or invalid access token)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Target not found
+          description: Target not found or does not belong to the current user
           content:
             application/json:
               schema:
@@ -659,40 +679,51 @@ components:
     # ==========
     GoalType:
       type: string
+      description: Target goal type.
       enum:
         - weight_loss
-        - weight_maintain
+        - maintain
         - weight_gain
         - health_improve
 
     ActivityLevel:
       type: string
-      enum: [low, normal, high]
+      description: User's activity level used for target calculation.
+      enum:
+        - low
+        - normal
+        - high
 
     NutrientCode:
       type: string
-      description: 'Identifier for a nutrient'
+      description: >
+        Code for one of the 17 nutrients tracked in daily targets.
       enum:
+        # Energy sources
         - carbohydrate
         - fat
         - protein
+        # Vitamins
         - vitamin_a
         - vitamin_b_complex
         - vitamin_c
         - vitamin_d
         - vitamin_e
         - vitamin_k
+        # Minerals
         - calcium
         - iron
         - magnesium
         - zinc
         - sodium
         - potassium
+        # Others
         - fiber
         - water
 
     NutrientSource:
       type: string
+      description: Source of the target nutrient value.
       enum:
         - llm
         - manual
@@ -700,20 +731,30 @@ components:
 
     TargetNutrient:
       type: object
+      description: Target value for a single nutrient.
       properties:
         code:
           $ref: '#/components/schemas/NutrientCode'
         amount:
           type: number
+          format: float
+          description: Target amount of the nutrient.
+          example: 150.0
         unit:
           type: string
-          description: 'Unit of the nutrient (e.g., g, mg, µg, kcal)'
+          description: Unit of the amount (e.g. "g", "mg", "kcal", "ml").
+          example: g
         source:
           $ref: '#/components/schemas/NutrientSource'
+      required:
+        - code
+        - amount
+        - unit
+        - source
 
-    Target:
+    TargetResponse:
       type: object
-      description: 'Nutrition target for a specific user and goal.'
+      description: A single nutrition target definition.
       properties:
         id:
           type: string
@@ -748,48 +789,74 @@ components:
         updated_at:
           type: string
           format: date-time
+      required:
+        - id
+        - user_id
+        - title
+        - goal_type
+        - activity_level
+        - is_active
+        - nutrients
+        - created_at
+        - updated_at
 
-    TargetResponse:
+    TargetListResponse:
       type: object
-      properties:
-        target:
-          $ref: '#/components/schemas/Target'
-
-    TargetsResponse:
-      type: object
+      description: List of targets for the current user.
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Target'
+            $ref: '#/components/schemas/TargetResponse'
+      required:
+        - items
 
-    TargetCreateRequest:
+    CreateTargetRequest:
       type: object
+      description: Request body to create a new target.
+      properties:
+        title:
+          type: string
+          description: Human-friendly name of the target.
+          example: 'Lean bulk (spring 2025)'
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+          description: Optional free-form description of the goal.
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
       required:
         - title
         - goal_type
         - activity_level
-      properties:
-        title:
-          type: string
-          description: Short title for the target (e.g., "Cutting phase")
-        goal_type:
-          $ref: '#/components/schemas/GoalType'
-        goal_description:
-          type: string
-          nullable: true
-          description: Free-text description of the user's goal
-        activity_level:
-          $ref: '#/components/schemas/ActivityLevel'
 
-    TargetUpdateRequest:
+    UpdateTargetNutrient:
       type: object
-      description: >
-        Fields to update for an existing target. All properties are optional.
-        Provided nutrient values will be treated as manual overrides.
+      description: Partial update for a single nutrient in the target.
+      properties:
+        code:
+          $ref: '#/components/schemas/NutrientCode'
+        amount:
+          type: number
+          format: float
+          nullable: true
+          description: New amount. If omitted or null, the amount is not changed.
+        unit:
+          type: string
+          nullable: true
+          description: New unit. If omitted or null, the unit is not changed.
+      required:
+        - code
+
+    UpdateTargetRequest:
+      type: object
+      description: Partial update for a target definition.
       properties:
         title:
           type: string
+          nullable: true
         goal_type:
           $ref: '#/components/schemas/GoalType'
         goal_description:
@@ -797,23 +864,25 @@ components:
           nullable: true
         activity_level:
           $ref: '#/components/schemas/ActivityLevel'
+        llm_rationale:
+          type: string
+          nullable: true
+        disclaimer:
+          type: string
+          nullable: true
         nutrients:
           type: array
+          nullable: true
           items:
-            type: object
-            properties:
-              code:
-                $ref: '#/components/schemas/NutrientCode'
-              amount:
-                type: number
-              unit:
-                type: string
+            $ref: '#/components/schemas/UpdateTargetNutrient'
+      additionalProperties: false
 
     # ==========
     # Error
     # ==========
     ErrorResponse:
       type: object
+      description: Generic error response.
       properties:
         error:
           type: object
@@ -837,3 +906,5 @@ components:
             message:
               type: string
               description: Human-readable error message
+      required:
+        - error
