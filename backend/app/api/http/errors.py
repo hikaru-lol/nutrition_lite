@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.domain.auth import errors as auth_errors
+from app.application.target import errors as target_app_errors
+from app.domain.target import errors as target_domain_errors
 
 import logging
 
@@ -80,4 +82,55 @@ async def validation_error_handler(_: Request, exc: RequestValidationError):
         "VALIDATION_ERROR",
         "リクエストの形式が正しくありません。",
         status.HTTP_400_BAD_REQUEST,
+    )
+
+
+async def target_error_handler(request: Request, exc: target_app_errors.TargetError):
+    logger.warning(
+        "TargetError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, target_app_errors.TargetNotFoundError):
+        return error_response(
+            "TARGET_NOT_FOUND",
+            "ターゲットが見つかりません。",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    logger.exception("Unhandled TargetError: %s", exc)
+    return error_response(
+        "INTERNAL_ERROR",
+        "予期しないエラーが発生しました。",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+async def target_domain_error_handler(
+    request: Request,
+    exc: target_domain_errors.TargetDomainError,
+):
+    logger.warning(
+        "TargetDomainError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, target_domain_errors.InvalidTargetNutrientError):
+        return error_response(
+            "INVALID_TARGET_NUTRIENT",
+            "指定された栄養素コードが不正です。",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    logger.exception("Unhandled TargetDomainError: %s", exc)
+    return error_response(
+        "INTERNAL_ERROR",
+        "予期しないエラーが発生しました。",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
     )

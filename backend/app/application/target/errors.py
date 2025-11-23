@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 
-class TargetNotFoundError(Exception):
+class TargetError(Exception):
+    """Target アプリケーション用のベース例外。"""
+    pass
+
+
+class TargetNotFoundError(TargetError):
     """
-    指定された Target が存在しない、またはログインユーザーに属していないときのエラー。
-    API 層で 404 にマッピングする想定。
+    指定された Target が存在しない、
+    またはログインユーザーに属していないときのエラー。
     """
     pass
 
 
-class TargetLimitExceededError(Exception):
+class TargetLimitExceededError(TargetError):
     """
     ユーザーが作成できる TargetDefinition の上限を超えたときのエラー。
-    API 層で 400 などにマッピングする想定。
     """
     pass

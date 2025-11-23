@@ -9,6 +9,7 @@ from app.application.target.dto.target_dto import (
     TargetNutrientDTO,
 )
 from app.application.target.errors import TargetNotFoundError
+from app.domain.target.errors import InvalidTargetNutrientError
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 from app.domain.auth.value_objects import UserId
 from app.domain.target.entities import TargetDefinition, TargetNutrient
@@ -16,7 +17,6 @@ from app.domain.target.value_objects import (
     TargetId,
     GoalType,
     ActivityLevel,
-    NutrientCode,
     NutrientAmount,
     NutrientSource,
 )
@@ -98,8 +98,8 @@ def _apply_nutrient_patch(
     nutrient = nutrient_by_code.get(patch.code)
 
     if nutrient is None:
-        # 設計次第で無視してもいいが、ここでは明示的にエラーにしておく
-        raise ValueError(f"Unknown nutrient code: {patch.code}")
+        raise InvalidTargetNutrientError(
+            f"Unknown nutrient code: {patch.code}")
 
     current_amount = nutrient.amount
 
