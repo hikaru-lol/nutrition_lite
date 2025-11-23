@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as pg
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship  # ★ Mapped を追加
 
 from app.infra.db.base import Base  # プロジェクトの Base に合わせて調整
 
@@ -49,7 +49,8 @@ class TargetModel(Base):
     updated_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
 
     # nutrients との 1:N 関係
-    nutrients: list[TargetNutrientModel] = relationship(
+    # ★ 型を Mapped[...] に変更
+    nutrients: Mapped[list["TargetNutrientModel"]] = relationship(
         "TargetNutrientModel",
         back_populates="target",
         cascade="all, delete-orphan",
@@ -80,7 +81,8 @@ class TargetNutrientModel(Base):
     # NutrientSource.value
     source = sa.Column(sa.String(length=20), nullable=False)
 
-    target: TargetModel = relationship(
+    # ★ 型を Mapped[...] に変更
+    target: Mapped["TargetModel"] = relationship(
         "TargetModel",
         back_populates="nutrients",
     )
@@ -124,7 +126,8 @@ class DailyTargetSnapshotModel(Base):
         ),
     )
 
-    nutrients: list[DailyTargetSnapshotNutrientModel] = relationship(
+    # ★ 型を Mapped[...] に変更
+    nutrients: Mapped[list["DailyTargetSnapshotNutrientModel"]] = relationship(
         "DailyTargetSnapshotNutrientModel",
         back_populates="snapshot",
         cascade="all, delete-orphan",
@@ -153,7 +156,8 @@ class DailyTargetSnapshotNutrientModel(Base):
     amount_unit = sa.Column(sa.String(length=20), nullable=False)
     source = sa.Column(sa.String(length=20), nullable=False)
 
-    snapshot: DailyTargetSnapshotModel = relationship(
+    # ★ 型を Mapped[...] に変更
+    snapshot: Mapped["DailyTargetSnapshotModel"] = relationship(
         "DailyTargetSnapshotModel",
         back_populates="nutrients",
     )

@@ -8,7 +8,7 @@ from app.application.target.dto.target_dto import GetTargetInputDTO
 from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.application.target.errors import TargetNotFoundError
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,

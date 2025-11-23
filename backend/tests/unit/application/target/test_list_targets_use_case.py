@@ -6,7 +6,7 @@ from uuid import uuid4
 from app.application.target.dto.target_dto import ListTargetsInputDTO
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,

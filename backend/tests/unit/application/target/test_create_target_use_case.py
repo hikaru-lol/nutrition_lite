@@ -13,7 +13,7 @@ from app.domain.auth.value_objects import UserId
 from app.domain.target.value_objects import GoalType, ActivityLevel, NutrientCode
 from app.application.target.errors import TargetLimitExceededError
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,

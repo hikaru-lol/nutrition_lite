@@ -17,7 +17,7 @@ from app.domain.target.value_objects import (
 )
 from app.domain.target.errors import InvalidTargetNutrientError
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,

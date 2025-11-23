@@ -10,7 +10,7 @@ from app.application.target.use_cases.get_active_target import (
 )
 from app.application.target.errors import TargetNotFoundError
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,

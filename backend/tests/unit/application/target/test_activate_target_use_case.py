@@ -9,7 +9,7 @@ from app.application.target.use_cases.activate_target import ActivateTargetUseCa
 from app.application.target.errors import TargetNotFoundError
 from app.domain.auth.value_objects import UserId
 
-from .fakes import (
+from tests.unit.application.target.fakes import (
     FakeTargetRepository,
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,
