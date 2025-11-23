@@ -100,7 +100,7 @@ def test_upsert_profile_creates_profile_and_get_me_returns_it(client: TestClient
     )
     assert put_resp.status_code == 200
 
-    body = put_resp.json()jx
+    body = put_resp.json()
     assert body["user_id"]  # uuid 文字列が入っているはず
     assert body["sex"] == req["sex"]
     assert body["birthdate"] == req["birthdate"]
