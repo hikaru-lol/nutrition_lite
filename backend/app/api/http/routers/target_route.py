@@ -60,6 +60,7 @@ logger = logging.getLogger("target_route")
     responses={
         400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},  # 上限超えなどドメインエラーを想定
     },
 )

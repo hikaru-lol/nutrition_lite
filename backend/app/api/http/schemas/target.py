@@ -105,7 +105,8 @@ class UpdateTargetNutrientSchema(BaseModel):
     ターゲット内の特定栄養素の部分更新用。
     """
 
-    code: NutrientCodeLiteral
+    # code: NutrientCodeLiteral
+    code: str
     amount: Optional[float] = None
     unit: Optional[str] = None
 
