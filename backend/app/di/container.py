@@ -37,13 +37,13 @@ from app.infra.storage.minio_profile_image_storage import MinioProfileImageStora
 
 # ★ Target 用の追加
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
-from app.application.target.ports.target_repository_port import TargetRepositoryPort
 from app.application.target.ports.target_generator_port import TargetGeneratorPort
 from app.application.target.use_cases.create_target import CreateTargetUseCase
-# from app.application.target.use_cases.get_my_profile import GetMyProfileUseCase
+from app.application.target.use_cases.update_target import UpdateTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.activate_target import ActivateTargetUseCase
 from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
+from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
 from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
 from app.infra.llm.target_generator_stub import StubTargetGenerator
@@ -216,4 +216,23 @@ def get_activate_target_use_case() -> ActivateTargetUseCase:
     return ActivateTargetUseCase(
         uow=get_target_uow(),
         clock=get_clock(),
+    )
+
+
+def get_update_target_use_case() -> UpdateTargetUseCase:
+    """
+    /target/update のための UseCase。
+    """
+    return UpdateTargetUseCase(
+        uow=get_target_uow(),
+        clock=get_clock(),
+    )
+
+
+def get_get_target_use_case() -> GetTargetUseCase:
+    """
+    /target/get のための UseCase。
+    """
+    return GetTargetUseCase(
+        uow=get_target_uow(),
     )

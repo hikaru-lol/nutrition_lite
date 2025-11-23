@@ -18,13 +18,13 @@ from app.application.target.dto.target_dto import (
     TargetNutrientDTO,
     CreateTargetInputDTO,
     UpdateTargetInputDTO,
-    NutrientUpdateDTO,
+    UpdateTargetNutrientDTO,
     ActivateTargetInputDTO,
 )
 from app.application.target.use_cases.create_target import CreateTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
-# from app.application.target.use_cases.get_target import GetTargetUseCase  # ※未実装なら追加
+from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
 from app.application.target.use_cases.activate_target import ActivateTargetUseCase
 from app.di.container import (

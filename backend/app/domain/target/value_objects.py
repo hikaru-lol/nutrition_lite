@@ -13,6 +13,9 @@ class GoalType(str, Enum):
     WEIGHT_GAIN = "weight_gain"
     HEALTH_IMPROVE = "health_improve"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class ActivityLevel(str, Enum):
     """運動量のレベル。ターゲット計算時に使用する。"""
@@ -20,6 +23,9 @@ class ActivityLevel(str, Enum):
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class NutrientCode(str, Enum):
@@ -50,6 +56,9 @@ class NutrientCode(str, Enum):
     FIBER = "fiber"
     WATER = "water"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 NutrientSourceLiteral = Literal["llm", "manual", "user_input"]
 
@@ -63,6 +72,9 @@ class TargetId:
     def __post_init__(self) -> None:
         if not self.value:
             raise ValueError("TargetId cannot be empty")
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -85,6 +97,9 @@ class NutrientAmount:
         if not self.unit:
             raise ValueError("Nutrient unit cannot be empty")
 
+    def __str__(self) -> str:
+        return f"{self.value} {self.unit}"
+
 
 @dataclass(frozen=True)
 class NutrientSource:
@@ -101,3 +116,6 @@ class NutrientSource:
     def __post_init__(self) -> None:
         if self.value not in ("llm", "manual", "user_input"):
             raise ValueError(f"Invalid nutrient source: {self.value}")
+
+    def __str__(self) -> str:
+        return self.value

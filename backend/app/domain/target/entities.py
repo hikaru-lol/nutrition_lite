@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from typing import Iterable
 
 from app.domain.auth.value_objects import UserId
 from app.domain.target.value_objects import (
@@ -9,8 +10,8 @@ from app.domain.target.value_objects import (
     GoalType,
     ActivityLevel,
     NutrientCode,
-    NutrientSource,
     NutrientAmount,
+    NutrientSource,
 )
 
 
@@ -60,6 +61,8 @@ class TargetDefinition:
     # 医療行為ではない等の注意書き
     disclaimer: str | None = None
 
+    # --- ステート遷移系メソッド ------------------------------------
+
     def set_active(self) -> None:
         """このターゲットをアクティブ化する。"""
         self.is_active = True
@@ -68,22 +71,64 @@ class TargetDefinition:
         """このターゲットを非アクティブにする。"""
         self.is_active = False
 
-    def update_timestamp(self, now: datetime) -> None:
+    def update_timestamp(self, now: datetime | None = None) -> None:
         """更新時に updated_at を現在時刻で更新する。"""
+        if now is None:
+            now = datetime.now(timezone.utc)
         self.updated_at = now
 
-    def ensure_full_nutrients(self) -> None:
+    # --- 栄養素関連のヘルパー --------------------------------------
+
+    def get_nutrient(self, code: NutrientCode) -> TargetNutrient | None:
+        """指定した栄養素コードに対応する TargetNutrient を返す。"""
+        for n in self.nutrients:
+            if n.code == code:
+                return n
+        return None
+
+    def update_nutrient(
+        self,
+        code: NutrientCode,
+        amount: NutrientAmount | None = None,
+        source: NutrientSource | None = None,
+    ) -> None:
         """
-        nutrients が 17 種のコードをすべてカバーしているか、
-        必要ならここでチェックすることもできる。
+        指定した栄養素の値を更新する。
 
-        （実際のチェックロジックは後で必要になれば実装する）
+        - amount が None の場合は量は変更しない
+        - source が None の場合は由来は変更しない
         """
-        # TODO: 必要なら実装
-        pass
+        nutrient = self.get_nutrient(code)
+        if nutrient is None:
+            raise ValueError(f"Unknown nutrient code: {code.value}")
+
+        if amount is not None:
+            nutrient.amount = amount
+
+        if source is not None:
+            nutrient.source = source
+
+    def ensure_full_nutrients(
+        self,
+        required_codes: Iterable[NutrientCode] | None = None,
+    ) -> None:
+        """
+        nutrients が 17 種のコードをすべてカバーしているかをチェックする。
+
+        実際に呼び出すかどうかはユースケース次第。
+        """
+        if required_codes is None:
+            required_codes = list(NutrientCode)
+
+        present = {n.code for n in self.nutrients}
+        missing = [code for code in required_codes if code not in present]
+        if missing:
+            codes_str = ", ".join(c.value for c in missing)
+            raise ValueError(
+                f"Missing nutrient codes in TargetDefinition: {codes_str}")
 
 
-@dataclass
+@dataclass(frozen=True)
 class DailyTargetSnapshot:
     """
     特定日付に対するターゲット値のスナップショット。
@@ -97,6 +142,38 @@ class DailyTargetSnapshot:
     target_id: TargetId
 
     # スナップショット時点の栄養ターゲット（17要素）
-    nutrients: list[TargetNutrient]
-
+    nutrients: tuple[TargetNutrient, ...]
     created_at: datetime
+
+    @classmethod
+    def from_target(
+        cls,
+        target: TargetDefinition,
+        snapshot_date: date,
+        created_at: datetime | None = None,
+    ) -> DailyTargetSnapshot:
+        """
+        Active な TargetDefinition から、その日付のスナップショットを作成する。
+
+        - TargetNutrient 自体は新しくコピーを作成することで、後から
+          TargetDefinition 側を変更してもスナップショットが変わらないようにする。
+        """
+        if created_at is None:
+            created_at = datetime.now(timezone.utc)
+
+        nutrients_copy = tuple(
+            TargetNutrient(
+                code=n.code,
+                amount=n.amount,      # NutrientAmount は immutable
+                source=n.source,      # NutrientSource も immutable
+            )
+            for n in target.nutrients
+        )
+
+        return cls(
+            user_id=target.user_id,
+            date=snapshot_date,
+            target_id=target.id,
+            nutrients=nutrients_copy,
+            created_at=created_at,
+        )

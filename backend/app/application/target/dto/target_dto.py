@@ -83,27 +83,6 @@ class CreateTargetInputDTO:
 
 
 @dataclass
-class UpdateTargetInputDTO:
-    """
-    既存ターゲットを手動で編集する際の入力 DTO。
-
-    - 栄養素は「全量を置き換え」でも「部分的更新」でもよいが、
-      まずはシンプルに「全17栄養素をまとめて渡して丸ごと置き換える」前提でもよい。
-    """
-
-    user_id: str
-    target_id: str
-
-    title: Optional[str] = None
-    goal_type: Optional[GoalType] = None
-    goal_description: Optional[str] = None
-    activity_level: Optional[ActivityLevel] = None
-
-    # 手動編集後の栄養素セット（None の場合は栄養素は変更しない）
-    nutrients: Optional[List[TargetNutrientDTO]] = None
-
-
-@dataclass
 class ActivateTargetInputDTO:
     """
     指定ターゲットをアクティブ化する際の入力 DTO。
@@ -111,3 +90,49 @@ class ActivateTargetInputDTO:
 
     user_id: str
     target_id: str
+
+# --- GetTarget 用 ------------------------------------------------------
+
+
+@dataclass(slots=True)
+class GetTargetInputDTO:
+    """1件取得用の入力 DTO（認証済みユーザーの target_id ）"""
+
+    user_id: str
+    target_id: str
+
+
+# --- UpdateTarget 用 ---------------------------------------------------
+
+
+@dataclass(slots=True)
+class UpdateTargetNutrientDTO:
+    """栄養素1つ分のパッチ情報"""
+
+    code: str
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+    # source は UC 側で "manual" に変更するので、ここからは受け取らない
+
+
+@dataclass(slots=True)
+class UpdateTargetInputDTO:
+    """
+    Target の部分更新用 DTO。
+
+    - None のフィールドは「その項目は更新しない」
+    - 値が入っているフィールドだけを更新する（PATCH 的な挙動）
+    """
+
+    user_id: str
+    target_id: str
+
+    title: Optional[str] = None
+    goal_type: Optional[str] = None
+    goal_description: Optional[str] = None
+    activity_level: Optional[str] = None
+
+    llm_rationale: Optional[str] = None
+    disclaimer: Optional[str] = None
+
+    nutrients: Optional[list[UpdateTargetNutrientDTO]] = None
