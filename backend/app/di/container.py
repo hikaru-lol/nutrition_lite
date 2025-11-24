@@ -35,6 +35,9 @@ from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.infra.db.uow import SqlAlchemyProfileUnitOfWork
 from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
 from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
+from app.infra.profile.profile_query_service import ProfileQueryService
+from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
+from app.infra.profile.profile_query_service import ProfileQueryService
 
 # ★ Target 用の追加
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
@@ -198,6 +201,12 @@ def get_target_generator() -> TargetGeneratorPort:
     return _target_generator_singleton
 
 
+def get_profile_query_service() -> ProfileQueryService:
+    return ProfileQueryService(
+        get_my_profile_uc=get_get_my_profile_use_case(),
+    )
+
+
 def get_create_target_use_case() -> CreateTargetUseCase:
     """
     /target/create のための UseCase をDIする。
@@ -206,7 +215,7 @@ def get_create_target_use_case() -> CreateTargetUseCase:
         uow=get_target_uow(),
         profile_repo=get_profile_repository(),
         generator=get_target_generator(),
-        clock=get_clock(),
+        profile_query=get_profile_query_service(),
     )
 
 

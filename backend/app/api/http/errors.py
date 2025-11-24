@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from app.domain.auth import errors as auth_errors
 from app.application.target import errors as target_app_errors
 from app.domain.target import errors as target_domain_errors
-
+from app.domain.profile import errors as profile_domain_errors
 import logging
 
 logger = logging.getLogger(__name__)
@@ -98,6 +98,30 @@ async def target_error_handler(request: Request, exc: target_app_errors.TargetEr
         return error_response(
             "TARGET_NOT_FOUND",
             "ターゲットが見つかりません。",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    # LLM によるターゲット生成失敗
+    if isinstance(exc, target_app_errors.TargetGenerationFailedError):
+        return error_response(
+            "TARGET_GENERATION_FAILED",
+            "栄養ターゲットの自動生成に失敗しました。",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    # 上限超えをドメイン側で投げている場合（必要であれば）
+    if isinstance(exc, target_app_errors.TargetLimitExceededError):
+        return error_response(
+            "TARGET_LIMIT_EXCEEDED",
+            "作成できるターゲットの上限数に達しています。",
+            status.HTTP_409_CONFLICT,
+        )
+
+    # プロフィールが見つからない場合
+    if isinstance(exc, profile_domain_errors.ProfileNotFoundError):
+        return error_response(
+            "PROFILE_NOT_FOUND",
+            "プロフィールが見つかりません。",
             status.HTTP_404_NOT_FOUND,
         )
 
