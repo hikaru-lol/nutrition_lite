@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.settings import settings
+
+# --- auth 用 imports はそのまま ---
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort
@@ -20,8 +23,30 @@ from app.infra.db.repositories.user_repository import SqlAlchemyUserRepository
 from app.infra.security.password_hasher import BcryptPasswordHasher
 from app.infra.security.jwt_token_service import JwtTokenService
 from app.infra.time.system_clock import SystemClock
-
 from app.infra.db.uow import SqlAlchemyAuthUnitOfWork
+
+# --- ★ profile 用 imports を追加 ---
+from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
+from app.application.profile.ports.profile_image_storage_port import ProfileImageStoragePort
+from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
+from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
+from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
+from app.infra.db.uow import SqlAlchemyProfileUnitOfWork
+from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
+from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
+
+# ★ Target 用の追加
+from app.application.target.ports.uow_port import TargetUnitOfWorkPort
+from app.application.target.ports.target_generator_port import TargetGeneratorPort
+from app.application.target.use_cases.create_target import CreateTargetUseCase
+from app.application.target.use_cases.update_target import UpdateTargetUseCase
+from app.application.target.use_cases.list_targets import ListTargetsUseCase
+from app.application.target.use_cases.activate_target import ActivateTargetUseCase
+from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
+from app.application.target.use_cases.get_target import GetTargetUseCase
+from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
+from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
+from app.infra.llm.target_generator_stub import StubTargetGenerator
 
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
@@ -53,7 +78,11 @@ def get_clock() -> ClockPort:
     return SystemClock()
 
 
-# --- UseCase --------------------------------------------------
+def get_profile_repository() -> ProfileRepositoryPort:
+    session = get_db_session()
+    return SqlAlchemyTargetRepository(session)
+
+# --- Auth UseCases --------------------------------------------------
 
 
 def get_register_user_use_case() -> RegisterUserUseCase:
@@ -91,7 +120,119 @@ def get_refresh_token_use_case() -> RefreshTokenUseCase:
     )
 
 
-def get_get_current_user_use_case() -> GetCurrentUserUseCase:
+def get_current_user_use_case() -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(
         uow=get_auth_uow(),
+    )
+
+
+# --- Profile DI ----------------------------------------------------
+
+
+# InMemory ストレージはプロセス内で共有したいので、シングルトン的に1インスタンスを持つ
+_profile_image_storage_instance: InMemoryProfileImageStorage | None = None
+_profile_image_storage_singleton: ProfileImageStoragePort | None = None
+
+
+def get_profile_image_storage() -> ProfileImageStoragePort:
+    global _profile_image_storage_singleton
+    if _profile_image_storage_singleton is None:
+        if settings.USE_FAKE_INFRA:
+            _profile_image_storage_singleton = InMemoryProfileImageStorage()
+        else:
+            _profile_image_storage_singleton = MinioProfileImageStorage()
+    return _profile_image_storage_singleton
+
+
+def get_profile_uow() -> ProfileUnitOfWorkPort:
+    return SqlAlchemyProfileUnitOfWork()
+
+
+def get_upsert_profile_use_case() -> UpsertProfileUseCase:
+    return UpsertProfileUseCase(
+        uow=get_profile_uow(),
+        image_storage=get_profile_image_storage(),
+    )
+
+
+def get_get_my_profile_use_case() -> GetMyProfileUseCase:
+    return GetMyProfileUseCase(
+        uow=get_profile_uow(),
+    )
+
+
+# --- Target 用のUoW / Generator -------------------------------------
+
+
+def get_target_uow() -> TargetUnitOfWorkPort:
+    return SqlAlchemyTargetUnitOfWork()
+
+
+# Target生成ロジック（Stub）。後で本番用の実装に差し替え可能。
+_target_generator_singleton: TargetGeneratorPort | None = None
+
+
+def get_target_generator() -> TargetGeneratorPort:
+    global _target_generator_singleton
+    if _target_generator_singleton is None:
+        _target_generator_singleton = StubTargetGenerator()
+    return _target_generator_singleton
+
+
+def get_create_target_use_case() -> CreateTargetUseCase:
+    """
+    /target/create のための UseCase をDIする。
+    """
+    return CreateTargetUseCase(
+        uow=get_target_uow(),
+        profile_repo=get_profile_repository(),
+        generator=get_target_generator(),
+        clock=get_clock(),
+    )
+
+
+def get_get_active_target_use_case() -> GetMyProfileUseCase:
+    """
+    /target/active（現在のターゲット取得）のための UseCase。
+    """
+    return GetActiveTargetUseCase(
+        uow=get_target_uow(),
+    )
+
+
+def get_list_targets_use_case() -> ListTargetsUseCase:
+    """
+    /target/list のための UseCase。
+    """
+    return ListTargetsUseCase(
+        uow=get_target_uow(),
+    )
+
+
+def get_activate_target_use_case() -> ActivateTargetUseCase:
+    """
+    /target/activate のための UseCase。
+    """
+    return ActivateTargetUseCase(
+        uow=get_target_uow(),
+        clock=get_clock(),
+    )
+
+
+def get_update_target_use_case() -> UpdateTargetUseCase:
+    """
+    /target/update のための UseCase。
+    """
+    return UpdateTargetUseCase(
+        uow=get_target_uow(),
+        clock=get_clock(),
+    )
+
+
+def get_get_target_use_case() -> GetTargetUseCase:
+    """
+    /target/get のための UseCase。
+    """
+    return GetTargetUseCase(
+        uow=get_target_uow(),
     )

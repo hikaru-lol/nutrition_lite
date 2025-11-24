@@ -17,3 +17,7 @@ class UserNotFoundError(AuthError):
 
 class InvalidRefreshTokenError(AuthError):
     pass
+
+
+class InvalidEmailFormatError(AuthError):
+    pass

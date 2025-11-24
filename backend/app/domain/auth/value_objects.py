@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import StrEnum
 import re
 
+from app.domain.auth.errors import InvalidEmailFormatError
+
 
 class UserPlan(StrEnum):
     TRIAL = "trial"
@@ -21,7 +23,9 @@ class EmailAddress:
 
     def __post_init__(self) -> None:
         if not _EMAIL_REGEX.match(self.value):
-            raise ValueError(f"Invalid email format: {self.value}")
+            # 元: raise ValueError(...)
+            raise InvalidEmailFormatError(
+                f"Invalid email format: {self.value}")
 
 
 @dataclass(frozen=True)
