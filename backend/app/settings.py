@@ -56,5 +56,10 @@ class Settings:
     # テストで Fake を使うかどうか切り替えるためのフラグ
     USE_FAKE_INFRA: bool = _env_bool("USE_FAKE_INFRA", True)
 
+    # ===== OpenAI API 関連 =====
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    # OPENAI_ORG_ID: str | None = os.getenv("OPENAI_ORG_ID") or None
+    # OPENAI_PROJECT_ID: str | None = os.getenv("OPENAI_PROJECT_ID") or None
+
 
 settings = Settings()

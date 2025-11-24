@@ -21,6 +21,8 @@ from app.domain.target.value_objects import (
     GoalType,
     ActivityLevel,
 )
+from app.application.target.ports.profile_query_port import ProfileQueryPort, ProfileForTarget
+from app.domain.profile.errors import ProfileNotFoundError
 
 
 MAX_TARGETS_PER_USER = 5
@@ -39,9 +41,11 @@ class CreateTargetUseCase:
         self,
         uow: TargetUnitOfWorkPort,
         generator: TargetGeneratorPort,
+        profile_query: ProfileQueryPort,
     ) -> None:
         self._uow = uow
         self._generator = generator
+        self._profile_query = profile_query
 
     def execute(self, input_dto: CreateTargetInputDTO) -> TargetDTO:
         user_id = UserId(input_dto.user_id)
@@ -57,13 +61,19 @@ class CreateTargetUseCase:
                     f"User already has {MAX_TARGETS_PER_USER} targets."
                 )
 
+            profile = self._profile_query.get_profile_for_target(user_id)
+            if profile is None:
+                raise ProfileNotFoundError(
+                    f"Profile not found for user {user_id}."
+                )
+
             # --- ターゲット生成（LLM or Stub） ------------------------
             ctx = TargetGenerationContext(
                 user_id=user_id,
-                sex=None,
-                birthdate=None,
-                height_cm=None,
-                weight_kg=None,
+                sex=profile.sex,
+                birthdate=profile.birthdate,
+                height_cm=profile.height_cm,
+                weight_kg=profile.weight_kg,
                 goal_type=GoalType(input_dto.goal_type),
                 activity_level=ActivityLevel(input_dto.activity_level),
             )

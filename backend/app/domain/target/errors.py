@@ -7,7 +7,7 @@ class TargetError(Exception):
 
 class MaxTargetsReachedError(TargetError):
     """
-    ユーザーが作成可能なターゲット数の上限（例: 5件）を超えた場合。
+    ユーザーが作成可能なターゲット数の上限（例: 5件）を超えた場合。 
     """
 
 
