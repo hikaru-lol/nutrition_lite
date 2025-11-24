@@ -19,3 +19,8 @@ class TargetLimitExceededError(TargetError):
     ユーザーが作成できる TargetDefinition の上限を超えたときのエラー。
     """
     pass
+
+
+class TargetGenerationFailedError(TargetError):
+    """LLM によるターゲット生成に失敗したときのエラー。"""
+    pass

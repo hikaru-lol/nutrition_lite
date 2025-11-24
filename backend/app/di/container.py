@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from sqlalchemy.orm import Session
 
 from app.settings import settings
@@ -47,6 +48,11 @@ from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
 from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
 from app.infra.llm.target_generator_stub import StubTargetGenerator
+
+# TargetGeneratorPortの実装
+from app.application.target.ports.target_generator_port import TargetGeneratorPort
+from app.infra.llm.target_generator_stub import StubTargetGenerator
+from app.infra.llm.target_generator_openai import OpenAITargetGenerator, OpenAITargetGeneratorConfig
 
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
@@ -171,11 +177,24 @@ def get_target_uow() -> TargetUnitOfWorkPort:
 # Target生成ロジック（Stub）。後で本番用の実装に差し替え可能。
 _target_generator_singleton: TargetGeneratorPort | None = None
 
+_USE_OPENAI_TARGET_GENERATOR = os.getenv("USE_OPENAI_TARGET_GENERATOR", "false").lower() in (
+    "1", "true", "yes", "on"
+)
+
 
 def get_target_generator() -> TargetGeneratorPort:
     global _target_generator_singleton
     if _target_generator_singleton is None:
-        _target_generator_singleton = StubTargetGenerator()
+        if _USE_OPENAI_TARGET_GENERATOR:
+            _target_generator_singleton = OpenAITargetGenerator(
+                config=OpenAITargetGeneratorConfig(
+                    model=os.getenv("OPENAI_TARGET_MODEL", "gpt-4o-mini"),
+                    temperature=float(
+                        os.getenv("OPENAI_TARGET_TEMPERATURE", "0.2")),
+                )
+            )
+        else:
+            _target_generator_singleton = StubTargetGenerator()
     return _target_generator_singleton
 
 
