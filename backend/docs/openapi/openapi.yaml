@@ -640,6 +640,14 @@ components:
           minimum: 0
           exclusiveMinimum: true
           maximum: 500
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
+          minimum: 1
+          maximum: 6
 
     ProfileResponse:
       type: object
@@ -665,6 +673,12 @@ components:
           description: >
             Optional profile image identifier in the storage backend
             (object key, file name, etc.)
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
         created_at:
           type: string
           format: date-time

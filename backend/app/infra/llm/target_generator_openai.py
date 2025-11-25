@@ -134,7 +134,7 @@ class OpenAITargetGenerator(TargetGeneratorPort):
             raise TargetGenerationFailedError("OpenAI returned empty content")
 
         try:
-            data = json.loads(content)
+            data: dict[str, Any] = json.loads(content)
         except json.JSONDecodeError as e:
             logger.exception(
                 "Failed to parse JSON from OpenAI response: %s", content)

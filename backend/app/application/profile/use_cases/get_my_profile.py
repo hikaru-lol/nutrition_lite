@@ -33,6 +33,7 @@ class GetMyProfileUseCase:
             height_cm=profile.height_cm.value,
             weight_kg=profile.weight_kg.value,
             image_id=profile.image_id.value if profile.image_id else None,
+            meals_per_day=profile.meals_per_day,
             created_at=profile.created_at,
             updated_at=profile.updated_at,
         )

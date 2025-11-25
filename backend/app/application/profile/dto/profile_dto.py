@@ -21,6 +21,7 @@ class ProfileDTO:
     image_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+    meals_per_day: int | None = None
 
 
 @dataclass
@@ -40,3 +41,14 @@ class UpsertProfileInputDTO:
 
     image_content: bytes | None = None
     image_content_type: str | None = None
+    meals_per_day: int | None = None
+
+
+@dataclass
+class ProfileOutputDTO:
+    sex: str
+    birthdate: date
+    height: float
+    weight: float
+    image_id: str | None
+    meals_per_day: int | None

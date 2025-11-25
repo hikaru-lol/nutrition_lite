@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-
+from sqlalchemy.types import SmallInteger
 from sqlalchemy import Column, Date, DateTime, Float, String, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -30,5 +29,6 @@ class ProfileModel(Base):
 
     image_id = Column(String, nullable=True)
 
+    meals_per_day = Column(SmallInteger(display_width=2), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)

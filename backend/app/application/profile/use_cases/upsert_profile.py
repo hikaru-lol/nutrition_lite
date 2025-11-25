@@ -54,6 +54,7 @@ class UpsertProfileUseCase:
                     height_cm=HeightCm(input_dto.height_cm),
                     weight_kg=WeightKg(input_dto.weight_kg),
                     image_id=image_id,
+                    meals_per_day=input_dto.meals_per_day,
                     created_at=now,
                     updated_at=now,
                 )
@@ -63,6 +64,7 @@ class UpsertProfileUseCase:
                 existing.height_cm = HeightCm(input_dto.height_cm)
                 existing.weight_kg = WeightKg(input_dto.weight_kg)
                 existing.image_id = image_id
+                existing.meals_per_day = input_dto.meals_per_day
                 existing.updated_at = now
                 profile = existing
 
@@ -76,6 +78,7 @@ class UpsertProfileUseCase:
             height_cm=saved.height_cm.value,
             weight_kg=saved.weight_kg.value,
             image_id=saved.image_id.value if saved.image_id else None,
+            meals_per_day=saved.meals_per_day,
             created_at=saved.created_at,
             updated_at=saved.updated_at,
         )

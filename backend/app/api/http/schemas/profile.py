@@ -21,6 +21,13 @@ class ProfileRequest(BaseModel):
     height_cm: float = Field(gt=0, lt=300)
     weight_kg: float = Field(gt=0, lt=500)
 
+    meals_per_day: int | None = Field(
+        default=None,
+        ge=1,
+        le=6,
+        description="1日にメインの食事をとる回数（例: 2〜4）。省略可",
+    )
+
 
 class ProfileResponse(BaseModel):
     """
@@ -37,3 +44,9 @@ class ProfileResponse(BaseModel):
     image_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    meals_per_day: int | None = Field(
+        default=None,
+        ge=1,
+        le=6,
+        description="1日にメインの食事をとる回数（例: 2〜4）。省略可",
+    )

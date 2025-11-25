@@ -67,6 +67,7 @@ def upsert_my_profile(
         weight_kg=request.weight_kg,
         image_content=None,
         image_content_type=None,
+        meals_per_day=request.meals_per_day,
     )
 
     dto = use_case.execute(input_dto)
