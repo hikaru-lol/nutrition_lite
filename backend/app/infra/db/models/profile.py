@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-from sqlalchemy.types import SmallInteger
-from sqlalchemy import Column, Date, DateTime, Float, String, ForeignKey
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    Float,
+    String,
+    ForeignKey,
+    SmallInteger,  # ← ここで一緒にimport
+)
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.infra.db.base import Base
@@ -29,6 +36,8 @@ class ProfileModel(Base):
 
     image_id = Column(String, nullable=True)
 
-    meals_per_day = Column(SmallInteger(display_width=2), nullable=True)
+    # 💡 修正ポイント：display_width を削除
+    meals_per_day = Column(SmallInteger, nullable=True)
+
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
