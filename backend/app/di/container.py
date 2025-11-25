@@ -57,6 +57,14 @@ from app.application.target.ports.target_generator_port import TargetGeneratorPo
 from app.infra.llm.target_generator_stub import StubTargetGenerator
 from app.infra.llm.target_generator_openai import OpenAITargetGenerator, OpenAITargetGeneratorConfig
 
+# --- Meal 用の imports を追加 ---
+from app.application.meal.ports.food_entry_repository_port import FoodEntryRepositoryPort
+from app.application.meal.use_cases.create_food_entry import CreateFoodEntryUseCase
+from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
+from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
+from app.application.meal.use_cases.list_food_entries_by_date import ListFoodEntriesByDateUseCase
+from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
+
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
     return SqlAlchemyAuthUnitOfWork()
@@ -263,4 +271,41 @@ def get_get_target_use_case() -> GetTargetUseCase:
     """
     return GetTargetUseCase(
         uow=get_target_uow(),
+    )
+
+# --- Meal 用のUoW / Repository -------------------------------------
+
+
+# def get_meal_uow() -> MealUnitOfWorkPort:
+#     return SqlAlchemyMealUnitOfWork()
+
+
+def get_food_entry_repository() -> FoodEntryRepositoryPort:
+    session = get_db_session()
+    return SqlAlchemyFoodEntryRepository(session)
+
+
+# --- Meal UseCases ----------------------------------------------------
+
+def get_create_food_entry_use_case() -> CreateFoodEntryUseCase:
+    return CreateFoodEntryUseCase(
+        food_entry_repository=get_food_entry_repository(),
+    )
+
+
+def get_update_food_entry_use_case() -> UpdateFoodEntryUseCase:
+    return UpdateFoodEntryUseCase(
+        food_entry_repository=get_food_entry_repository(),
+    )
+
+
+def get_delete_food_entry_use_case() -> DeleteFoodEntryUseCase:
+    return DeleteFoodEntryUseCase(
+        food_entry_repository=get_food_entry_repository(),
+    )
+
+
+def get_list_food_entries_by_date_use_case() -> ListFoodEntriesByDateUseCase:
+    return ListFoodEntriesByDateUseCase(
+        food_entry_repository=get_food_entry_repository(),
     )

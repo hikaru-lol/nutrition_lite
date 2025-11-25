@@ -7,6 +7,9 @@ from app.domain.auth import errors as auth_errors
 from app.application.target import errors as target_app_errors
 from app.domain.target import errors as target_domain_errors
 from app.domain.profile import errors as profile_domain_errors
+from app.domain.meal import errors as meal_domain_errors
+
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -153,6 +156,60 @@ async def target_domain_error_handler(
         )
 
     logger.exception("Unhandled TargetDomainError: %s", exc)
+    return error_response(
+        "INTERNAL_ERROR",
+        "予期しないエラーが発生しました。",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+async def meal_domain_error_handler(
+    request: Request,
+    exc: meal_domain_errors.MealDomainError,
+) -> JSONResponse:
+    """
+    Meal ドメインのエラーを HTTP レスポンスに変換するハンドラ。
+    """
+    logger.warning(
+        "MealDomainError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    # 400 系
+    if isinstance(exc, meal_domain_errors.InvalidMealTypeError):
+        return error_response(
+            status_code=400,
+            code="INVALID_MEAL_TYPE",
+            message=str(exc) or "Invalid meal_type",
+        )
+
+    if isinstance(exc, meal_domain_errors.InvalidMealIndexError):
+        return error_response(
+            status_code=400,
+            code="INVALID_MEAL_INDEX",
+            message=str(exc) or "Invalid meal_index for given meal_type",
+        )
+
+    if isinstance(exc, meal_domain_errors.InvalidFoodAmountError):
+        return error_response(
+            status_code=400,
+            code="INVALID_FOOD_AMOUNT",
+            message=str(exc) or "Invalid food amount",
+        )
+
+    # 404 系
+    if isinstance(exc, meal_domain_errors.FoodEntryNotFoundError):
+        return error_response(
+            status_code=404,
+            code="FOOD_ENTRY_NOT_FOUND",
+            message=str(exc) or "FoodEntry not found",
+        )
+
+    # 想定外の MealDomainError（念のため）→ 500 扱い
+    logger.exception("Unhandled MealDomainError: %s", exc)
     return error_response(
         "INTERNAL_ERROR",
         "予期しないエラーが発生しました。",
