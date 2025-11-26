@@ -53,3 +53,38 @@ class MealNutritionSummaryResponse(BaseModel):
     nutrients: list[MealNutrientResponse] = Field(
         ..., description="この食事で摂取した栄養素ごとの一覧"
     )
+
+
+class DailyNutrientResponse(BaseModel):
+    """
+    1日分の中の、ある1栄養素のレスポンス表現。
+    """
+
+    code: str = Field(..., description="栄養素コード (例: protein, fat, vitamin_c)")
+    value: float = Field(..., description="1日分の摂取量の合計")
+    unit: str = Field(..., description='単位 (例: "g", "mg", "kcal")')
+    source: str = Field(
+        ..., description='由来 (例: "llm", "manual", "user_input")'
+    )
+
+
+class DailyNutritionSummaryResponse(BaseModel):
+    """
+    1日分の栄養サマリのレスポンス。
+    """
+
+    id: str = Field(..., description="DailyNutritionSummary ID (UUID 文字列)")
+    date: date = Field(..., description="対象日 (YYYY-MM-DD)")
+    generated_at: datetime = Field(..., description="このサマリを計算した日時")
+    nutrients: list[DailyNutrientResponse] = Field(
+        ..., description="1日分の栄養素ごとの合計一覧"
+    )
+
+
+class MealAndDailyNutritionResponse(BaseModel):
+    """
+    Meal + Daily をまとめて返すためのレスポンス。
+    """
+
+    meal: MealNutritionSummaryResponse
+    daily: DailyNutritionSummaryResponse
