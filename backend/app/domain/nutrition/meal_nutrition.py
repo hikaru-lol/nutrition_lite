@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Iterable
+from uuid import UUID, uuid4
 
 from app.domain.auth.value_objects import UserId
 from app.domain.meal.value_objects import MealType
@@ -14,6 +15,22 @@ from app.domain.target.value_objects import (
 
 
 @dataclass(frozen=True)
+class MealNutritionSummaryId:
+    """
+    MealNutritionSummary の ID（UUID をラップした ValueObject）。
+    """
+
+    value: UUID
+
+    @classmethod
+    def new(cls) -> MealNutritionSummaryId:
+        return cls(uuid4())
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+@dataclass(frozen=True)
 class MealNutrientIntake:
     """
     1食分の中の、ある1栄養素の摂取量。
@@ -21,7 +38,7 @@ class MealNutrientIntake:
     例:
       - code: NutrientCode.PROTEIN
       - amount: NutrientAmount(value=25.0, unit="g")
-      - source: NutrientSource.ESTIMATED
+      - source: NutrientSource("llm")
     """
 
     code: NutrientCode
@@ -32,8 +49,9 @@ class MealNutrientIntake:
 @dataclass
 class MealNutritionSummary:
     """
-    1回の食事に対する栄養サマリ。
+    1回の食事に対する栄養サマリのエンティティ。
 
+    - id: このサマリ自体のID（DBの主キーと対応）
     - user_id: どのユーザーの食事か
     - date: 食事の日付
     - meal_type: "main" or "snack"
@@ -44,6 +62,7 @@ class MealNutritionSummary:
     - generated_at: このサマリをいつ計算したか
     """
 
+    id: MealNutritionSummaryId
     user_id: UserId
     date: date
     meal_type: MealType
@@ -55,10 +74,10 @@ class MealNutritionSummary:
         # code が重複しないように一応チェックだけしておく
         codes = [n.code for n in self.nutrients]
         if len(codes) != len(set(codes)):
-            # 重複を許容したい場合はこのチェックを外す
             duplicated = [c for c in set(codes) if codes.count(c) > 1]
             raise ValueError(
-                f"MealNutritionSummary.nutrients has duplicated codes: {duplicated}")
+                f"MealNutritionSummary.nutrients has duplicated codes: {duplicated}"
+            )
 
         # MAIN のときは meal_index が 1 以上
         if self.meal_type == MealType.MAIN:
@@ -88,9 +107,9 @@ class MealNutritionSummary:
     def as_dict(self) -> dict:
         """
         後で API レスポンス用 DTO を組み立てるときなどに使える軽い helper。
-        （必須ではないので好みで削ってもOK）
         """
         return {
+            "id": str(self.id.value),
             "user_id": self.user_id.value,
             "date": self.date.isoformat(),
             "meal_type": self.meal_type.value,
@@ -118,17 +137,23 @@ class MealNutritionSummary:
         meal_type: MealType,
         meal_index: int | None,
         nutrients: Iterable[tuple[NutrientCode, NutrientAmount]],
-        source: NutrientSource
+        source: NutrientSource,
+        summary_id: MealNutritionSummaryId | None = None,
     ) -> MealNutritionSummary:
         """
         Estimator の結果が (code, NutrientAmount) のペアで返ってくる場合に、
         まとめて MealNutritionSummary を作るための helper。
+
+        summary_id が指定されていない場合は新しい ID を採番する。
+        既存レコードの再計算などで既存 ID を維持したい場合は summary_id を渡す。
         """
         ints = [
             MealNutrientIntake(code=code, amount=amount, source=source)
             for code, amount in nutrients
         ]
+
         return cls(
+            id=summary_id or MealNutritionSummaryId.new(),
             user_id=user_id,
             date=date,
             meal_type=meal_type,
