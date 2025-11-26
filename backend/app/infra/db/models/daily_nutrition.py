@@ -8,14 +8,14 @@ from sqlalchemy.orm import relationship
 from app.infra.db.base import Base
 
 
-class MealNutritionSummaryModel(Base):
+class DailyNutritionSummaryModel(Base):
     """
-    meal_nutrition_summaries テーブル。
+    daily_nutrition_summaries テーブル。
 
-    1レコード = 1食分の栄養サマリ。
+    1レコード = あるユーザーの 1日分の栄養サマリ。
     """
 
-    __tablename__ = "meal_nutrition_summaries"
+    __tablename__ = "daily_nutrition_summaries"
 
     id = sa.Column(pg.UUID(as_uuid=True), primary_key=True)
 
@@ -27,12 +27,6 @@ class MealNutritionSummaryModel(Base):
     )
 
     date = sa.Column(sa.Date(), nullable=False, index=True)
-
-    # "main" or "snack"
-    meal_type = sa.Column(sa.String(length=16), nullable=False, index=True)
-
-    # main: 1..N / snack: NULL
-    meal_index = sa.Column(sa.SmallInteger(), nullable=True)
 
     generated_at = sa.Column(
         sa.DateTime(timezone=True),
@@ -46,8 +40,8 @@ class MealNutritionSummaryModel(Base):
         onupdate=sa.func.now(),
     )
 
-    nutrients: List[MealNutritionNutrientModel] = relationship(
-        "MealNutritionNutrientModel",
+    nutrients: List[DailyNutritionNutrientModel] = relationship(
+        "DailyNutritionNutrientModel",
         back_populates="summary",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -57,25 +51,23 @@ class MealNutritionSummaryModel(Base):
         sa.UniqueConstraint(
             "user_id",
             "date",
-            "meal_type",
-            "meal_index",
-            name="uq_meal_nutrition_user_date_slot",
+            name="uq_daily_nutrition_user_date",
         ),
     )
 
 
-class MealNutritionNutrientModel(Base):
+class DailyNutritionNutrientModel(Base):
     """
-    meal_nutrition_nutrients テーブル。
+    daily_nutrition_nutrients テーブル。
 
-    1レコード = ある1食分の中の1栄養素分。
+    1レコード = その1日分の中の1栄養素。
     """
 
-    __tablename__ = "meal_nutrition_nutrients"
+    __tablename__ = "daily_nutrition_nutrients"
 
     summary_id = sa.Column(
         pg.UUID(as_uuid=True),
-        sa.ForeignKey("meal_nutrition_summaries.id", ondelete="CASCADE"),
+        sa.ForeignKey("daily_nutrition_summaries.id", ondelete="CASCADE"),
         primary_key=True,
     )
 
@@ -88,6 +80,6 @@ class MealNutritionNutrientModel(Base):
     source = sa.Column(sa.String(length=50), nullable=False)
 
     summary = relationship(
-        "MealNutritionSummaryModel",
+        "DailyNutritionSummaryModel",
         back_populates="nutrients",
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.settings import settings
@@ -64,6 +65,21 @@ from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseC
 from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
 from app.application.meal.use_cases.list_food_entries_by_date import ListFoodEntriesByDateUseCase
 from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
+
+
+# --- Nutrition 用の imports を追加 ---
+from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
+from app.application.nutrition.use_cases.compute_meal_nutrition import ComputeMealNutritionUseCase
+from app.application.nutrition.ports.meal_nutrition_repository_port import MealNutritionSummaryRepositoryPort
+from app.infra.db.repositories.meal_nutrition_repository import SqlAlchemyMealNutritionSummaryRepository
+
+# --- Estimator Provider -------------------------------------------------
+from app.infra.nutrition.estimator_stub import StubNutritionEstimator
+
+# --- DailyNutrition Summary Provider -------------------------------------------------
+from app.application.nutrition.ports.daily_nutrition_repository_port import DailyNutritionSummaryRepositoryPort
+from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
+from app.infra.db.repositories.daily_nutrition_repository import SqlAlchemyDailyNutritionSummaryRepository
 
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
@@ -308,4 +324,65 @@ def get_delete_food_entry_use_case() -> DeleteFoodEntryUseCase:
 def get_list_food_entries_by_date_use_case() -> ListFoodEntriesByDateUseCase:
     return ListFoodEntriesByDateUseCase(
         food_entry_repository=get_food_entry_repository(),
+    )
+
+
+# --- Estimator Provider -------------------------------------------------
+
+
+def get_nutrition_estimator() -> NutritionEstimatorPort:
+    """
+    栄養推定ロジック。
+
+    - MVP では StubNutritionEstimator を利用
+    - 後で LLM / 外部DB 実装に差し替え可能
+    """
+    return StubNutritionEstimator()
+
+# --- Nutrition Repositories ----------------------------------------------------
+
+
+def get_meal_nutrition_summary_repository() -> MealNutritionSummaryRepositoryPort:
+    session = get_db_session()
+    return SqlAlchemyMealNutritionSummaryRepository(session)
+
+
+def get_daily_nutrition_summary_repository() -> DailyNutritionSummaryRepositoryPort:
+    session = get_db_session()
+    return SqlAlchemyDailyNutritionSummaryRepository(session)
+
+# --- UseCase Provider ---------------------------------------------------
+
+
+def get_compute_meal_nutrition_use_case(
+    food_entry_repo: FoodEntryRepositoryPort = Depends(
+        get_food_entry_repository),
+    meal_nutrition_repo: MealNutritionSummaryRepositoryPort = Depends(
+        get_meal_nutrition_summary_repository
+    ),
+    estimator: NutritionEstimatorPort = Depends(get_nutrition_estimator),
+) -> ComputeMealNutritionUseCase:
+    return ComputeMealNutritionUseCase(
+        food_entry_repo=food_entry_repo,
+        meal_nutrition_repo=meal_nutrition_repo,
+        estimator=estimator,
+    )
+
+
+def get_compute_daily_nutrition_summary_use_case(
+    meal_repo: MealNutritionSummaryRepositoryPort = Depends(
+        get_meal_nutrition_summary_repository
+    ),
+    daily_repo: DailyNutritionSummaryRepositoryPort = Depends(
+        get_daily_nutrition_summary_repository
+    ),
+) -> ComputeDailyNutritionSummaryUseCase:
+    """
+    1日分の栄養サマリ (DailyNutritionSummary) を計算・保存する UC。
+
+    - MealNutritionSummary を集約して計算する。
+    """
+    return ComputeDailyNutritionSummaryUseCase(
+        meal_repo=meal_repo,
+        daily_repo=daily_repo,
     )

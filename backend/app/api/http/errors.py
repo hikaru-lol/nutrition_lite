@@ -8,8 +8,8 @@ from app.application.target import errors as target_app_errors
 from app.domain.target import errors as target_domain_errors
 from app.domain.profile import errors as profile_domain_errors
 from app.domain.meal import errors as meal_domain_errors
-
-
+from app.domain.nutrition import errors as nutrition_domain_errors
+from app.domain.meal.errors import InvalidMealTypeError, InvalidMealIndexError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -214,4 +214,48 @@ async def meal_domain_error_handler(
         "INTERNAL_ERROR",
         "予期しないエラーが発生しました。",
         status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+async def nutrition_domain_error_handler(
+    request: Request,
+    exc: nutrition_domain_errors.NutritionDomainError,
+) -> JSONResponse:
+    if isinstance(exc, nutrition_domain_errors.NutritionEstimationFailedError):
+        return error_response(
+            status_code=500,
+            code="NUTRITION_ESTIMATION_FAILED",
+            message=str(exc) or "Failed to estimate nutrition",
+        )
+    # 万が一 NutritionDomainError の別バリエーションが増えても、ここで 500 にフォールバック
+    return error_response(
+        status_code=500,
+        code="NUTRITION_ERROR",
+        message=str(exc) or "Nutrition domain error",
+    )
+
+
+async def meal_slot_error_handler(
+    request: Request,
+    exc,
+) -> JSONResponse:
+    # meal_type / meal_index のバリデーションエラー用
+    if isinstance(exc, InvalidMealTypeError):
+        return error_response(
+            status_code=400,
+            code="INVALID_MEAL_TYPE",
+            message=str(exc) or "Invalid meal_type",
+        )
+    if isinstance(exc, InvalidMealIndexError):
+        return error_response(
+            status_code=400,
+            code="INVALID_MEAL_INDEX",
+            message=str(exc) or "Invalid meal_index for given meal_type",
+        )
+
+    # ここまで来ることはあまりない想定だが念のため
+    return error_response(
+        status_code=400,
+        code="INVALID_MEAL_SLOT",
+        message=str(exc) or "Invalid meal slot",
     )
