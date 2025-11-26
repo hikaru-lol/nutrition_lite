@@ -75,3 +75,25 @@ class FoodEntryDTO:
     serving_count: float | None
 
     note: str | None
+
+
+@dataclass
+class UpdateFoodEntryResultDTO:
+    """
+    FoodEntry 更新結果 + 変更前の日付。
+
+    - entry: 更新後の FoodEntryDTO
+    - old_date: 更新前の date
+    """
+    entry: FoodEntryDTO
+    old_date: date
+
+
+@dataclass
+class DeleteFoodEntryResultDTO:
+    """
+    FoodEntry 削除結果。
+
+    - date: 削除されたエントリが属していた日付
+    """
+    date: date

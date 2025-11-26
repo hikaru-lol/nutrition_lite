@@ -19,7 +19,10 @@ from app.application.meal.dto.food_entry_dto import (
     FoodEntryDTO,
     CreateFoodEntryInputDTO,
     UpdateFoodEntryInputDTO,
+    UpdateFoodEntryResultDTO,
+    DeleteFoodEntryResultDTO,
 )
+from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
 from app.api.http.dependencies.auth import get_current_user_dto
 
 from app.di.container import (
@@ -27,6 +30,7 @@ from app.di.container import (
     get_update_food_entry_use_case,
     get_delete_food_entry_use_case,
     get_list_food_entries_by_date_use_case,
+    get_compute_daily_nutrition_summary_use_case,
 )
 
 router = APIRouter(tags=["Meal"])
@@ -113,15 +117,19 @@ def update_meal_item(
     body: MealItemRequest = ...,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: UpdateFoodEntryUseCase = Depends(get_update_food_entry_use_case),
+    compute_daily_uc: ComputeDailyNutritionSummaryUseCase = Depends(
+        get_compute_daily_nutrition_summary_use_case
+    ),
 ) -> MealItemResponse:
     """
-    既存の FoodEntry を更新する。（現時点ではフル更新）
+    既存の FoodEntry を更新し、
+    影響のある日の DailyNutritionSummary を再計算する。
     """
 
     input_dto = UpdateFoodEntryInputDTO(
         entry_id=entry_id,
         date=body.date,
-        meal_type=body.meal_type.value,
+        meal_type=body.meal_type.value,  # Enum -> str ("main" / "snack")
         meal_index=body.meal_index,
         name=body.name,
         amount_value=body.amount_value,
@@ -130,7 +138,19 @@ def update_meal_item(
         note=body.note,
     )
 
-    dto = use_case.execute(current_user.id, input_dto)
+    # UpdateFoodEntryUseCase は UpdateFoodEntryResultDTO を返すようにしてある
+    result = use_case.execute(current_user.id, input_dto)
+    dto = result.entry
+
+    # 影響する日付 = {更新前の日, 更新後の日}
+    impacted_dates = {result.old_date, dto.date}
+
+    for d in impacted_dates:
+        compute_daily_uc.execute(
+            user_id=current_user.id,
+            date_=d,
+        )
+
     return _dto_to_response(dto)
 
 
@@ -142,13 +162,24 @@ def delete_meal_item(
     entry_id: str = Path(..., description="FoodEntry ID (UUID 文字列)"),
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: DeleteFoodEntryUseCase = Depends(get_delete_food_entry_use_case),
+    compute_daily_uc: ComputeDailyNutritionSummaryUseCase = Depends(
+        get_compute_daily_nutrition_summary_use_case
+    ),
 ) -> Response:
     """
-    FoodEntry を削除する。
+    FoodEntry を削除し、その日の DailyNutritionSummary を再計算する。
 
     - Repository 実装側ではソフトデリートを想定。
-    - 既に削除済みの場合でも 204 を返すことで冪等性を担保。
     """
 
-    use_case.execute(current_user.id, entry_id)
+    result = use_case.execute(current_user.id, entry_id)
+
+    # DeleteFoodEntryUseCase は DeleteFoodEntryResultDTO を返すようにしている想定
+    # （存在しない場合は例外を投げる実装のままなら、このチェックは不要）
+    if result is not None:
+        compute_daily_uc.execute(
+            user_id=current_user.id,
+            date_=result.date,
+        )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)

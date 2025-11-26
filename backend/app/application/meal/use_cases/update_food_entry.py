@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.application.meal.dto.food_entry_dto import (
     UpdateFoodEntryInputDTO,
-    FoodEntryDTO,
+    UpdateFoodEntryResultDTO,
 )
 from app.application.meal.ports.food_entry_repository_port import (
     FoodEntryRepositoryPort,
@@ -26,7 +26,7 @@ class UpdateFoodEntryUseCase:
     def __init__(self, repo: FoodEntryRepositoryPort) -> None:
         self._repo = repo
 
-    def execute(self, user_id: UserId, dto: UpdateFoodEntryInputDTO) -> FoodEntryDTO:
+    def execute(self, user_id: UserId, dto: UpdateFoodEntryInputDTO) -> UpdateFoodEntryResultDTO:
         entry_id = FoodEntryId(UUID(dto.entry_id))
 
         existing = self._repo.get_by_id(user_id, entry_id)
@@ -34,6 +34,9 @@ class UpdateFoodEntryUseCase:
             raise FoodEntryNotFoundError(
                 f"FoodEntry not found for id={dto.entry_id} user_id={user_id.value}"
             )
+
+        # 変更前の日付を保持
+        old_date = existing.date
 
         try:
             meal_type = MealType(dto.meal_type)
@@ -59,4 +62,10 @@ class UpdateFoodEntryUseCase:
 
         self._repo.update(updated_entry)
 
-        return food_entry_to_dto(updated_entry)
+        updated_dto = food_entry_to_dto(updated_entry)
+
+        # 更新後 DTO + 変更前の日付をまとめて返す
+        return UpdateFoodEntryResultDTO(
+            entry=updated_dto,
+            old_date=old_date,
+        )
