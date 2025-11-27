@@ -38,3 +38,21 @@ class DailyNutritionReportAlreadyExistsError(Exception):
     """
 
     pass
+
+
+class NotEnoughDailyReportsError(Exception):
+    """
+    提案生成に必要な日次レポート数が足りない場合のエラー。
+
+    - 例: 「直近 5 日分必要だが 3 日分しかない」など。
+    """
+
+    pass
+
+
+class MealRecommendationAlreadyExistsError(Exception):
+    """
+    同じ (user_id, generated_for_date) の提案が既に存在する場合のエラー。
+    """
+
+    pass

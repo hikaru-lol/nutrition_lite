@@ -1,4 +1,21 @@
 from __future__ import annotations
+from app.application.nutrition.use_cases.generate_meal_recommendation import (
+    GenerateMealRecommendationUseCase,
+)
+from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
+from app.application.target.ports.target_repository_port import TargetRepositoryPort
+from app.infra.llm.stub_recommendation_generator import (
+    StubMealRecommendationGenerator,
+)
+from app.application.nutrition.ports.recommendation_generator_port import (
+    MealRecommendationGeneratorPort,
+)
+# from app.infra.db.repositories.recommendation_repository import (
+#     SqlAlchemyMealRecommendationRepository,
+# )
+from app.application.nutrition.ports.recommendation_repository_port import (
+    MealRecommendationRepositoryPort,
+)
 from app.application.meal.use_cases.check_daily_log_completion import CheckDailyLogCompletionUseCase
 from app.infra.llm.stub_daily_report_generator import StubDailyNutritionReportGenerator
 from app.application.nutrition.ports.daily_report_generator_port import DailyNutritionReportGeneratorPort
@@ -533,3 +550,43 @@ def get_generate_daily_nutrition_report_use_case() -> GenerateDailyNutritionRepo
         report_generator=report_generator,
         clock=clock,
     )
+
+
+_recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None
+
+
+def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
+    global _recommendation_generator_singleton
+    if _recommendation_generator_singleton is None:
+        _recommendation_generator_singleton = StubMealRecommendationGenerator()
+    return _recommendation_generator_singleton
+
+
+# def get_meal_recommendation_repository() -> MealRecommendationRepositoryPort:
+#     session = get_db_session()
+#     return SqlAlchemyMealRecommendationRepository(session)
+
+
+# def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUseCase:
+#     session = get_db_session()
+
+#     profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
+#     target_repo: TargetRepositoryPort = SqlAlchemyTargetRepository(session)
+#     daily_report_repo: DailyNutritionReportRepositoryPort = (
+#         SqlAlchemyDailyNutritionReportRepository(session)
+#     )
+#     recommendation_repo: MealRecommendationRepositoryPort = (
+#         SqlAlchemyMealRecommendationRepository(session)
+#     )
+#     generator: MealRecommendationGeneratorPort = get_meal_recommendation_generator()
+#     clock: ClockPort = get_clock()
+
+#     return GenerateMealRecommendationUseCase(
+#         profile_repo=profile_repo,
+#         target_repo=target_repo,
+#         daily_report_repo=daily_report_repo,
+#         recommendation_repo=recommendation_repo,
+#         generator=generator,
+#         clock=clock,
+#         required_days=5,
+#     )
