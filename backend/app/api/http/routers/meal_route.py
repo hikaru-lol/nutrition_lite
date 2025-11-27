@@ -19,8 +19,6 @@ from app.application.meal.dto.food_entry_dto import (
     FoodEntryDTO,
     CreateFoodEntryInputDTO,
     UpdateFoodEntryInputDTO,
-    UpdateFoodEntryResultDTO,
-    DeleteFoodEntryResultDTO,
 )
 from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
 from app.api.http.dependencies.auth import get_current_user_dto

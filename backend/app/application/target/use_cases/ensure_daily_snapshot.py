@@ -1,69 +1,73 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date as DateType
 
-from app.application.target.errors import TargetNotFoundError
-from app.application.target.ports.uow_port import TargetUnitOfWorkPort
+from app.application.target.ports.target_repository_port import (
+    TargetRepositoryPort,
+)
+from app.application.target.ports.target_snapshot_repository_port import (
+    TargetSnapshotRepositoryPort,
+)
 from app.domain.auth.value_objects import UserId
-from app.domain.target.entities import DailyTargetSnapshot
-from app.domain.target.value_objects import TargetId  # 型参照だけならなくてもよいが、明示のため
+from app.domain.target.entities import (
+    TargetDefinition,
+    DailyTargetSnapshot,
+)
+from app.domain.target.errors import NoActiveTargetError  # 既存エラーに合わせて調整
 
 
-@dataclass(slots=True)
-class EnsureDailySnapshotInputDTO:
+class EnsureDailyTargetSnapshotUseCase:
     """
-    DailyTargetSnapshot を「その日付について必ず1件存在する状態」にするための入力 DTO。
+    指定した (user_id, date) の DailyTargetSnapshot を「必ず 1 つ用意する」UseCase。
 
-    - date を省略した場合は今日の日付を使う想定。
-    """
-
-    user_id: str
-    target_date: date | None = None
-
-
-class EnsureDailySnapshotUseCase:
-    """
-    指定ユーザー + 日付について DailyTargetSnapshot を「存在させる」ユースケース。
-
-    ロジック:
-      1. (user_id, date) の Snapshot が既にあれば、それをそのまま返す
-      2. なければ、その時点で Active な TargetDefinition を取得
-      3. Active Target がなければ TargetNotFoundError
-      4. TargetDefinition から DailyTargetSnapshot を生成し、保存して返す
+    フロー:
+        1. 既に DailyTargetSnapshot が存在するか？
+            → あればそれを返す
+        2. なければ、ユーザーのアクティブな TargetDefinition を取得
+            → なければ ActiveTargetNotFoundError
+        3. TargetDefinition から DailyTargetSnapshot を生成して保存
+        4. 生成した Snapshot を返す
     """
 
-    def __init__(self, uow: TargetUnitOfWorkPort) -> None:
-        self._uow = uow
+    def __init__(
+        self,
+        target_repo: TargetRepositoryPort,
+        snapshot_repo: TargetSnapshotRepositoryPort,
+    ) -> None:
+        self._target_repo = target_repo
+        self._snapshot_repo = snapshot_repo
 
     def execute(
         self,
-        input_dto: EnsureDailySnapshotInputDTO,
+        user_id: UserId,
+        date_: DateType,
     ) -> DailyTargetSnapshot:
-        target_date = input_dto.target_date or date.today()
-        user_id = UserId(input_dto.user_id)
+        # --- 1. 既存 Snapshot チェック -------------------------------
+        existing = self._snapshot_repo.get_by_user_and_date(
+            user_id=user_id,
+            date_=date_,
+        )
+        if existing is not None:
+            return existing
 
-        with self._uow as uow:
-            existing = uow.target_snapshot_repo.get_by_user_and_date(
-                user_id=user_id,
-                snapshot_date=target_date,
-            )
-            if existing is not None:
-                return existing
-
-            active_target = uow.target_repo.get_active(user_id)
-            if active_target is None:
-                raise TargetNotFoundError(
-                    "Cannot create DailyTargetSnapshot because no active target exists."
-                )
-
-            snapshot = DailyTargetSnapshot.from_target(
-                target=active_target,
-                snapshot_date=target_date,
-                created_at=datetime.now(timezone.utc),
+        # --- 2. アクティブ TargetDefinition を取得 -------------------
+        active_target: TargetDefinition | None = self._target_repo.get_active(
+            user_id=user_id,
+        )
+        if active_target is None:
+            raise NoActiveTargetError(
+                f"Active TargetDefinition not found for user_id={user_id.value}"
             )
 
-            uow.target_snapshot_repo.add(snapshot)
-            uow.commit()
+        # --- 3. TargetDefinition から Snapshot を生成 ----------------
+        # Domain 側に用意しているファクトリメソッド名に合わせて調整してください。
+        # 例: DailyTargetSnapshot.from_definition(...)
+        snapshot = DailyTargetSnapshot.from_target(
+            user_id=user_id,
+            date=date_,
+            definition=active_target,
+        )
 
-            return snapshot
+        # --- 4. 保存して返す ----------------------------------------
+        self._snapshot_repo.add(snapshot)
+        return snapshot

@@ -1,4 +1,7 @@
 from __future__ import annotations
+from app.application.meal.use_cases.check_daily_log_completion import CheckDailyLogCompletionUseCase
+from app.infra.llm.stub_daily_report_generator import StubDailyNutritionReportGenerator
+from app.application.nutrition.ports.daily_report_generator_port import DailyNutritionReportGeneratorPort
 
 import os
 from fastapi import Depends
@@ -31,6 +34,7 @@ from app.infra.db.uow import SqlAlchemyAuthUnitOfWork
 from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
 from app.application.profile.ports.profile_image_storage_port import ProfileImageStoragePort
 from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
+from app.infra.db.repositories.profile_repository import SqlAlchemyProfileRepository
 from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.infra.db.uow import SqlAlchemyProfileUnitOfWork
@@ -72,6 +76,8 @@ from app.application.nutrition.ports.nutrition_estimator_port import NutritionEs
 from app.application.nutrition.use_cases.compute_meal_nutrition import ComputeMealNutritionUseCase
 from app.application.nutrition.ports.meal_nutrition_repository_port import MealNutritionSummaryRepositoryPort
 from app.infra.db.repositories.meal_nutrition_repository import SqlAlchemyMealNutritionSummaryRepository
+from app.application.nutrition.ports.daily_report_repository_port import DailyNutritionReportRepositoryPort
+from app.infra.db.repositories.daily_nutrition_report_repository import SqlAlchemyDailyNutritionReportRepository
 
 # --- Estimator Provider -------------------------------------------------
 from app.infra.nutrition.estimator_stub import StubNutritionEstimator
@@ -80,6 +86,11 @@ from app.infra.nutrition.estimator_stub import StubNutritionEstimator
 from app.application.nutrition.ports.daily_nutrition_repository_port import DailyNutritionSummaryRepositoryPort
 from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
 from app.infra.db.repositories.daily_nutrition_repository import SqlAlchemyDailyNutritionSummaryRepository
+from app.application.nutrition.use_cases.generate_daily_nutrition_report import GenerateDailyNutritionReportUseCase
+
+# --- EnsureDailyTargetSnapshotUseCase Provider -------------------------------------------------
+from app.application.target.use_cases.ensure_daily_snapshot import EnsureDailyTargetSnapshotUseCase
+from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
 
 
 def get_auth_uow() -> AuthUnitOfWorkPort:
@@ -385,4 +396,140 @@ def get_compute_daily_nutrition_summary_use_case(
     return ComputeDailyNutritionSummaryUseCase(
         meal_repo=meal_repo,
         daily_repo=daily_repo,
+    )
+
+
+# --- DailyNutrition Report Generator Provider -------------------------------------------------
+
+_daily_report_generator_singleton: DailyNutritionReportGeneratorPort | None = None
+
+
+def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
+    """
+    日次レポート生成用 LLM ポートの DI。
+
+    - 現時点では StubDailyNutritionReportGenerator をシングルトンで返す。
+    - 後で OpenAI 実装に差し替えるときはここを書き換える。
+    """
+    global _daily_report_generator_singleton
+    if _daily_report_generator_singleton is None:
+        _daily_report_generator_singleton = StubDailyNutritionReportGenerator()
+    return _daily_report_generator_singleton
+
+
+def get_check_daily_log_completion_use_case() -> CheckDailyLogCompletionUseCase:
+    """
+    1 日分の食事ログが「記録完了」しているかを判定する UseCase の DI。
+    """
+
+    session = get_db_session()
+
+    profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
+    food_entry_repo: FoodEntryRepositoryPort = SqlAlchemyFoodEntryRepository(
+        session)
+
+    return CheckDailyLogCompletionUseCase(
+        profile_repo=profile_repo,
+        food_entry_repo=food_entry_repo,
+    )
+
+
+def get_meal_nutrition_summary_repository() -> MealNutritionSummaryRepositoryPort:
+    """
+    MealNutritionSummary 用の Repository の DI。
+    """
+
+    session = get_db_session()
+    return SqlAlchemyMealNutritionSummaryRepository(session)
+
+
+def get_daily_nutrition_report_repository() -> DailyNutritionReportRepositoryPort:
+    """
+    DailyNutritionReport 用 Repository の DI。
+    """
+
+    session = get_db_session()
+    return SqlAlchemyDailyNutritionReportRepository(session)
+
+
+def get_compute_daily_nutrition_summary_use_case() -> ComputeDailyNutritionSummaryUseCase:
+    """
+    既存の ComputeDailyNutritionSummaryUseCase の DI。
+
+    - まだなければ、ここで meal_repo / daily_repo を組み立てて返す。
+    - 既に実装済みなら、その実装に合わせてください。
+    """
+
+    session = get_db_session()
+    meal_repo = SqlAlchemyMealNutritionSummaryRepository(session)
+    daily_repo: DailyNutritionSummaryRepositoryPort = SqlAlchemyDailyNutritionSummaryRepository(
+        session
+    )
+
+    return ComputeDailyNutritionSummaryUseCase(
+        meal_repo=meal_repo,
+        daily_repo=daily_repo,
+    )
+
+
+def get_ensure_daily_target_snapshot_use_case() -> EnsureDailyTargetSnapshotUseCase:
+    """
+    DailyTargetSnapshot 用 UseCase の DI。
+    """
+    return EnsureDailyTargetSnapshotUseCase(
+        uow=get_target_uow(),
+    )
+
+
+def get_generate_daily_nutrition_report_use_case() -> GenerateDailyNutritionReportUseCase:
+    """
+    DailyNutritionReport 生成用 UseCase の DI。
+    """
+
+    # 1. サブ UC / Repo / Generator / Clock を組み立て
+    daily_log_uc = get_check_daily_log_completion_use_case()
+
+    session = get_db_session()
+
+    # ProfileRepo
+    profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
+
+    # TargetSnapshot 用 UC（既に DI がある前提）
+    # 例: app/di/container.py 内に get_ensure_daily_target_snapshot_use_case がある想定
+    ensure_target_snapshot_uc: EnsureDailyTargetSnapshotUseCase = (
+        get_ensure_daily_target_snapshot_use_case()  # 既存の DI 関数に合わせて名前調整
+    )
+
+    # DailyNutritionSummary 用 UC
+    daily_nutrition_uc: ComputeDailyNutritionSummaryUseCase = (
+        get_compute_daily_nutrition_summary_use_case()
+    )
+
+    # MealNutritionSummary 用 Repo
+    meal_nutrition_repo: MealNutritionSummaryRepositoryPort = (
+        SqlAlchemyMealNutritionSummaryRepository(session)
+    )
+
+    # DailyNutritionReport 用 Repo
+    report_repo: DailyNutritionReportRepositoryPort = (
+        SqlAlchemyDailyNutritionReportRepository(session)
+    )
+
+    # LLM レポート生成ポート
+    report_generator: DailyNutritionReportGeneratorPort = (
+        get_daily_nutrition_report_generator()
+    )
+
+    clock: ClockPort = get_clock()
+
+    # 2. UseCase を組み立てて返す
+    return GenerateDailyNutritionReportUseCase(
+        daily_log_uc=daily_log_uc,
+        profile_repo=profile_repo,
+        ensure_target_snapshot_uc=ensure_target_snapshot_uc,
+        daily_nutrition_uc=daily_nutrition_uc,
+        meal_nutrition_repo=meal_nutrition_repo,
+        report_repo=report_repo,
+        report_generator=report_generator,
+        clock=clock,
     )

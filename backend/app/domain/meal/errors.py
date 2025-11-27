@@ -44,3 +44,21 @@ class FoodEntryNotFoundError(MealDomainError):
     Repository からの取得時などに使用する想定。
     """
     pass
+
+
+class DailyLogProfileNotFoundError(Exception):
+    """
+    記録完了判定などで、ユーザーの Profile が存在しない場合のエラー。
+
+    - 記録完了やレポート生成は Profile（meals_per_day）前提とする仕様。
+    """
+    pass
+
+
+class InvalidMealsPerDayError(Exception):
+    """
+    Profile.meals_per_day が 1 未満など、無効な値だった場合のエラー。
+
+    - アプリの仕様として 1 以上を前提とする。
+    """
+    pass
