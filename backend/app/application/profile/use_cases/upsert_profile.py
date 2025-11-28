@@ -29,10 +29,10 @@ class UpsertProfileUseCase:
 
     def execute(self, input_dto: UpsertProfileInputDTO) -> ProfileDTO:
         now = datetime.now(timezone.utc)
-        user_id_vo = UserId(input_dto.user_id)
+        user_id = UserId(input_dto.user_id)
 
         with self._uow as uow:
-            existing = uow.profile_repo.get_by_user_id(user_id_vo)
+            existing = uow.profile_repo.get_by_user_id(user_id)
 
             # 既存の image_id（あれば）を引き継ぐ
             image_id: Optional[ProfileImageId] = existing.image_id if existing else None
@@ -40,7 +40,7 @@ class UpsertProfileUseCase:
             # 画像が送られてきている場合は新しく保存する
             if input_dto.image_content is not None and input_dto.image_content_type is not None:
                 stored = self._image_storage.save(
-                    user_id=user_id_vo,
+                    user_id=user_id,
                     content=input_dto.image_content,
                     content_type=input_dto.image_content_type,
                 )
@@ -48,7 +48,7 @@ class UpsertProfileUseCase:
 
             if existing is None:
                 profile = Profile(
-                    user_id=user_id_vo,
+                    user_id=user_id,
                     sex=input_dto.sex,
                     birthdate=input_dto.birthdate,
                     height_cm=HeightCm(input_dto.height_cm),

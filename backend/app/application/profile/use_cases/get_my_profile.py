@@ -18,10 +18,10 @@ class GetMyProfileUseCase:
         self._uow = uow
 
     def execute(self, user_id: str) -> ProfileDTO:
-        user_id_vo = UserId(user_id)
+        user_id = UserId(user_id)
 
         with self._uow as uow:
-            profile = uow.profile_repo.get_by_user_id(user_id_vo)
+            profile = uow.profile_repo.get_by_user_id(user_id)
             if profile is None:
                 # TODO: 必要であれば profile 用の専用エラーにする
                 raise UserNotFoundError("Profile not found.")

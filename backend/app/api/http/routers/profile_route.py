@@ -45,6 +45,7 @@ def get_my_profile(
     response_model=ProfileResponse,
     status_code=status.HTTP_200_OK,
     responses={
+        400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
     },
 )

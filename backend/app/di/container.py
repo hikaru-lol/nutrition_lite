@@ -1,151 +1,201 @@
 from __future__ import annotations
+
+# === Standard library =======================================================
+import os
+
+# === Third-party ============================================================
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+# === Core settings / infra ==================================================
+from app.settings import settings
+from app.infra.db.session import create_session
+from app.infra.time.system_clock import SystemClock
+
+# === Auth ===================================================================
+# Ports
+from app.application.auth.ports.clock_port import ClockPort
+from app.application.auth.ports.password_hasher_port import PasswordHasherPort
+from app.application.auth.ports.token_service_port import TokenServicePort
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.user_repository_port import UserRepositoryPort
+
+# Use cases
+from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
+from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
+from app.application.auth.use_cases.current_user.get_current_user import (
+    GetCurrentUserUseCase,
+)
+from app.application.auth.use_cases.session.login_user import LoginUserUseCase
+from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
+from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
+
+# Infra (repo / security / uow)
+from app.infra.db.repositories.user_repository import SqlAlchemyUserRepository
+from app.infra.db.uow.auth import SqlAlchemyAuthUnitOfWork
+from app.infra.security.jwt_token_service import JwtTokenService
+from app.infra.security.password_hasher import BcryptPasswordHasher
+
+# === Profile ================================================================
+# Ports
+from app.application.profile.ports.profile_image_storage_port import (
+    ProfileImageStoragePort,
+)
+from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
+from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
+
+# Use cases
+from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
+from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
+
+# Infra (repo / uow / storage / query service)
+from app.infra.db.repositories.profile_repository import SqlAlchemyProfileRepository
+from app.infra.db.uow.profile import SqlAlchemyProfileUnitOfWork
+from app.infra.profile.profile_query_service import ProfileQueryService
+from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
+from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
+
+# === Target ================================================================
+# Ports
+from app.application.target.ports.target_generator_port import TargetGeneratorPort
+from app.application.target.ports.target_repository_port import TargetRepositoryPort
+from app.application.target.ports.uow_port import TargetUnitOfWorkPort
+
+# Use cases
+from app.application.target.use_cases.activate_target import ActivateTargetUseCase
+from app.application.target.use_cases.create_target import CreateTargetUseCase
+from app.application.target.use_cases.ensure_daily_snapshot import (
+    EnsureDailyTargetSnapshotUseCase,
+)
+from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
+from app.application.target.use_cases.get_target import GetTargetUseCase
+from app.application.target.use_cases.list_targets import ListTargetsUseCase
+from app.application.target.use_cases.update_target import UpdateTargetUseCase
+
+# Infra (repo / uow / llm)
+from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
+from app.infra.db.uow.target import SqlAlchemyTargetUnitOfWork
+from app.infra.llm.target_generator_openai import (
+    OpenAITargetGenerator,
+    OpenAITargetGeneratorConfig,
+)
+from app.infra.llm.target_generator_stub import StubTargetGenerator
+
+# === Meal ===================================================================
+# Ports
+from app.application.meal.ports.food_entry_repository_port import FoodEntryRepositoryPort
+
+# Use cases
+from app.application.meal.use_cases.check_daily_log_completion import (
+    CheckDailyLogCompletionUseCase,
+)
+from app.application.meal.use_cases.create_food_entry import CreateFoodEntryUseCase
+from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
+from app.application.meal.use_cases.list_food_entries_by_date import (
+    ListFoodEntriesByDateUseCase,
+)
+from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
+
+# Infra (repo)
+from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
+
+# === Nutrition ==============================================================
+# Ports
+from app.application.nutrition.ports.daily_nutrition_repository_port import (
+    DailyNutritionSummaryRepositoryPort,
+)
+from app.application.nutrition.ports.daily_report_generator_port import (
+    DailyNutritionReportGeneratorPort,
+)
+from app.application.nutrition.ports.daily_report_repository_port import (
+    DailyNutritionReportRepositoryPort,
+)
+from app.application.nutrition.ports.meal_nutrition_repository_port import (
+    MealNutritionSummaryRepositoryPort,
+)
+from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
+from app.application.nutrition.ports.recommendation_generator_port import (
+    MealRecommendationGeneratorPort,
+)
+from app.application.nutrition.ports.recommendation_repository_port import (
+    MealRecommendationRepositoryPort,
+)
+
+# Use cases
+from app.application.nutrition.use_cases.compute_daily_nutrition import (
+    ComputeDailyNutritionSummaryUseCase,
+)
+from app.application.nutrition.use_cases.compute_meal_nutrition import (
+    ComputeMealNutritionUseCase,
+)
+from app.application.nutrition.use_cases.generate_daily_nutrition_report import (
+    GenerateDailyNutritionReportUseCase,
+)
 from app.application.nutrition.use_cases.generate_meal_recommendation import (
     GenerateMealRecommendationUseCase,
 )
-from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
-from app.application.target.ports.target_repository_port import TargetRepositoryPort
-from app.infra.llm.stub_recommendation_generator import (
-    StubMealRecommendationGenerator,
+
+# Infra (repos)
+from app.infra.db.repositories.daily_nutrition_report_repository import (
+    SqlAlchemyDailyNutritionReportRepository,
 )
-from app.application.nutrition.ports.recommendation_generator_port import (
-    MealRecommendationGeneratorPort,
+from app.infra.db.repositories.daily_nutrition_repository import (
+    SqlAlchemyDailyNutritionSummaryRepository,
+)
+from app.infra.db.repositories.meal_nutrition_repository import (
+    SqlAlchemyMealNutritionSummaryRepository,
 )
 # from app.infra.db.repositories.recommendation_repository import (
 #     SqlAlchemyMealRecommendationRepository,
 # )
-from app.application.nutrition.ports.recommendation_repository_port import (
-    MealRecommendationRepositoryPort,
+
+# LLM / estimators
+from app.infra.llm.stub_daily_report_generator import (
+    StubDailyNutritionReportGenerator,
 )
-from app.application.meal.use_cases.check_daily_log_completion import CheckDailyLogCompletionUseCase
-from app.infra.llm.stub_daily_report_generator import StubDailyNutritionReportGenerator
-from app.application.nutrition.ports.daily_report_generator_port import DailyNutritionReportGeneratorPort
-
-import os
-from fastapi import Depends
-from sqlalchemy.orm import Session
-
-from app.settings import settings
-
-# --- auth 用 imports はそのまま ---
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
-from app.application.auth.ports.password_hasher_port import PasswordHasherPort
-from app.application.auth.ports.token_service_port import TokenServicePort
-from app.application.auth.ports.clock_port import ClockPort
-from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
-
-from app.application.auth.use_cases.account.register_user import RegisterUserUseCase
-from app.application.auth.use_cases.session.login_user import LoginUserUseCase
-from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
-from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
-from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
-from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase
-
-from app.infra.db.session import create_session
-from app.infra.db.repositories.user_repository import SqlAlchemyUserRepository
-from app.infra.security.password_hasher import BcryptPasswordHasher
-from app.infra.security.jwt_token_service import JwtTokenService
-from app.infra.time.system_clock import SystemClock
-from app.infra.db.uow import SqlAlchemyAuthUnitOfWork
-
-# --- ★ profile 用 imports を追加 ---
-from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
-from app.application.profile.ports.profile_image_storage_port import ProfileImageStoragePort
-from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
-from app.infra.db.repositories.profile_repository import SqlAlchemyProfileRepository
-from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
-from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
-from app.infra.db.uow import SqlAlchemyProfileUnitOfWork
-from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
-from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
-from app.infra.profile.profile_query_service import ProfileQueryService
-from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
-from app.infra.profile.profile_query_service import ProfileQueryService
-
-# ★ Target 用の追加
-from app.application.target.ports.uow_port import TargetUnitOfWorkPort
-from app.application.target.ports.target_generator_port import TargetGeneratorPort
-from app.application.target.use_cases.create_target import CreateTargetUseCase
-from app.application.target.use_cases.update_target import UpdateTargetUseCase
-from app.application.target.use_cases.list_targets import ListTargetsUseCase
-from app.application.target.use_cases.activate_target import ActivateTargetUseCase
-from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
-from app.application.target.use_cases.get_target import GetTargetUseCase
-from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
-from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
-from app.infra.llm.target_generator_stub import StubTargetGenerator
-
-# TargetGeneratorPortの実装
-from app.application.target.ports.target_generator_port import TargetGeneratorPort
-from app.infra.llm.target_generator_stub import StubTargetGenerator
-from app.infra.llm.target_generator_openai import OpenAITargetGenerator, OpenAITargetGeneratorConfig
-
-# --- Meal 用の imports を追加 ---
-from app.application.meal.ports.food_entry_repository_port import FoodEntryRepositoryPort
-from app.application.meal.use_cases.create_food_entry import CreateFoodEntryUseCase
-from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
-from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
-from app.application.meal.use_cases.list_food_entries_by_date import ListFoodEntriesByDateUseCase
-from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
-
-
-# --- Nutrition 用の imports を追加 ---
-from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
-from app.application.nutrition.use_cases.compute_meal_nutrition import ComputeMealNutritionUseCase
-from app.application.nutrition.ports.meal_nutrition_repository_port import MealNutritionSummaryRepositoryPort
-from app.infra.db.repositories.meal_nutrition_repository import SqlAlchemyMealNutritionSummaryRepository
-from app.application.nutrition.ports.daily_report_repository_port import DailyNutritionReportRepositoryPort
-from app.infra.db.repositories.daily_nutrition_report_repository import SqlAlchemyDailyNutritionReportRepository
-
-# --- Estimator Provider -------------------------------------------------
+from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
 from app.infra.nutrition.estimator_stub import StubNutritionEstimator
 
-# --- DailyNutrition Summary Provider -------------------------------------------------
-from app.application.nutrition.ports.daily_nutrition_repository_port import DailyNutritionSummaryRepositoryPort
-from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
-from app.infra.db.repositories.daily_nutrition_repository import SqlAlchemyDailyNutritionSummaryRepository
-from app.application.nutrition.use_cases.generate_daily_nutrition_report import GenerateDailyNutritionReportUseCase
 
-# --- EnsureDailyTargetSnapshotUseCase Provider -------------------------------------------------
-from app.application.target.use_cases.ensure_daily_snapshot import EnsureDailyTargetSnapshotUseCase
-from app.infra.db.uow import SqlAlchemyTargetUnitOfWork
+# === Common / DB / UoW =====================================================
+# アプリ全体で共通して使うインフラ（DBセッション / Clock など）の提供
 
-
-def get_auth_uow() -> AuthUnitOfWorkPort:
-    return SqlAlchemyAuthUnitOfWork()
-
-# --- Ports ----------------------------------------------------
-
-
+# DBセッションを1つ生成して返す（各 Repository で利用する）
 def get_db_session() -> Session:
-    # NOTE: FastAPI から直接使うなら infra/db/session.get_db_session を Depends で
-    #       コンテナ経由ならここで create_session を呼んで返す
     return create_session()
 
 
-def get_user_repository() -> UserRepositoryPort:
-    session = get_db_session()
-    return SqlAlchemyUserRepository(session)
-
-
-def get_password_hasher() -> PasswordHasherPort:
-    return BcryptPasswordHasher()
-
-
-def get_token_service() -> TokenServicePort:
-    return JwtTokenService()
-
-
+# 現在時刻を提供する ClockPort の実装を返す
 def get_clock() -> ClockPort:
     return SystemClock()
 
 
-def get_profile_repository() -> ProfileRepositoryPort:
-    session = get_db_session()
-    return SqlAlchemyTargetRepository(session)
+# === Auth ===================================================================
+# 認証・認可（ユーザー登録 / ログイン / トークン）関連の DI 定義
 
-# --- Auth UseCases --------------------------------------------------
+# 認証コンテキスト用の UnitOfWork 実装を返す
+def get_auth_uow() -> AuthUnitOfWorkPort:
+    return SqlAlchemyAuthUnitOfWork()
 
 
+# パスワードのハッシュ化ロジック（Bcrypt）の実装を返す
+def get_password_hasher() -> PasswordHasherPort:
+    return BcryptPasswordHasher()
+
+
+# アクセストークン / リフレッシュトークンを扱うサービスの実装を返す
+def get_token_service() -> TokenServicePort:
+    return JwtTokenService()
+
+
+# ユーザー情報を扱う Repository を返す（必要に応じて Session を外から渡せる）
+def get_user_repository(session: Session | None = None) -> UserRepositoryPort:
+    if session is None:
+        session = get_db_session()
+    return SqlAlchemyUserRepository(session)
+
+
+# ユーザー登録 UseCase 用の依存を組み立てて返す
 def get_register_user_use_case() -> RegisterUserUseCase:
     return RegisterUserUseCase(
         uow=get_auth_uow(),
@@ -155,6 +205,7 @@ def get_register_user_use_case() -> RegisterUserUseCase:
     )
 
 
+# ログイン UseCase 用の依存を組み立てて返す
 def get_login_user_use_case() -> LoginUserUseCase:
     return LoginUserUseCase(
         uow=get_auth_uow(),
@@ -163,10 +214,12 @@ def get_login_user_use_case() -> LoginUserUseCase:
     )
 
 
+# ログアウト UseCase（今は stateless）を返す
 def get_logout_user_use_case() -> LogoutUserUseCase:
     return LogoutUserUseCase()
 
 
+# アカウント削除 UseCase 用の依存を組み立てて返す
 def get_delete_account_use_case() -> DeleteAccountUseCase:
     return DeleteAccountUseCase(
         uow=get_auth_uow(),
@@ -174,6 +227,7 @@ def get_delete_account_use_case() -> DeleteAccountUseCase:
     )
 
 
+# リフレッシュトークン発行 UseCase 用の依存を組み立てて返す
 def get_refresh_token_use_case() -> RefreshTokenUseCase:
     return RefreshTokenUseCase(
         uow=get_auth_uow(),
@@ -181,22 +235,24 @@ def get_refresh_token_use_case() -> RefreshTokenUseCase:
     )
 
 
+# 現在ログイン中のユーザーを取得する UseCase の DI
 def get_current_user_use_case() -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(
         uow=get_auth_uow(),
     )
 
 
-# --- Profile DI ----------------------------------------------------
+# === Profile ================================================================
+# プロフィール情報とプロフィール画像ストレージまわりの DI 定義
 
-
-# InMemory ストレージはプロセス内で共有したいので、シングルトン的に1インスタンスを持つ
-_profile_image_storage_instance: InMemoryProfileImageStorage | None = None
+# プロフィール画像ストレージ（MinIO / InMemory）のシングルトンインスタンス
 _profile_image_storage_singleton: ProfileImageStoragePort | None = None
 
 
+# プロフィール画像の保存先（MinIO or InMemory）の実装を返す
 def get_profile_image_storage() -> ProfileImageStoragePort:
     global _profile_image_storage_singleton
+
     if _profile_image_storage_singleton is None:
         if settings.USE_FAKE_INFRA:
             _profile_image_storage_singleton = InMemoryProfileImageStorage()
@@ -205,10 +261,19 @@ def get_profile_image_storage() -> ProfileImageStoragePort:
     return _profile_image_storage_singleton
 
 
+# プロフィール更新用の UnitOfWork 実装を返す
 def get_profile_uow() -> ProfileUnitOfWorkPort:
     return SqlAlchemyProfileUnitOfWork()
 
 
+# プロフィール情報を扱う Repository を返す
+def get_profile_repository(session: Session | None = None) -> ProfileRepositoryPort:
+    if session is None:
+        session = get_db_session()
+    return SqlAlchemyProfileRepository(session)
+
+
+# プロフィールを新規作成・更新する UseCase の DI
 def get_upsert_profile_use_case() -> UpsertProfileUseCase:
     return UpsertProfileUseCase(
         uow=get_profile_uow(),
@@ -216,29 +281,34 @@ def get_upsert_profile_use_case() -> UpsertProfileUseCase:
     )
 
 
+# 自分自身のプロフィールを取得する UseCase の DI
 def get_get_my_profile_use_case() -> GetMyProfileUseCase:
     return GetMyProfileUseCase(
         uow=get_profile_uow(),
     )
 
 
-# --- Target 用のUoW / Generator -------------------------------------
+# === Target ================================================================
+# 目標（Target）と DailyTargetSnapshot まわりの DI 定義
 
-
+# 目標情報を扱う UnitOfWork 実装を返す
 def get_target_uow() -> TargetUnitOfWorkPort:
     return SqlAlchemyTargetUnitOfWork()
 
 
-# Target生成ロジック（Stub）。後で本番用の実装に差し替え可能。
+# 目標自動生成ロジック（Stub / OpenAI）のシングルトンインスタンス
 _target_generator_singleton: TargetGeneratorPort | None = None
 
-_USE_OPENAI_TARGET_GENERATOR = os.getenv("USE_OPENAI_TARGET_GENERATOR", "false").lower() in (
-    "1", "true", "yes", "on"
-)
+# OpenAI の TargetGenerator を使うかどうかのフラグ
+_USE_OPENAI_TARGET_GENERATOR = os.getenv(
+    "USE_OPENAI_TARGET_GENERATOR", "false"
+).lower() in ("1", "true", "yes", "on")
 
 
+# 目標を自動生成する TargetGeneratorPort の実装を返す
 def get_target_generator() -> TargetGeneratorPort:
     global _target_generator_singleton
+
     if _target_generator_singleton is None:
         if _USE_OPENAI_TARGET_GENERATOR:
             _target_generator_singleton = OpenAITargetGenerator(
@@ -253,15 +323,17 @@ def get_target_generator() -> TargetGeneratorPort:
     return _target_generator_singleton
 
 
+# プロフィール情報取得用の QueryService を返す
 def get_profile_query_service() -> ProfileQueryService:
     return ProfileQueryService(
         get_my_profile_uc=get_get_my_profile_use_case(),
     )
 
 
+# 新しい Target を作成する UseCase の DI
 def get_create_target_use_case() -> CreateTargetUseCase:
     """
-    /target/create のための UseCase をDIする。
+    /target/create のための UseCase を DI する。
     """
     return CreateTargetUseCase(
         uow=get_target_uow(),
@@ -271,7 +343,8 @@ def get_create_target_use_case() -> CreateTargetUseCase:
     )
 
 
-def get_get_active_target_use_case() -> GetMyProfileUseCase:
+# アクティブな Target を取得する UseCase の DI
+def get_get_active_target_use_case() -> GetActiveTargetUseCase:
     """
     /target/active（現在のターゲット取得）のための UseCase。
     """
@@ -280,6 +353,7 @@ def get_get_active_target_use_case() -> GetMyProfileUseCase:
     )
 
 
+# Target 一覧を取得する UseCase の DI
 def get_list_targets_use_case() -> ListTargetsUseCase:
     """
     /target/list のための UseCase。
@@ -289,6 +363,7 @@ def get_list_targets_use_case() -> ListTargetsUseCase:
     )
 
 
+# Target を有効化（activate）する UseCase の DI
 def get_activate_target_use_case() -> ActivateTargetUseCase:
     """
     /target/activate のための UseCase。
@@ -299,6 +374,7 @@ def get_activate_target_use_case() -> ActivateTargetUseCase:
     )
 
 
+# 既存の Target を更新する UseCase の DI
 def get_update_target_use_case() -> UpdateTargetUseCase:
     """
     /target/update のための UseCase。
@@ -309,6 +385,7 @@ def get_update_target_use_case() -> UpdateTargetUseCase:
     )
 
 
+# 特定の Target を取得する UseCase の DI
 def get_get_target_use_case() -> GetTargetUseCase:
     """
     /target/get のための UseCase。
@@ -317,47 +394,49 @@ def get_get_target_use_case() -> GetTargetUseCase:
         uow=get_target_uow(),
     )
 
-# --- Meal 用のUoW / Repository -------------------------------------
 
+# === Meal ===================================================================
+# 食事記録（FoodEntry）まわりの DI 定義
 
-# def get_meal_uow() -> MealUnitOfWorkPort:
-#     return SqlAlchemyMealUnitOfWork()
-
-
-def get_food_entry_repository() -> FoodEntryRepositoryPort:
-    session = get_db_session()
+# 食事エントリを扱う Repository を返す
+def get_food_entry_repository(session: Session | None = None) -> FoodEntryRepositoryPort:
+    if session is None:
+        session = get_db_session()
     return SqlAlchemyFoodEntryRepository(session)
 
 
-# --- Meal UseCases ----------------------------------------------------
-
+# 食事エントリの作成 UseCase の DI
 def get_create_food_entry_use_case() -> CreateFoodEntryUseCase:
     return CreateFoodEntryUseCase(
         food_entry_repository=get_food_entry_repository(),
     )
 
 
+# 食事エントリの更新 UseCase の DI
 def get_update_food_entry_use_case() -> UpdateFoodEntryUseCase:
     return UpdateFoodEntryUseCase(
         food_entry_repository=get_food_entry_repository(),
     )
 
 
+# 食事エントリの削除 UseCase の DI
 def get_delete_food_entry_use_case() -> DeleteFoodEntryUseCase:
     return DeleteFoodEntryUseCase(
         food_entry_repository=get_food_entry_repository(),
     )
 
 
+# 指定日の食事エントリ一覧を取得する UseCase の DI
 def get_list_food_entries_by_date_use_case() -> ListFoodEntriesByDateUseCase:
     return ListFoodEntriesByDateUseCase(
         food_entry_repository=get_food_entry_repository(),
     )
 
 
-# --- Estimator Provider -------------------------------------------------
+# === Nutrition: estimator & repositories ====================================
+# 栄養推定ロジックと栄養サマリ系 Repository の DI 定義
 
-
+# 栄養推定ロジック（Stub）の実装を返す
 def get_nutrition_estimator() -> NutritionEstimatorPort:
     """
     栄養推定ロジック。
@@ -367,29 +446,39 @@ def get_nutrition_estimator() -> NutritionEstimatorPort:
     """
     return StubNutritionEstimator()
 
-# --- Nutrition Repositories ----------------------------------------------------
 
-
-def get_meal_nutrition_summary_repository() -> MealNutritionSummaryRepositoryPort:
-    session = get_db_session()
+# MealNutritionSummary を扱う Repository を返す
+def get_meal_nutrition_summary_repository(
+    session: Session | None = None,
+) -> MealNutritionSummaryRepositoryPort:
+    if session is None:
+        session = get_db_session()
     return SqlAlchemyMealNutritionSummaryRepository(session)
 
 
-def get_daily_nutrition_summary_repository() -> DailyNutritionSummaryRepositoryPort:
-    session = get_db_session()
+# DailyNutritionSummary を扱う Repository を返す
+def get_daily_nutrition_summary_repository(
+    session: Session | None = None,
+) -> DailyNutritionSummaryRepositoryPort:
+    if session is None:
+        session = get_db_session()
     return SqlAlchemyDailyNutritionSummaryRepository(session)
 
-# --- UseCase Provider ---------------------------------------------------
 
+# === Nutrition: core use cases ==============================================
+# Meal単位 / 日単位の栄養計算 UseCase の DI 定義
 
-def get_compute_meal_nutrition_use_case(
-    food_entry_repo: FoodEntryRepositoryPort = Depends(
-        get_food_entry_repository),
-    meal_nutrition_repo: MealNutritionSummaryRepositoryPort = Depends(
-        get_meal_nutrition_summary_repository
-    ),
-    estimator: NutritionEstimatorPort = Depends(get_nutrition_estimator),
-) -> ComputeMealNutritionUseCase:
+# 1 Meal 分の栄養を推定し、MealNutritionSummary を更新する UseCase の DI
+def get_compute_meal_nutrition_use_case() -> ComputeMealNutritionUseCase:
+    """
+    1 Meal 分の栄養を推定して MealNutritionSummary を更新する UseCase。
+    """
+    session = get_db_session()
+    food_entry_repo = get_food_entry_repository(session=session)
+    meal_nutrition_repo = get_meal_nutrition_summary_repository(
+        session=session)
+    estimator = get_nutrition_estimator()
+
     return ComputeMealNutritionUseCase(
         food_entry_repo=food_entry_repo,
         meal_nutrition_repo=meal_nutrition_repo,
@@ -397,30 +486,32 @@ def get_compute_meal_nutrition_use_case(
     )
 
 
+# 1 日分の栄養サマリ（DailyNutritionSummary）を計算・保存する UseCase の DI
 def get_compute_daily_nutrition_summary_use_case(
-    meal_repo: MealNutritionSummaryRepositoryPort = Depends(
-        get_meal_nutrition_summary_repository
-    ),
-    daily_repo: DailyNutritionSummaryRepositoryPort = Depends(
-        get_daily_nutrition_summary_repository
-    ),
 ) -> ComputeDailyNutritionSummaryUseCase:
     """
     1日分の栄養サマリ (DailyNutritionSummary) を計算・保存する UC。
 
     - MealNutritionSummary を集約して計算する。
     """
+    session = get_db_session()
+    meal_repo = get_meal_nutrition_summary_repository(session=session)
+    daily_repo = get_daily_nutrition_summary_repository(session=session)
+
     return ComputeDailyNutritionSummaryUseCase(
         meal_repo=meal_repo,
         daily_repo=daily_repo,
     )
 
 
-# --- DailyNutrition Report Generator Provider -------------------------------------------------
+# === DailyNutritionReport ====================================================
+# 日次栄養レポート生成まわりの DI 定義
 
+# 日次レポート生成用 LLM ポートのシングルトンインスタンス
 _daily_report_generator_singleton: DailyNutritionReportGeneratorPort | None = None
 
 
+# 日次栄養レポートを文章として生成する Generator の実装を返す
 def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
     """
     日次レポート生成用 LLM ポートの DI。
@@ -434,16 +525,24 @@ def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
     return _daily_report_generator_singleton
 
 
+# DailyNutritionReport を扱う Repository を返す
+def get_daily_nutrition_report_repository(
+    session: Session | None = None,
+) -> DailyNutritionReportRepositoryPort:
+    if session is None:
+        session = get_db_session()
+    return SqlAlchemyDailyNutritionReportRepository(session)
+
+
+# 1 日分の食事ログが「記録完了」かどうか判定する UseCase の DI
 def get_check_daily_log_completion_use_case() -> CheckDailyLogCompletionUseCase:
     """
     1 日分の食事ログが「記録完了」しているかを判定する UseCase の DI。
     """
-
+    # 同一セッションで Profile / FoodEntry を読む
     session = get_db_session()
-
-    profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
-    food_entry_repo: FoodEntryRepositoryPort = SqlAlchemyFoodEntryRepository(
-        session)
+    profile_repo = get_profile_repository(session=session)
+    food_entry_repo = get_food_entry_repository(session=session)
 
     return CheckDailyLogCompletionUseCase(
         profile_repo=profile_repo,
@@ -451,44 +550,7 @@ def get_check_daily_log_completion_use_case() -> CheckDailyLogCompletionUseCase:
     )
 
 
-def get_meal_nutrition_summary_repository() -> MealNutritionSummaryRepositoryPort:
-    """
-    MealNutritionSummary 用の Repository の DI。
-    """
-
-    session = get_db_session()
-    return SqlAlchemyMealNutritionSummaryRepository(session)
-
-
-def get_daily_nutrition_report_repository() -> DailyNutritionReportRepositoryPort:
-    """
-    DailyNutritionReport 用 Repository の DI。
-    """
-
-    session = get_db_session()
-    return SqlAlchemyDailyNutritionReportRepository(session)
-
-
-def get_compute_daily_nutrition_summary_use_case() -> ComputeDailyNutritionSummaryUseCase:
-    """
-    既存の ComputeDailyNutritionSummaryUseCase の DI。
-
-    - まだなければ、ここで meal_repo / daily_repo を組み立てて返す。
-    - 既に実装済みなら、その実装に合わせてください。
-    """
-
-    session = get_db_session()
-    meal_repo = SqlAlchemyMealNutritionSummaryRepository(session)
-    daily_repo: DailyNutritionSummaryRepositoryPort = SqlAlchemyDailyNutritionSummaryRepository(
-        session
-    )
-
-    return ComputeDailyNutritionSummaryUseCase(
-        meal_repo=meal_repo,
-        daily_repo=daily_repo,
-    )
-
-
+# DailyTargetSnapshot を確保する UseCase の DI
 def get_ensure_daily_target_snapshot_use_case() -> EnsureDailyTargetSnapshotUseCase:
     """
     DailyTargetSnapshot 用 UseCase の DI。
@@ -498,48 +560,26 @@ def get_ensure_daily_target_snapshot_use_case() -> EnsureDailyTargetSnapshotUseC
     )
 
 
-def get_generate_daily_nutrition_report_use_case() -> GenerateDailyNutritionReportUseCase:
+# 日次栄養レポート（DailyNutritionReport）を生成する UseCase の DI
+def get_generate_daily_nutrition_report_use_case(
+) -> GenerateDailyNutritionReportUseCase:
     """
     DailyNutritionReport 生成用 UseCase の DI。
     """
-
-    # 1. サブ UC / Repo / Generator / Clock を組み立て
+    # サブ UC / Generator / Clock
     daily_log_uc = get_check_daily_log_completion_use_case()
+    ensure_target_snapshot_uc = get_ensure_daily_target_snapshot_use_case()
+    daily_nutrition_uc = get_compute_daily_nutrition_summary_use_case()
+    report_generator = get_daily_nutrition_report_generator()
+    clock = get_clock()
 
+    # Repos（同一セッションを共有）
     session = get_db_session()
+    profile_repo = get_profile_repository(session=session)
+    meal_nutrition_repo = get_meal_nutrition_summary_repository(
+        session=session)
+    report_repo = get_daily_nutrition_report_repository(session=session)
 
-    # ProfileRepo
-    profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
-
-    # TargetSnapshot 用 UC（既に DI がある前提）
-    # 例: app/di/container.py 内に get_ensure_daily_target_snapshot_use_case がある想定
-    ensure_target_snapshot_uc: EnsureDailyTargetSnapshotUseCase = (
-        get_ensure_daily_target_snapshot_use_case()  # 既存の DI 関数に合わせて名前調整
-    )
-
-    # DailyNutritionSummary 用 UC
-    daily_nutrition_uc: ComputeDailyNutritionSummaryUseCase = (
-        get_compute_daily_nutrition_summary_use_case()
-    )
-
-    # MealNutritionSummary 用 Repo
-    meal_nutrition_repo: MealNutritionSummaryRepositoryPort = (
-        SqlAlchemyMealNutritionSummaryRepository(session)
-    )
-
-    # DailyNutritionReport 用 Repo
-    report_repo: DailyNutritionReportRepositoryPort = (
-        SqlAlchemyDailyNutritionReportRepository(session)
-    )
-
-    # LLM レポート生成ポート
-    report_generator: DailyNutritionReportGeneratorPort = (
-        get_daily_nutrition_report_generator()
-    )
-
-    clock: ClockPort = get_clock()
-
-    # 2. UseCase を組み立てて返す
     return GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
         profile_repo=profile_repo,
@@ -552,9 +592,14 @@ def get_generate_daily_nutrition_report_use_case() -> GenerateDailyNutritionRepo
     )
 
 
+# === MealRecommendation (今は Stub のみ) ====================================
+# 食事レコメンド（将来の機能）の DI 定義
+
+# 食事レコメンドを生成する Generator のシングルトンインスタンス
 _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None
 
 
+# 食事レコメンド生成ロジック（Stub）の実装を返す
 def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     global _recommendation_generator_singleton
     if _recommendation_generator_singleton is None:
@@ -562,15 +607,16 @@ def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     return _recommendation_generator_singleton
 
 
+# ここから下は将来の実装用にコメントのまま残しておくイメージ
 # def get_meal_recommendation_repository() -> MealRecommendationRepositoryPort:
 #     session = get_db_session()
 #     return SqlAlchemyMealRecommendationRepository(session)
-
-
+#
+#
 # def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUseCase:
 #     session = get_db_session()
-
-#     profile_repo: ProfileRepositoryPort = SqlAlchemyProfileRepository(session)
+#
+#     profile_repo: ProfileRepositoryPort = get_profile_repository(session=session)
 #     target_repo: TargetRepositoryPort = SqlAlchemyTargetRepository(session)
 #     daily_report_repo: DailyNutritionReportRepositoryPort = (
 #         SqlAlchemyDailyNutritionReportRepository(session)
@@ -580,7 +626,7 @@ def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
 #     )
 #     generator: MealRecommendationGeneratorPort = get_meal_recommendation_generator()
 #     clock: ClockPort = get_clock()
-
+#
 #     return GenerateMealRecommendationUseCase(
 #         profile_repo=profile_repo,
 #         target_repo=target_repo,
