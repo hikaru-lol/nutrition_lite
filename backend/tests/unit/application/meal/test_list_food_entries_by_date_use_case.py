@@ -15,6 +15,7 @@ from app.application.meal.use_cases._helpers import food_entry_to_dto
 from app.domain.auth.value_objects import UserId
 from app.domain.meal.entities import FoodEntry
 from app.domain.meal.value_objects import FoodEntryId, MealType
+from tests.fakes.meal_uow import FakeMealUnitOfWork
 
 pytestmark = pytest.mark.unit
 
@@ -83,7 +84,7 @@ def _make_entry(
 
 def test_list_meal_items_by_date_returns_only_that_day_and_user() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = ListFoodEntriesByDateUseCase(repo)
+    use_case = ListFoodEntriesByDateUseCase(FakeMealUnitOfWork(repo))
     user1 = _make_user_id()
     user2 = _make_user_id()
 

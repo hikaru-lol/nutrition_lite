@@ -61,7 +61,8 @@ class CreateTargetUseCase:
                     f"User already has {MAX_TARGETS_PER_USER} targets."
                 )
 
-            profile = self._profile_query.get_profile_for_target(user_id)
+            profile: ProfileForTarget | None = self._profile_query.get_profile_for_target(
+                user_id)
             if profile is None:
                 raise ProfileNotFoundError(
                     f"Profile not found for user {user_id}."

@@ -41,6 +41,8 @@ from app.domain.profile.entities import Profile  # 実際のパスに合わせ�
 from app.domain.target.entities import DailyTargetSnapshot  # 実際のパスに合わせて調整
 from app.domain.nutrition.daily_nutrition import DailyNutritionSummary
 from app.domain.nutrition.meal_nutrition import MealNutritionSummary  # 実際のパスに合わせて
+from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
+from app.application.profile.ports.profile_query_port import ProfileQueryPort
 
 
 class GenerateDailyNutritionReportUseCase:
@@ -62,20 +64,18 @@ class GenerateDailyNutritionReportUseCase:
     def __init__(
         self,
         daily_log_uc: CheckDailyLogCompletionUseCase,
-        profile_repo: ProfileRepositoryPort,
+        profile_query: ProfileQueryPort,
         ensure_target_snapshot_uc: EnsureDailyTargetSnapshotUseCase,
         daily_nutrition_uc: ComputeDailyNutritionSummaryUseCase,
-        meal_nutrition_repo: MealNutritionSummaryRepositoryPort,
-        report_repo: DailyNutritionReportRepositoryPort,
+        nutrition_uow: NutritionUnitOfWorkPort,
         report_generator: DailyNutritionReportGeneratorPort,
         clock: ClockPort,
     ) -> None:
         self._daily_log_uc = daily_log_uc
-        self._profile_repo = profile_repo
+        self._profile_query = profile_query
         self._ensure_target_snapshot_uc = ensure_target_snapshot_uc
         self._daily_nutrition_uc = daily_nutrition_uc
-        self._meal_nutrition_repo = meal_nutrition_repo
-        self._report_repo = report_repo
+        self._uow = nutrition_uow
         self._report_generator = report_generator
         self._clock = clock
 
@@ -107,7 +107,7 @@ class GenerateDailyNutritionReportUseCase:
             )
 
         # --- 2. 既存レポートの有無をチェック -------------------------
-        existing = self._report_repo.get_by_user_and_date(
+        existing = self._uow.daily_report_repo.get_by_user_and_date(
             user_id=user_id,
             target_date=date_,
         )
@@ -119,7 +119,8 @@ class GenerateDailyNutritionReportUseCase:
         # --- 3. Profile / TargetSnapshot / Daily / Meal を取得 --------
 
         # 3-1. Profile
-        profile: Profile | None = self._profile_repo.get_by_user_id(user_id)
+        profile: Profile | None = self._profile_query.get_profile_for_daily_log(
+            user_id)
         if profile is None:
             # ここは既に DailyLog 側でも ProfileNotFound を投げている想定だが、
             # 念のため二重チェックしておく。
@@ -144,7 +145,7 @@ class GenerateDailyNutritionReportUseCase:
 
         # 3-4. その日の MealNutritionSummary 一覧
         meal_summaries: list[MealNutritionSummary] = list(
-            self._meal_nutrition_repo.list_by_user_and_date(
+            self._uow.meal_nutrition_repo.list_by_user_and_date(
                 user_id=user_id,
                 target_date=date_,
             )
@@ -177,6 +178,6 @@ class GenerateDailyNutritionReportUseCase:
         )
 
         # --- 6. 保存 -------------------------------------------------
-        self._report_repo.save(report)
+        self._uow.daily_report_repo.save(report)
 
         return report

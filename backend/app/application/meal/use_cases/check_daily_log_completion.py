@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 from datetime import date as DateType
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from app.application.meal.dto.daily_log_completion_dto import (
     DailyLogCompletionResultDTO,
 )
-from app.application.meal.ports.food_entry_repository_port import (
-    FoodEntryRepositoryPort,
-)
 from app.application.profile.ports.profile_repository_port import (
     ProfileRepositoryPort,
 )
+from app.application.meal.ports.uow_port import MealUnitOfWorkPort
 from app.domain.auth.value_objects import UserId
 from app.domain.meal.errors import (
     DailyLogProfileNotFoundError,
@@ -19,6 +17,7 @@ from app.domain.meal.errors import (
 )
 from app.domain.meal.value_objects import MealType
 from app.domain.meal.entities import FoodEntry
+from app.application.profile.ports.profile_query_port import ProfileQueryPort
 
 
 class CheckDailyLogCompletionUseCase:
@@ -40,11 +39,11 @@ class CheckDailyLogCompletionUseCase:
 
     def __init__(
         self,
-        profile_repo: ProfileRepositoryPort,
-        food_entry_repo: FoodEntryRepositoryPort,
+        profile_query: ProfileQueryPort,
+        meal_uow: MealUnitOfWorkPort,
     ) -> None:
-        self._profile_repo = profile_repo
-        self._food_entry_repo = food_entry_repo
+        self._profile_query = profile_query
+        self._meal_uow = meal_uow
 
     def execute(
         self,
@@ -52,7 +51,7 @@ class CheckDailyLogCompletionUseCase:
         date_: DateType,
     ) -> DailyLogCompletionResultDTO:
         # --- 1. Profile 取得（なければエラー） ------------------------
-        profile = self._profile_repo.get_by_user_id(user_id)
+        profile = self._profile_query.get_profile_for_daily_log(user_id)
         if profile is None:
             raise DailyLogProfileNotFoundError(
                 f"Profile not found for user_id={user_id.value}"
@@ -65,12 +64,11 @@ class CheckDailyLogCompletionUseCase:
             )
 
         # --- 2. 当日の FoodEntry（main のみ）を取得 -------------------
-        # 既存の Repo に list_by_user_and_date があればそれを使い、
-        # meal_type が main のものだけをここでフィルタするイメージ。
-        entries: Sequence[FoodEntry] = self._food_entry_repo.list_by_user_and_date(
-            user_id=user_id,
-            date=date_,
-        )
+        with self._meal_uow as uow:
+            entries: Sequence[FoodEntry] = uow.food_entry_repo.list_by_user_and_date(
+                user_id=user_id,
+                date=date_,
+            )
 
         main_indices: set[int] = set()
 

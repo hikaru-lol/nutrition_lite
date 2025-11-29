@@ -12,6 +12,7 @@ from app.domain.auth.value_objects import UserId
 from app.domain.meal.entities import FoodEntry
 from app.domain.meal.errors import FoodEntryNotFoundError
 from app.domain.meal.value_objects import FoodEntryId, MealType
+from tests.fakes.meal_uow import FakeMealUnitOfWork
 
 pytestmark = pytest.mark.unit
 
@@ -77,7 +78,7 @@ def _make_entry(user_id: UserId) -> FoodEntry:
 
 def test_delete_existing_entry_success() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = DeleteFoodEntryUseCase(repo)
+    use_case = DeleteFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
     entry = _make_entry(user_id)
     repo.add(entry)
@@ -89,7 +90,7 @@ def test_delete_existing_entry_success() -> None:
 
 def test_delete_not_found_raises_error() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = DeleteFoodEntryUseCase(repo)
+    use_case = DeleteFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     with pytest.raises(FoodEntryNotFoundError):

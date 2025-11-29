@@ -84,6 +84,7 @@ from app.infra.llm.target_generator_stub import StubTargetGenerator
 # === Meal ===================================================================
 # Ports
 from app.application.meal.ports.food_entry_repository_port import FoodEntryRepositoryPort
+from app.application.meal.ports.uow_port import MealUnitOfWorkPort
 
 # Use cases
 from app.application.meal.use_cases.check_daily_log_completion import (
@@ -98,9 +99,14 @@ from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseC
 
 # Infra (repo)
 from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
+from app.infra.db.uow.meal import SqlAlchemyMealUnitOfWork
+from app.infra.meal.meal_entry_query_service import MealEntryQueryService
 
 # === Nutrition ==============================================================
 # Ports
+from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
+from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
+
 from app.application.nutrition.ports.daily_nutrition_repository_port import (
     DailyNutritionSummaryRepositoryPort,
 )
@@ -136,6 +142,8 @@ from app.application.nutrition.use_cases.generate_meal_recommendation import (
 )
 
 # Infra (repos)
+from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
+
 from app.infra.db.repositories.daily_nutrition_report_repository import (
     SqlAlchemyDailyNutritionReportRepository,
 )
@@ -282,7 +290,7 @@ def get_upsert_profile_use_case() -> UpsertProfileUseCase:
 
 
 # 自分自身のプロフィールを取得する UseCase の DI
-def get_get_my_profile_use_case() -> GetMyProfileUseCase:
+def get_my_profile_use_case() -> GetMyProfileUseCase:
     return GetMyProfileUseCase(
         uow=get_profile_uow(),
     )
@@ -326,7 +334,7 @@ def get_target_generator() -> TargetGeneratorPort:
 # プロフィール情報取得用の QueryService を返す
 def get_profile_query_service() -> ProfileQueryService:
     return ProfileQueryService(
-        get_my_profile_uc=get_get_my_profile_use_case(),
+        get_my_profile_uc=get_my_profile_use_case(),
     )
 
 
@@ -337,7 +345,6 @@ def get_create_target_use_case() -> CreateTargetUseCase:
     """
     return CreateTargetUseCase(
         uow=get_target_uow(),
-        profile_repo=get_profile_repository(),
         generator=get_target_generator(),
         profile_query=get_profile_query_service(),
     )
@@ -399,42 +406,48 @@ def get_get_target_use_case() -> GetTargetUseCase:
 # 食事記録（FoodEntry）まわりの DI 定義
 
 # 食事エントリを扱う Repository を返す
-def get_food_entry_repository(session: Session | None = None) -> FoodEntryRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyFoodEntryRepository(session)
+def get_meal_uow() -> MealUnitOfWorkPort:
+    return SqlAlchemyMealUnitOfWork()
 
 
 # 食事エントリの作成 UseCase の DI
 def get_create_food_entry_use_case() -> CreateFoodEntryUseCase:
     return CreateFoodEntryUseCase(
-        food_entry_repository=get_food_entry_repository(),
+        meal_uow=get_meal_uow(),
     )
 
 
 # 食事エントリの更新 UseCase の DI
 def get_update_food_entry_use_case() -> UpdateFoodEntryUseCase:
     return UpdateFoodEntryUseCase(
-        food_entry_repository=get_food_entry_repository(),
+        meal_uow=get_meal_uow(),
     )
 
 
 # 食事エントリの削除 UseCase の DI
 def get_delete_food_entry_use_case() -> DeleteFoodEntryUseCase:
     return DeleteFoodEntryUseCase(
-        food_entry_repository=get_food_entry_repository(),
+        meal_uow=get_meal_uow(),
     )
 
 
 # 指定日の食事エントリ一覧を取得する UseCase の DI
 def get_list_food_entries_by_date_use_case() -> ListFoodEntriesByDateUseCase:
     return ListFoodEntriesByDateUseCase(
-        food_entry_repository=get_food_entry_repository(),
+        meal_uow=get_meal_uow(),
     )
 
 
 # === Nutrition: estimator & repositories ====================================
 # 栄養推定ロジックと栄養サマリ系 Repository の DI 定義
+
+# NutritionUnitOfWork を返す
+def get_nutrition_uow() -> NutritionUnitOfWorkPort:
+    """
+    栄養ドメイン用 UnitOfWork 実装を返す。
+    """
+    return SqlAlchemyNutritionUnitOfWork()
+
 
 # 栄養推定ロジック（Stub）の実装を返す
 def get_nutrition_estimator() -> NutritionEstimatorPort:
@@ -445,6 +458,12 @@ def get_nutrition_estimator() -> NutritionEstimatorPort:
     - 後で LLM / 外部DB 実装に差し替え可能
     """
     return StubNutritionEstimator()
+
+
+def get_meal_entry_query_service() -> MealEntryQueryPort:
+    return MealEntryQueryService(
+        meal_uow=get_meal_uow(),
+    )
 
 
 # MealNutritionSummary を扱う Repository を返す
@@ -473,15 +492,13 @@ def get_compute_meal_nutrition_use_case() -> ComputeMealNutritionUseCase:
     """
     1 Meal 分の栄養を推定して MealNutritionSummary を更新する UseCase。
     """
-    session = get_db_session()
-    food_entry_repo = get_food_entry_repository(session=session)
-    meal_nutrition_repo = get_meal_nutrition_summary_repository(
-        session=session)
+    meal_entry_query_service = get_meal_entry_query_service()
+    nutrition_uow = get_nutrition_uow()
     estimator = get_nutrition_estimator()
 
     return ComputeMealNutritionUseCase(
-        food_entry_repo=food_entry_repo,
-        meal_nutrition_repo=meal_nutrition_repo,
+        meal_entry_query_service=meal_entry_query_service,
+        nutrition_uow=nutrition_uow,
         estimator=estimator,
     )
 
@@ -494,13 +511,8 @@ def get_compute_daily_nutrition_summary_use_case(
 
     - MealNutritionSummary を集約して計算する。
     """
-    session = get_db_session()
-    meal_repo = get_meal_nutrition_summary_repository(session=session)
-    daily_repo = get_daily_nutrition_summary_repository(session=session)
-
     return ComputeDailyNutritionSummaryUseCase(
-        meal_repo=meal_repo,
-        daily_repo=daily_repo,
+        uow=get_nutrition_uow(),
     )
 
 
@@ -539,14 +551,9 @@ def get_check_daily_log_completion_use_case() -> CheckDailyLogCompletionUseCase:
     """
     1 日分の食事ログが「記録完了」しているかを判定する UseCase の DI。
     """
-    # 同一セッションで Profile / FoodEntry を読む
-    session = get_db_session()
-    profile_repo = get_profile_repository(session=session)
-    food_entry_repo = get_food_entry_repository(session=session)
-
     return CheckDailyLogCompletionUseCase(
-        profile_repo=profile_repo,
-        food_entry_repo=food_entry_repo,
+        profile_query=get_profile_query_service(),
+        meal_uow=get_meal_uow(),
     )
 
 
@@ -563,30 +570,18 @@ def get_ensure_daily_target_snapshot_use_case() -> EnsureDailyTargetSnapshotUseC
 # 日次栄養レポート（DailyNutritionReport）を生成する UseCase の DI
 def get_generate_daily_nutrition_report_use_case(
 ) -> GenerateDailyNutritionReportUseCase:
-    """
-    DailyNutritionReport 生成用 UseCase の DI。
-    """
-    # サブ UC / Generator / Clock
     daily_log_uc = get_check_daily_log_completion_use_case()
     ensure_target_snapshot_uc = get_ensure_daily_target_snapshot_use_case()
     daily_nutrition_uc = get_compute_daily_nutrition_summary_use_case()
     report_generator = get_daily_nutrition_report_generator()
     clock = get_clock()
 
-    # Repos（同一セッションを共有）
-    session = get_db_session()
-    profile_repo = get_profile_repository(session=session)
-    meal_nutrition_repo = get_meal_nutrition_summary_repository(
-        session=session)
-    report_repo = get_daily_nutrition_report_repository(session=session)
-
     return GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
-        profile_repo=profile_repo,
+        profile_query=get_profile_query_service(),
         ensure_target_snapshot_uc=ensure_target_snapshot_uc,
         daily_nutrition_uc=daily_nutrition_uc,
-        meal_nutrition_repo=meal_nutrition_repo,
-        report_repo=report_repo,
+        nutrition_uow=get_nutrition_uow(),
         report_generator=report_generator,
         clock=clock,
     )

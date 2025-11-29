@@ -20,6 +20,8 @@ from app.domain.nutrition.meal_nutrition import (
     MealNutritionSummaryId,
 )
 from app.domain.target.value_objects import NutrientSource
+from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
+from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 
 
 class ComputeMealNutritionUseCase:
@@ -38,12 +40,12 @@ class ComputeMealNutritionUseCase:
 
     def __init__(
         self,
-        food_entry_repo: FoodEntryRepositoryPort,
-        meal_nutrition_repo: MealNutritionSummaryRepositoryPort,
+        meal_entry_query_service: MealEntryQueryPort,
+        nutrition_uow: NutritionUnitOfWorkPort,
         estimator: NutritionEstimatorPort,
     ) -> None:
-        self._food_entry_repo = food_entry_repo
-        self._meal_nutrition_repo = meal_nutrition_repo
+        self._meal_entry_query_service = meal_entry_query_service
+        self._nutrition_uow = nutrition_uow
         self._estimator = estimator
 
     def execute(
@@ -71,64 +73,46 @@ class ComputeMealNutritionUseCase:
                     f"MealType=snack の場合、meal_index は None である必要があります: {meal_index}"
                 )
 
-        # --- 対象食事の FoodEntry 一覧を取得 --------------------------
+         # 1. MealEntry 取得（MealEntryQueryPort 経由）
         entries = list(
-            self._food_entry_repo.list_by_user_date_type_index(
+            self._meal_entry_query_service.list_entries_for_meal(
                 user_id=user_id,
-                target_date=date_,
+                date_=date_,
                 meal_type=meal_type,
                 meal_index=meal_index,
             )
         )
 
-        # --- 栄養推定 (Estimator) --------------------------------------
-        try:
-            nutrient_intakes = self._estimator.estimate_for_entries(
-                user_id=user_id,
-                date=date_,
-                entries=entries,
-            )
-        except Exception as exc:
-            # Estimator 内部の例外を NutritionEstimationFailedError にラップ
-            raise NutritionEstimationFailedError(
-                f"Failed to estimate nutrients for user={user_id.value}, date={date_}, "
-                f"meal_type={meal_type.value}, meal_index={meal_index}: {exc}"
-            ) from exc
-
-        # --- 既存サマリの存在チェック ---------------------------------
-        existing = self._meal_nutrition_repo.get_by_user_date_meal(
-            user_id=user_id,
-            target_date=date_,
-            meal_type=meal_type,
-            meal_index=meal_index,
-        )
-
-        # 由来: 今は「LLM などによる推定値」という扱いで "llm" を使う
-        source = NutrientSource("llm")
-
-        if existing is not None:
-            summary_id: MealNutritionSummaryId | None = existing.id
-        else:
-            summary_id = None
-
-        # --- MealNutritionSummary を組み立て --------------------------
-        # Estimator が返した nutrient_intakes は List[MealNutrientIntake] なので、
-        # code/amount を抜き出して from_nutrient_amounts を使っても良いし、
-        # ここでそのまま生成しても良い。
-        # ここでは from_nutrient_amounts を使うパターンを想定。
-        pairs = [(n.code, n.amount) for n in nutrient_intakes]
-
-        summary = MealNutritionSummary.from_nutrient_amounts(
+        # 2. 栄養推定（estimator はそのまま）
+        nutrient_intakes = self._estimator.estimate_for_entries(
             user_id=user_id,
             date=date_,
-            meal_type=meal_type,
-            meal_index=meal_index,
-            nutrients=pairs,
-            source=source,
-            summary_id=summary_id,
+            entries=entries,
         )
 
-        # --- 保存 (upsert) --------------------------------------------
-        self._meal_nutrition_repo.save(summary)
+        # 3. 既存サマリの取得 & 4. 保存 は NutritionUoW 経由
+        with self._nutrition_uow as uow:
+            existing = uow.meal_nutrition_repo.get_by_user_date_meal(
+                user_id=user_id,
+                target_date=date_,
+                meal_type=meal_type,
+                meal_index=meal_index,
+            )
 
-        return summary
+            source = NutrientSource("llm")
+            summary_id = existing.id if existing is not None else None
+            pairs = [(n.code, n.amount) for n in nutrient_intakes]
+
+            summary = MealNutritionSummary.from_nutrient_amounts(
+                user_id=user_id,
+                date=date_,
+                meal_type=meal_type,
+                meal_index=meal_index,
+                nutrients=pairs,
+                source=source,
+                summary_id=summary_id,
+            )
+
+            uow.meal_nutrition_repo.save(summary)
+
+            return summary

@@ -16,6 +16,7 @@ from app.domain.meal.errors import (
     FoodEntryNotFoundError,
 )
 from app.domain.meal.value_objects import FoodEntryId, MealType
+from tests.fakes.meal_uow import FakeMealUnitOfWork
 
 pytestmark = pytest.mark.unit
 
@@ -82,7 +83,7 @@ def _make_existing_entry(user_id: UserId) -> FoodEntry:
 
 def test_update_existing_entry_success() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = UpdateFoodEntryUseCase(repo)
+    use_case = UpdateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     existing = _make_existing_entry(user_id)
@@ -119,7 +120,7 @@ def test_update_existing_entry_success() -> None:
 
 def test_update_not_found_raises_error() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = UpdateFoodEntryUseCase(repo)
+    use_case = UpdateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     dto = UpdateFoodEntryInputDTO(
@@ -140,7 +141,7 @@ def test_update_not_found_raises_error() -> None:
 
 def test_update_invalid_meal_type_raises_error() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = UpdateFoodEntryUseCase(repo)
+    use_case = UpdateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     existing = _make_existing_entry(user_id)
