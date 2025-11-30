@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from app.application.auth.dto.login_dto import LoginInputDTO, LoginOutputDTO
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.application.auth.dto.login_dto import LoginInputDTO, LoginOutputDTO
+
+from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload
-from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+
 from app.domain.auth.value_objects import EmailAddress
 from app.domain.auth.errors import InvalidCredentialsError
 

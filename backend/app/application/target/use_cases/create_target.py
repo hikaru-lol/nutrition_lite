@@ -3,27 +3,30 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
+# === Application (DTO / Ports) ==============================================
+
+from app.application.profile.ports.profile_query_port import (
+    ProfileForTarget,
+    ProfileQueryPort,
+)
 from app.application.target.dto.target_dto import (
     CreateTargetInputDTO,
     TargetDTO,
     TargetNutrientDTO,
 )
 from app.application.target.errors import TargetLimitExceededError
-from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 from app.application.target.ports.target_generator_port import (
-    TargetGeneratorPort,
     TargetGenerationContext,
+    TargetGeneratorPort,
 )
-from app.domain.auth.value_objects import UserId
-from app.domain.target.entities import TargetDefinition
-from app.domain.target.value_objects import (
-    TargetId,
-    GoalType,
-    ActivityLevel,
-)
-from app.application.target.ports.profile_query_port import ProfileQueryPort, ProfileForTarget
-from app.domain.profile.errors import ProfileNotFoundError
+from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 
+# === Domain (Entities / ValueObjects / Errors) ==============================
+
+from app.domain.auth.value_objects import UserId
+from app.domain.profile.errors import ProfileNotFoundError
+from app.domain.target.entities import TargetDefinition
+from app.domain.target.value_objects import ActivityLevel, GoalType, TargetId
 
 MAX_TARGETS_PER_USER = 5
 
@@ -34,7 +37,6 @@ class CreateTargetUseCase:
 
     - プロフィール + 目標情報から TargetGeneratorPort を使って 17 栄養素を生成
     - 初めての Target なら is_active=True、それ以外は is_active=False
-    - 将来的には Profile 情報を ctx に詰めて渡す想定（いまは未使用部分は None）
     """
 
     def __init__(
@@ -48,10 +50,17 @@ class CreateTargetUseCase:
         self._profile_query = profile_query
 
     def execute(self, input_dto: CreateTargetInputDTO) -> TargetDTO:
+        """
+        ターゲットを 1 件生成して永続化し、TargetDTO として返す。
+
+        Raises:
+            TargetLimitExceededError: ユーザーが既に上限数のターゲットを持っている場合
+            ProfileNotFoundError: ターゲット生成に必要なプロフィールが存在しない場合
+        """
         user_id = UserId(input_dto.user_id)
 
         with self._uow as uow:
-            # --- 上限チェック（5個まで） ------------------------------
+            # --- 1. 上限チェック（5個まで） ---------------------------
             existing_targets = uow.target_repo.list_by_user(
                 user_id=user_id,
                 limit=MAX_TARGETS_PER_USER + 1,
@@ -61,14 +70,16 @@ class CreateTargetUseCase:
                     f"User already has {MAX_TARGETS_PER_USER} targets."
                 )
 
+            # --- 2. プロフィール取得 -----------------------------------
             profile: ProfileForTarget | None = self._profile_query.get_profile_for_target(
-                user_id)
+                user_id
+            )
             if profile is None:
                 raise ProfileNotFoundError(
                     f"Profile not found for user {user_id}."
                 )
 
-            # --- ターゲット生成（LLM or Stub） ------------------------
+            # --- 3. ターゲット生成（LLM or Stub） ----------------------
             ctx = TargetGenerationContext(
                 user_id=user_id,
                 sex=profile.sex,
@@ -80,9 +91,11 @@ class CreateTargetUseCase:
             )
             gen_result = self._generator.generate(ctx)
 
+            # 既にアクティブなターゲットがなければ、このターゲットを is_active=True に
             already_active = uow.target_repo.get_active(user_id)
             is_active = already_active is None
 
+            # --- 4. TargetDefinition を組み立て -----------------------
             now = datetime.now(timezone.utc)
             target = TargetDefinition(
                 id=TargetId(str(uuid4())),
@@ -100,15 +113,17 @@ class CreateTargetUseCase:
             )
 
             uow.target_repo.add(target)
-            uow.commit()
 
             return _to_dto(target)
 
 
-# --- Domain -> DTO 変換ヘルパー ----------------------------------------
+# === Domain -> DTO 変換ヘルパー ============================================
 
 
 def _to_dto(target: TargetDefinition) -> TargetDTO:
+    """
+    Domain の TargetDefinition -> Application 層の TargetDTO 変換。
+    """
     nutrients_dto = [
         TargetNutrientDTO(
             code=n.code.value,

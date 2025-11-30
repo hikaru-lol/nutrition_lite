@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal, Optional
-
 from uuid import UUID
+
 from pydantic import BaseModel, EmailStr, Field
+
+
+# === Auth: Request Schemas ==================================================
 
 
 class RegisterRequest(BaseModel):
@@ -18,6 +21,9 @@ class LoginRequest(BaseModel):
     password: str
 
 
+# === User / Auth: Common Schemas ===========================================
+
+# trial / free / paid の 3 パターンに限定したプラン種別
 UserPlanLiteral = Literal["trial", "free", "paid"]
 
 
@@ -26,10 +32,9 @@ class UserSummary(BaseModel):
     email: EmailStr
     name: Optional[str] = None
 
-    # trial / free / paid の 3 パターンに絞る
-    plan: Literal["trial", "free", "paid"]
-
+    plan: UserPlanLiteral
     trial_ends_at: Optional[datetime] = None
+
     has_profile: bool
     created_at: datetime
 
@@ -41,6 +46,9 @@ class AuthUserResponse(BaseModel):
 class RefreshResponse(BaseModel):
     ok: bool
     user: UserSummary
+
+
+# === Error Schemas ==========================================================
 
 
 class ErrorDetail(BaseModel):

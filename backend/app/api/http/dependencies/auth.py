@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from fastapi import Depends, Cookie
+from fastapi import Cookie, Depends
 
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.auth.ports.token_service_port import TokenServicePort
-from app.application.auth.use_cases.current_user.get_current_user import GetCurrentUserUseCase
+from app.application.auth.use_cases.current_user.get_current_user import (
+    GetCurrentUserUseCase,
+)
+
+from app.di.container import get_current_user_use_case, get_token_service
+
 from app.domain.auth.errors import InvalidCredentialsError
-from app.di.container import get_token_service, get_current_user_use_case
 
 
 def get_current_user_dto(

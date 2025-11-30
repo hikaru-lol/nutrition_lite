@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.application.profile.dto.profile_dto import ProfileDTO, UpsertProfileInputDTO
+
 from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
 from app.application.profile.ports.profile_image_storage_port import ProfileImageStoragePort
+
 from app.domain.auth.value_objects import UserId
 from app.domain.profile.entities import Profile
 from app.domain.profile.value_objects import HeightCm, WeightKg, ProfileImageId
@@ -69,7 +71,6 @@ class UpsertProfileUseCase:
                 profile = existing
 
             saved = uow.profile_repo.save(profile)
-            # commit / rollback は UoW の __exit__ に任せる
 
         return ProfileDTO(
             user_id=saved.user_id.value,

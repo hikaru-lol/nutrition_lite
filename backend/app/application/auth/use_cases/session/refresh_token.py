@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from app.application.auth.dto.refresh_dto import RefreshInputDTO, RefreshOutputDTO
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
-from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload, TokenPair
+from app.application.auth.dto.refresh_dto import RefreshInputDTO, RefreshOutputDTO
+
 from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.token_service_port import TokenServicePort, TokenPayload, TokenPair
+
 from app.domain.auth.value_objects import UserId
 from app.domain.auth.errors import InvalidRefreshTokenError, UserNotFoundError
 
@@ -18,7 +20,6 @@ class RefreshTokenUseCase:
         self._token_service = token_service
 
     def execute(self, input_dto: RefreshInputDTO) -> RefreshOutputDTO:
-        # refresh token 検証
         try:
             payload = self._token_service.verify_refresh_token(
                 input_dto.refresh_token)

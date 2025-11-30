@@ -44,6 +44,5 @@ class CreateFoodEntryUseCase:
 
         with self._meal_uow as uow:
             uow.food_entry_repo.add(entry)
-            # commit/rollback は UoW.__exit__ が担当
 
         return food_entry_to_dto(entry)
