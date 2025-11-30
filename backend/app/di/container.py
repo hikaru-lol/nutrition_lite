@@ -137,9 +137,13 @@ from app.application.nutrition.use_cases.compute_meal_nutrition import (
 from app.application.nutrition.use_cases.generate_daily_nutrition_report import (
     GenerateDailyNutritionReportUseCase,
 )
+from app.application.nutrition.use_cases.get_daily_nutrition_report import (
+    GetDailyNutritionReportUseCase,
+)
 from app.application.nutrition.use_cases.generate_meal_recommendation import (
     GenerateMealRecommendationUseCase,
 )
+
 
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
@@ -194,13 +198,6 @@ def get_password_hasher() -> PasswordHasherPort:
 # アクセストークン / リフレッシュトークンを扱うサービスの実装を返す
 def get_token_service() -> TokenServicePort:
     return JwtTokenService()
-
-
-# ユーザー情報を扱う Repository を返す（必要に応じて Session を外から渡せる）
-def get_user_repository(session: Session | None = None) -> UserRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyUserRepository(session)
 
 
 # ユーザー登録 UseCase 用の依存を組み立てて返す
@@ -272,13 +269,6 @@ def get_profile_image_storage() -> ProfileImageStoragePort:
 # プロフィール更新用の UnitOfWork 実装を返す
 def get_profile_uow() -> ProfileUnitOfWorkPort:
     return SqlAlchemyProfileUnitOfWork()
-
-
-# プロフィール情報を扱う Repository を返す
-def get_profile_repository(session: Session | None = None) -> ProfileRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyProfileRepository(session)
 
 
 # プロフィールを新規作成・更新する UseCase の DI
@@ -466,24 +456,6 @@ def get_meal_entry_query_service() -> MealEntryQueryPort:
     )
 
 
-# MealNutritionSummary を扱う Repository を返す
-def get_meal_nutrition_summary_repository(
-    session: Session | None = None,
-) -> MealNutritionSummaryRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyMealNutritionSummaryRepository(session)
-
-
-# DailyNutritionSummary を扱う Repository を返す
-def get_daily_nutrition_summary_repository(
-    session: Session | None = None,
-) -> DailyNutritionSummaryRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyDailyNutritionSummaryRepository(session)
-
-
 # === Nutrition: core use cases ==============================================
 # Meal単位 / 日単位の栄養計算 UseCase の DI 定義
 
@@ -587,8 +559,15 @@ def get_generate_daily_nutrition_report_use_case(
     )
 
 
+# 指定した (user_id, date) の DailyNutritionReport を取得する UseCase の DI
+def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
+    return GetDailyNutritionReportUseCase(
+        uow=get_nutrition_uow(),
+    )
+
 # === MealRecommendation (今は Stub のみ) ====================================
 # 食事レコメンド（将来の機能）の DI 定義
+
 
 # 食事レコメンドを生成する Generator のシングルトンインスタンス
 _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None

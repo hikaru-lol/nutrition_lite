@@ -13,14 +13,11 @@ from app.application.auth.dto.auth_user_dto import AuthUserDTO
 
 from app.di.container import (
     get_generate_daily_nutrition_report_use_case,
-    get_daily_nutrition_report_repository,
+    get_get_daily_nutrition_report_use_case,
 )
 
 from app.application.nutrition.use_cases.generate_daily_nutrition_report import (
     GenerateDailyNutritionReportUseCase,
-)
-from app.application.nutrition.ports.daily_report_repository_port import (
-    DailyNutritionReportRepositoryPort,
 )
 from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.errors import (
@@ -29,7 +26,7 @@ from app.domain.nutrition.errors import (
 )
 from app.domain.meal.errors import DailyLogProfileNotFoundError  # フェーズ1で定義した想定
 from app.domain.nutrition.daily_report import DailyNutritionReport
-
+from app.application.nutrition.use_cases.get_daily_nutrition_report import GetDailyNutritionReportUseCase
 
 router = APIRouter(tags=["DailyReport"])
 
@@ -109,8 +106,8 @@ def generate_daily_nutrition_report(
 def get_daily_nutrition_report(
     date: DateType = Query(..., description="レポート対象日 (YYYY-MM-DD)"),
     current_user: AuthUserDTO = Depends(get_current_user_dto),
-    repo: DailyNutritionReportRepositoryPort = Depends(
-        get_daily_nutrition_report_repository
+    use_case: GetDailyNutritionReportUseCase = Depends(
+        get_get_daily_nutrition_report_use_case
     ),
 ):
     """
@@ -122,9 +119,9 @@ def get_daily_nutrition_report(
 
     user_id = UserId(current_user.id)
 
-    report = repo.get_by_user_and_date(
+    report = use_case.execute(
         user_id=user_id,
-        target_date=date,
+        date_=date,
     )
     if report is None:
         from fastapi import HTTPException
