@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.application.target import errors as target_app_errors
 from app.domain.auth import errors as auth_errors
 from app.domain.meal import errors as meal_domain_errors
-from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError
+from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError, DailyLogProfileNotFoundError
 from app.domain.nutrition import errors as nutrition_domain_errors
 from app.domain.profile import errors as profile_domain_errors
 from app.domain.target import errors as target_domain_errors
@@ -237,6 +237,13 @@ async def meal_domain_error_handler(
             message=str(exc) or "Invalid food amount",
         )
 
+    if isinstance(exc, DailyLogProfileNotFoundError):
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="DAILY_LOG_PROFILE_NOT_FOUND",
+            message="日次ログの判定にはプロフィールの設定が必要です。",
+        )
+
     # 404 系
     if isinstance(exc, meal_domain_errors.FoodEntryNotFoundError):
         return error_response(
@@ -272,6 +279,7 @@ async def nutrition_domain_error_handler(
         str(exc),
     )
 
+    # LLM などによる栄養推定失敗
     if isinstance(exc, nutrition_domain_errors.NutritionEstimationFailedError):
         return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -279,7 +287,24 @@ async def nutrition_domain_error_handler(
             message=str(exc) or "Failed to estimate nutrition",
         )
 
+    # 日次ログが「記録完了」になっていない場合
+    if isinstance(exc, nutrition_domain_errors.DailyLogNotCompletedError):
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="DAILY_LOG_NOT_COMPLETED",
+            message="指定された日付の食事ログがまだ記録完了になっていません。",
+        )
+
+    # すでにその日のレポートが存在する場合
+    if isinstance(exc, nutrition_domain_errors.DailyNutritionReportAlreadyExistsError):
+        return error_response(
+            status_code=status.HTTP_409_CONFLICT,
+            code="DAILY_NUTRITION_REPORT_ALREADY_EXISTS",
+            message="指定された日付の栄養レポートは既に存在します。",
+        )
+
     # 万が一 NutritionDomainError の別バリエーションが増えても、ここで 500 にフォールバック
+    logger.exception("Unhandled NutritionDomainError: %s", exc)
     return error_response(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         code="NUTRITION_ERROR",

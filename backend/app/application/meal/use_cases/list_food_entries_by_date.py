@@ -5,8 +5,10 @@ from typing import Sequence
 
 from app.application.meal.dto.food_entry_dto import FoodEntryDTO
 from app.application.meal.use_cases._helpers import food_entry_to_dto
-from app.domain.auth.value_objects import UserId
+
 from app.application.meal.ports.uow_port import MealUnitOfWorkPort
+
+from app.domain.auth.value_objects import UserId
 
 
 class ListFoodEntriesByDateUseCase:

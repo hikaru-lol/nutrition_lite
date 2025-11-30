@@ -16,17 +16,8 @@ from app.application.nutrition.dto.daily_report_llm_dto import (
 from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
 )
-from app.application.nutrition.ports.daily_report_repository_port import (
-    DailyNutritionReportRepositoryPort,
-)
-from app.application.nutrition.ports.meal_nutrition_repository_port import (
-    MealNutritionSummaryRepositoryPort,
-)
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
     ComputeDailyNutritionSummaryUseCase,
-)
-from app.application.profile.ports.profile_repository_port import (
-    ProfileRepositoryPort,
 )
 from app.application.target.use_cases.ensure_daily_snapshot import (
     EnsureDailyTargetSnapshotUseCase,

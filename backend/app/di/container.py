@@ -107,25 +107,17 @@ from app.infra.meal.meal_entry_query_service import MealEntryQueryService
 from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
 
-from app.application.nutrition.ports.daily_nutrition_repository_port import (
-    DailyNutritionSummaryRepositoryPort,
-)
 from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
 )
 from app.application.nutrition.ports.daily_report_repository_port import (
     DailyNutritionReportRepositoryPort,
 )
-from app.application.nutrition.ports.meal_nutrition_repository_port import (
-    MealNutritionSummaryRepositoryPort,
-)
 from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
 from app.application.nutrition.ports.recommendation_generator_port import (
     MealRecommendationGeneratorPort,
 )
-from app.application.nutrition.ports.recommendation_repository_port import (
-    MealRecommendationRepositoryPort,
-)
+from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
 
 # Use cases
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
@@ -140,8 +132,10 @@ from app.application.nutrition.use_cases.generate_daily_nutrition_report import 
 from app.application.nutrition.use_cases.get_daily_nutrition_report import (
     GetDailyNutritionReportUseCase,
 )
-from app.application.nutrition.use_cases.generate_meal_recommendation import (
-    GenerateMealRecommendationUseCase,
+from app.infra.nutrition.estimator_stub import StubNutritionEstimator
+from app.infra.llm.estimator_openai import (
+    OpenAINutritionEstimator,
+    OpenAINutritionEstimatorConfig,
 )
 
 
@@ -439,15 +433,36 @@ def get_nutrition_uow() -> NutritionUnitOfWorkPort:
     return SqlAlchemyNutritionUnitOfWork()
 
 
-# 栄養推定ロジック（Stub）の実装を返す
+_USE_OPENAI_NUTRITION_ESTIMATOR = os.getenv(
+    "USE_OPENAI_NUTRITION_ESTIMATOR", "false"
+).lower() in ("1", "true", "yes", "on")
+
+_nutrition_estimator_singleton: NutritionEstimatorPort | None = None
+
+
 def get_nutrition_estimator() -> NutritionEstimatorPort:
     """
-    栄養推定ロジック。
+    栄養推定ロジックの DI。
 
-    - MVP では StubNutritionEstimator を利用
-    - 後で LLM / 外部DB 実装に差し替え可能
+    - デフォルトは StubNutritionEstimator（開発 / テスト用）
+    - USE_OPENAI_NUTRITION_ESTIMATOR=true のとき OpenAI ベースの実装に切り替える
     """
-    return StubNutritionEstimator()
+    global _nutrition_estimator_singleton
+
+    if _nutrition_estimator_singleton is None:
+        if _USE_OPENAI_NUTRITION_ESTIMATOR:
+            _nutrition_estimator_singleton = OpenAINutritionEstimator(
+                config=OpenAINutritionEstimatorConfig(
+                    model=os.getenv("OPENAI_NUTRITION_MODEL", "gpt-4o-mini"),
+                    temperature=float(
+                        os.getenv("OPENAI_NUTRITION_TEMPERATURE", "0.1")
+                    ),
+                )
+            )
+        else:
+            _nutrition_estimator_singleton = StubNutritionEstimator()
+
+    return _nutrition_estimator_singleton
 
 
 def get_meal_entry_query_service() -> MealEntryQueryPort:

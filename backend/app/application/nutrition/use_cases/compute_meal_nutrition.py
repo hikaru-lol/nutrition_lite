@@ -1,27 +1,18 @@
 from __future__ import annotations
 
-from datetime import date as DateType, datetime
+from datetime import date as DateType
 
-from app.application.meal.ports.food_entry_repository_port import (
-    FoodEntryRepositoryPort,
-)
+from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
+from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 from app.application.nutrition.ports.nutrition_estimator_port import (
     NutritionEstimatorPort,
 )
-from app.application.nutrition.ports.meal_nutrition_repository_port import (
-    MealNutritionSummaryRepositoryPort,
-)
+
 from app.domain.auth.value_objects import UserId
-from app.domain.meal.errors import InvalidMealTypeError, InvalidMealIndexError
 from app.domain.meal.value_objects import MealType
-from app.domain.nutrition.errors import NutritionEstimationFailedError
-from app.domain.nutrition.meal_nutrition import (
-    MealNutritionSummary,
-    MealNutritionSummaryId,
-)
+from app.domain.meal.errors import InvalidMealTypeError, InvalidMealIndexError
+from app.domain.nutrition.meal_nutrition import MealNutritionSummary
 from app.domain.target.value_objects import NutrientSource
-from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
-from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 
 
 class ComputeMealNutritionUseCase:

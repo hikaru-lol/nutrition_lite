@@ -23,12 +23,7 @@ from app.application.nutrition.use_cases.get_daily_nutrition_report import (
 
 # === Domain ================================================================
 from app.domain.auth.value_objects import UserId
-from app.domain.meal.errors import DailyLogProfileNotFoundError
 from app.domain.nutrition.daily_report import DailyNutritionReport
-from app.domain.nutrition.errors import (
-    DailyLogNotCompletedError,
-    DailyNutritionReportAlreadyExistsError,
-)
 
 # === DI =====================================================================
 from app.di.container import (
@@ -69,47 +64,23 @@ def generate_daily_nutrition_report(
     use_case: GenerateDailyNutritionReportUseCase = Depends(
         get_generate_daily_nutrition_report_use_case
     ),
-):
+) -> DailyNutritionReportResponse:
     """
     指定した日の DailyNutritionReport を生成する。
 
     - 前提:
         - その日の食事ログが「記録完了」していること。
-    - 失敗ケース:
+    - 失敗ケース（例）:
         - DailyLogNotCompletedError
         - DailyNutritionReportAlreadyExistsError
-        - Profile 未設定 など
+        - DailyLogProfileNotFoundError など
+      → ここでは捕まえず、共通エラーハンドラで HTTP にマッピングする。
     """
 
     user_id = UserId(current_user.id)
     target_date: DateType = body.date
 
-    try:
-        report = use_case.execute(user_id=user_id, date_=target_date)
-    except DailyLogProfileNotFoundError as e:
-        # プロフィール未設定 → 400 などにマッピングする想定
-        # 実際には共通エラーハンドラ側で処理してもOK
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Profile is required before generating a daily report.",
-        ) from e
-    except DailyLogNotCompletedError as e:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Daily log is not completed for the specified date.",
-        ) from e
-    except DailyNutritionReportAlreadyExistsError as e:
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Daily nutrition report already exists for the specified date.",
-        ) from e
-
+    report = use_case.execute(user_id=user_id, date_=target_date)
     return _report_to_response(report)
 
 
@@ -123,13 +94,15 @@ def get_daily_nutrition_report(
     use_case: GetDailyNutritionReportUseCase = Depends(
         get_get_daily_nutrition_report_use_case
     ),
-):
+) -> DailyNutritionReportResponse:
     """
     指定した日の DailyNutritionReport を取得する。
 
     - 既に生成済みのレポートを読むだけ。
     - 存在しない場合は 404 を返す。
     """
+
+    from fastapi import HTTPException
 
     user_id = UserId(current_user.id)
 
@@ -138,8 +111,8 @@ def get_daily_nutrition_report(
         date_=date,
     )
     if report is None:
-        from fastapi import HTTPException
-
+        # ここだけはまだ HTTPException 直書きのまま。
+        # 必要なら専用エラーを定義して共通ハンドラに寄せても OK。
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Daily nutrition report not found for the specified date.",
