@@ -2,33 +2,44 @@ from __future__ import annotations
 
 from datetime import date as DateType
 
+# === Third-party ============================================================
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.http.schemas.daily_report import (
-    GenerateDailyReportRequest,
-    DailyNutritionReportResponse,
-)
+# === API (schemas / dependencies) ==========================================
 from app.api.http.dependencies.auth import get_current_user_dto
-from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.api.http.schemas.daily_report import (
+    DailyNutritionReportResponse,
+    GenerateDailyReportRequest,
+)
 
+# === Application (DTO / UseCase) ============================================
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.application.nutrition.use_cases.generate_daily_nutrition_report import (
+    GenerateDailyNutritionReportUseCase,
+)
+from app.application.nutrition.use_cases.get_daily_nutrition_report import (
+    GetDailyNutritionReportUseCase,
+)
+
+# === Domain ================================================================
+from app.domain.auth.value_objects import UserId
+from app.domain.meal.errors import DailyLogProfileNotFoundError
+from app.domain.nutrition.daily_report import DailyNutritionReport
+from app.domain.nutrition.errors import (
+    DailyLogNotCompletedError,
+    DailyNutritionReportAlreadyExistsError,
+)
+
+# === DI =====================================================================
 from app.di.container import (
     get_generate_daily_nutrition_report_use_case,
     get_get_daily_nutrition_report_use_case,
 )
 
-from app.application.nutrition.use_cases.generate_daily_nutrition_report import (
-    GenerateDailyNutritionReportUseCase,
-)
-from app.domain.auth.value_objects import UserId
-from app.domain.nutrition.errors import (
-    DailyLogNotCompletedError,
-    DailyNutritionReportAlreadyExistsError,
-)
-from app.domain.meal.errors import DailyLogProfileNotFoundError  # フェーズ1で定義した想定
-from app.domain.nutrition.daily_report import DailyNutritionReport
-from app.application.nutrition.use_cases.get_daily_nutrition_report import GetDailyNutritionReportUseCase
-
 router = APIRouter(tags=["DailyReport"])
+
+
+# === Helpers ===============================================================
 
 
 def _report_to_response(report: DailyNutritionReport) -> DailyNutritionReportResponse:
@@ -42,6 +53,9 @@ def _report_to_response(report: DailyNutritionReport) -> DailyNutritionReportRes
         improvement_points=report.improvement_points,
         tomorrow_focus=report.tomorrow_focus,
     )
+
+
+# === Routes ================================================================
 
 
 @router.post(

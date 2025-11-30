@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
 
-from app.api.http.schemas.profile import ProfileRequest, ProfileResponse
-from app.api.http.schemas.auth import ErrorResponse
+# === API (schemas / dependencies) ==========================================
 from app.api.http.dependencies.auth import get_current_user_dto
+from app.api.http.schemas.auth import ErrorResponse
+from app.api.http.schemas.profile import ProfileRequest, ProfileResponse
+
+# === Application (DTO / UseCase) ============================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
-
 from app.application.profile.dto.profile_dto import UpsertProfileInputDTO
-from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
+from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
 
+# === DI =====================================================================
 from app.di.container import (
+    get_my_profile_use_case,
     get_upsert_profile_use_case,
-    get_get_my_profile_use_case,
 )
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
@@ -28,7 +31,7 @@ router = APIRouter(prefix="/profile", tags=["Profile"])
 )
 def get_my_profile(
     current_user: AuthUserDTO = Depends(get_current_user_dto),
-    use_case: GetMyProfileUseCase = Depends(get_get_my_profile_use_case),
+    use_case: GetMyProfileUseCase = Depends(get_my_profile_use_case),
 ) -> ProfileResponse:
     """
     現在ログイン中ユーザーのプロフィールを取得する。

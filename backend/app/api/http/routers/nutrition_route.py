@@ -2,36 +2,44 @@ from __future__ import annotations
 
 from datetime import date as DateType
 
+# === Third-party ============================================================
 from fastapi import APIRouter, Depends, Query
 
+# === API (schemas / dependencies) ==========================================
+from app.api.http.dependencies.auth import get_current_user_dto
 from app.api.http.schemas.nutrition import (
+    DailyNutrientResponse,
+    DailyNutritionSummaryResponse,
+    MealAndDailyNutritionResponse,
     MealNutritionSummaryResponse,
     MealNutrientResponse,
-    DailyNutritionSummaryResponse,
-    DailyNutrientResponse,
-    MealAndDailyNutritionResponse,
 )
-from app.api.http.dependencies.auth import get_current_user_dto
+
+# === Application (DTO / UseCase) ============================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
-from app.application.nutrition.use_cases.compute_meal_nutrition import (
-    ComputeMealNutritionUseCase,
-)
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
     ComputeDailyNutritionSummaryUseCase,
 )
-from app.di.container import (
-    get_compute_meal_nutrition_use_case,
-    get_compute_daily_nutrition_summary_use_case,
+from app.application.nutrition.use_cases.compute_meal_nutrition import (
+    ComputeMealNutritionUseCase,
 )
+
+# === Domain ================================================================
 from app.domain.auth.value_objects import UserId
-from app.domain.nutrition.meal_nutrition import MealNutritionSummary
 from app.domain.nutrition.daily_nutrition import DailyNutritionSummary
+from app.domain.nutrition.meal_nutrition import MealNutritionSummary
+
+# === DI =====================================================================
+from app.di.container import (
+    get_compute_daily_nutrition_summary_use_case,
+    get_compute_meal_nutrition_use_case,
+)
 
 
 router = APIRouter(tags=["Nutrition"])
 
 
-# --- Domain -> API schema 変換 helper ---------------------------------
+# === Helpers ===============================================================
 
 
 def _to_meal_response(summary: MealNutritionSummary) -> MealNutritionSummaryResponse:
@@ -76,7 +84,7 @@ def _to_daily_response(summary: DailyNutritionSummary) -> DailyNutritionSummaryR
     )
 
 
-# --- Routes -------------------------------------------------------------
+# === Routes ================================================================
 
 
 @router.get(

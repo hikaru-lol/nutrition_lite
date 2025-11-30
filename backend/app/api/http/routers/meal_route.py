@@ -2,39 +2,47 @@ from __future__ import annotations
 
 from datetime import date as DateType
 
-from fastapi import APIRouter, Depends, Query, Path, Response, status
+# === Third-party ============================================================
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 
-from app.application.auth.dto.auth_user_dto import AuthUserDTO
-from app.application.meal.dto.food_entry_dto import FoodEntryDTO
-from app.application.meal.use_cases.create_food_entry import CreateFoodEntryUseCase
-from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
-from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
-from app.application.meal.use_cases.list_food_entries_by_date import ListFoodEntriesByDateUseCase
+# === API (schemas / dependencies) ==========================================
+from app.api.http.dependencies.auth import get_current_user_dto
 from app.api.http.schemas.meal import (
+    MealItemListResponse,
     MealItemRequest,
     MealItemResponse,
-    MealItemListResponse,
 )
+
+# === Application (DTO / UseCase) ============================================
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.meal.dto.food_entry_dto import (
-    FoodEntryDTO,
     CreateFoodEntryInputDTO,
+    FoodEntryDTO,
     UpdateFoodEntryInputDTO,
 )
-from app.application.nutrition.use_cases.compute_daily_nutrition import ComputeDailyNutritionSummaryUseCase
-from app.api.http.dependencies.auth import get_current_user_dto
+from app.application.meal.use_cases.create_food_entry import CreateFoodEntryUseCase
+from app.application.meal.use_cases.delete_food_entry import DeleteFoodEntryUseCase
+from app.application.meal.use_cases.list_food_entries_by_date import (
+    ListFoodEntriesByDateUseCase,
+)
+from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
+from app.application.nutrition.use_cases.compute_daily_nutrition import (
+    ComputeDailyNutritionSummaryUseCase,
+)
 
+# === DI =====================================================================
 from app.di.container import (
+    get_compute_daily_nutrition_summary_use_case,
     get_create_food_entry_use_case,
-    get_update_food_entry_use_case,
     get_delete_food_entry_use_case,
     get_list_food_entries_by_date_use_case,
-    get_compute_daily_nutrition_summary_use_case,
+    get_update_food_entry_use_case,
 )
 
 router = APIRouter(tags=["Meal"])
 
 
-# --- Helpers -----------------------------------------------------------
+# === Helpers ===============================================================
 
 
 def _dto_to_response(dto: FoodEntryDTO) -> MealItemResponse:
@@ -54,7 +62,7 @@ def _dto_to_response(dto: FoodEntryDTO) -> MealItemResponse:
     )
 
 
-# --- Routes ------------------------------------------------------------
+# === Routes ================================================================
 
 
 @router.post(
