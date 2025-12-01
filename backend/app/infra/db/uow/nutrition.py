@@ -29,9 +29,9 @@ from app.infra.db.repositories.daily_nutrition_repository import (
 from app.infra.db.repositories.daily_nutrition_report_repository import (
     SqlAlchemyDailyNutritionReportRepository,
 )
-# from app.infra.db.repositories.recommendation_repository import (
-#     SqlAlchemyMealRecommendationRepository,
-# )
+from app.infra.db.repositories.meal_recommendation_repository import (
+    SqlAlchemyMealRecommendationRepository,
+)
 
 
 class SqlAlchemyNutritionUnitOfWork(SqlAlchemyUnitOfWorkBase, NutritionUnitOfWorkPort):
@@ -54,5 +54,5 @@ class SqlAlchemyNutritionUnitOfWork(SqlAlchemyUnitOfWorkBase, NutritionUnitOfWor
             session)
         self.daily_report_repo = SqlAlchemyDailyNutritionReportRepository(
             session)
-        # self.meal_recommendation_repo = SqlAlchemyMealRecommendationRepository(
-        #     session)
+        self.meal_recommendation_repo = SqlAlchemyMealRecommendationRepository(
+            session)

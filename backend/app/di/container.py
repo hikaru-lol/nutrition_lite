@@ -150,7 +150,10 @@ from app.application.nutrition.use_cases.generate_meal_recommendation import (
 )
 # infra
 from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
-
+from app.infra.llm.meal_recommendation_generator_openai import (
+    OpenAIMealRecommendationGenerator,
+    OpenAIMealRecommendationGeneratorConfig,
+)
 
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
@@ -606,9 +609,12 @@ def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
         uow=get_nutrition_uow(),
     )
 
+
 # === MealRecommendation (今は Stub のみ) ====================================
 # 食事レコメンド（将来の機能）の DI 定義
-
+_USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR = os.getenv(
+    "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false"
+).lower() in ("1", "true", "yes", "on")
 
 # 食事レコメンドを生成する Generator のシングルトンインスタンス
 _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None
@@ -617,13 +623,23 @@ _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = No
 def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     """
     MealRecommendation 生成ロジック（LLM / Stub）の DI。
-
-    - 現状は StubMealRecommendationGenerator をシングルトンで返す。
-    - 後で OpenAI 実装に差し替えるときはここを書き換える or env 切り替えを追加する。
     """
     global _recommendation_generator_singleton
     if _recommendation_generator_singleton is None:
-        _recommendation_generator_singleton = StubMealRecommendationGenerator()
+        if _USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR:
+            model = os.getenv(
+                "OPENAI_MEAL_RECOMMENDATION_MODEL", "gpt-4o-mini")
+            temperature = float(
+                os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4")
+            )
+            _recommendation_generator_singleton = OpenAIMealRecommendationGenerator(
+                config=OpenAIMealRecommendationGeneratorConfig(
+                    model=model,
+                    temperature=temperature,
+                )
+            )
+        else:
+            _recommendation_generator_singleton = StubMealRecommendationGenerator()
     return _recommendation_generator_singleton
 
 
