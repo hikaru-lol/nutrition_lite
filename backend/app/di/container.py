@@ -151,6 +151,11 @@ from app.infra.db.repositories.daily_nutrition_repository import (
 from app.infra.db.repositories.meal_nutrition_repository import (
     SqlAlchemyMealNutritionSummaryRepository,
 )
+
+from app.infra.llm.daily_report_generator_openai import (
+    OpenAIDailyNutritionReportGenerator,
+    OpenAIDailyReportGeneratorConfig,
+)
 # from app.infra.db.repositories.recommendation_repository import (
 #     SqlAlchemyMealRecommendationRepository,
 # )
@@ -506,31 +511,39 @@ def get_compute_daily_nutrition_summary_use_case(
 # === DailyNutritionReport ====================================================
 # 日次栄養レポート生成まわりの DI 定義
 
-# 日次レポート生成用 LLM ポートのシングルトンインスタンス
+_USE_OPENAI_DAILY_REPORT_GENERATOR = os.getenv(
+    "USE_OPENAI_DAILY_REPORT_GENERATOR", "false"
+).lower() in ("1", "true", "yes", "on")
+
 _daily_report_generator_singleton: DailyNutritionReportGeneratorPort | None = None
 
+# 日次レポート生成用 LLM ポートのシングルトンインスタンス
 
-# 日次栄養レポートを文章として生成する Generator の実装を返す
+
 def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
     """
     日次レポート生成用 LLM ポートの DI。
 
-    - 現時点では StubDailyNutritionReportGenerator をシングルトンで返す。
-    - 後で OpenAI 実装に差し替えるときはここを書き換える。
+    - デフォルトは StubDailyNutritionReportGenerator（開発 / テスト用）
+    - USE_OPENAI_DAILY_REPORT_GENERATOR=true のとき OpenAI ベースの実装に切り替える
     """
     global _daily_report_generator_singleton
+
     if _daily_report_generator_singleton is None:
-        _daily_report_generator_singleton = StubDailyNutritionReportGenerator()
+        if _USE_OPENAI_DAILY_REPORT_GENERATOR:
+            model = os.getenv("OPENAI_DAILY_REPORT_MODEL", "gpt-4o-mini")
+            temperature = float(
+                os.getenv("OPENAI_DAILY_REPORT_TEMPERATURE", "0.4"))
+            _daily_report_generator_singleton = OpenAIDailyNutritionReportGenerator(
+                config=OpenAIDailyReportGeneratorConfig(
+                    model=model,
+                    temperature=temperature,
+                )
+            )
+        else:
+            _daily_report_generator_singleton = StubDailyNutritionReportGenerator()
+
     return _daily_report_generator_singleton
-
-
-# DailyNutritionReport を扱う Repository を返す
-def get_daily_nutrition_report_repository(
-    session: Session | None = None,
-) -> DailyNutritionReportRepositoryPort:
-    if session is None:
-        session = get_db_session()
-    return SqlAlchemyDailyNutritionReportRepository(session)
 
 
 # 1 日分の食事ログが「記録完了」かどうか判定する UseCase の DI
@@ -609,7 +622,7 @@ def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
 #     target_repo: TargetRepositoryPort = SqlAlchemyTargetRepository(session)
 #     daily_report_repo: DailyNutritionReportRepositoryPort = (
 #         SqlAlchemyDailyNutritionReportRepository(session)
-#     )
+#     )xz
 #     recommendation_repo: MealRecommendationRepositoryPort = (
 #         SqlAlchemyMealRecommendationRepository(session)
 #     )
