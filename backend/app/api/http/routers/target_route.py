@@ -1,46 +1,46 @@
 from __future__ import annotations
 
 import logging
-from typing import List
-
 from fastapi import APIRouter, Depends, status
 
+# === API (schemas / dependencies) ==========================================
 from app.api.http.dependencies.auth import get_current_user_dto
-from app.api.http.schemas.auth import ErrorResponse, AuthUserResponse  # ErrorResponseだけ使う
+from app.api.http.schemas.auth import ErrorResponse
 from app.api.http.schemas.target import (
     CreateTargetRequest,
-    UpdateTargetRequest,
-    TargetResponse,
     TargetListResponse,
+    TargetResponse,
+    UpdateTargetRequest,
     target_dto_to_schema,
     target_list_dto_to_schema,
 )
-from app.application.auth.dto.auth_user_dto import AuthUserDTO
 
+# === Application (DTO / UseCase) ============================================
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.target.dto.target_dto import (
+    ActivateTargetInputDTO,
     CreateTargetInputDTO,
-    ListTargetsInputDTO,
-    GetTargetInputDTO,
     GetActiveTargetInputDTO,
+    GetTargetInputDTO,
+    ListTargetsInputDTO,
     UpdateTargetInputDTO,
     UpdateTargetNutrientDTO,
-    ActivateTargetInputDTO,
 )
-from app.application.target.use_cases.create_target import CreateTargetUseCase
-from app.application.target.use_cases.list_targets import ListTargetsUseCase
-from app.application.target.use_cases.get_target import GetTargetUseCase
-from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
-from app.application.target.use_cases.update_target import UpdateTargetUseCase
 from app.application.target.use_cases.activate_target import ActivateTargetUseCase
+from app.application.target.use_cases.create_target import CreateTargetUseCase
+from app.application.target.use_cases.get_active_target import GetActiveTargetUseCase
+from app.application.target.use_cases.get_target import GetTargetUseCase
+from app.application.target.use_cases.list_targets import ListTargetsUseCase
+from app.application.target.use_cases.update_target import UpdateTargetUseCase
 
-# DI コンテナ（Auth ルーターに合わせて container から取得する想定）
+# === DI =====================================================================
 from app.di.container import (
-    get_create_target_use_case,
-    get_list_targets_use_case,
-    get_get_target_use_case,
-    get_get_active_target_use_case,
-    get_update_target_use_case,
     get_activate_target_use_case,
+    get_create_target_use_case,
+    get_get_active_target_use_case,
+    get_get_target_use_case,
+    get_list_targets_use_case,
+    get_update_target_use_case,
 )
 
 router = APIRouter(prefix="/targets", tags=["Target"])
@@ -48,11 +48,10 @@ router = APIRouter(prefix="/targets", tags=["Target"])
 logger = logging.getLogger("target_route")
 
 
-# ---------------------------------------------------------------------
-# POST /targets  ターゲット作成
-# ---------------------------------------------------------------------
-# 外部APIを呼び出す
+# === Routes ================================================================
 
+
+# --- POST /targets  ターゲット作成 ----------------------------------------
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -92,11 +91,7 @@ def create_target(
     return target_dto_to_schema(result)
 
 
-# ---------------------------------------------------------------------
-# GET /targets  ターゲット一覧
-# ---------------------------------------------------------------------
-
-
+# --- GET /targets  ターゲット一覧 -----------------------------------------
 @router.get(
     "",
     response_model=TargetListResponse,
@@ -123,11 +118,7 @@ def list_targets(
     return target_list_dto_to_schema(result)
 
 
-# ---------------------------------------------------------------------
-# GET /targets/active  アクティブターゲット取得
-# ---------------------------------------------------------------------
-
-
+# --- GET /targets/active  アクティブターゲット取得 -----------------------
 @router.get(
     "/active",
     response_model=TargetResponse,
@@ -148,11 +139,7 @@ def get_active_target(
     return target_dto_to_schema(result)
 
 
-# ---------------------------------------------------------------------
-# GET /targets/{target_id}  ターゲット1件取得
-# ---------------------------------------------------------------------
-
-
+# --- GET /targets/{target_id}  ターゲット1件取得 -------------------------
 @router.get(
     "/{target_id}",
     response_model=TargetResponse,
@@ -178,11 +165,7 @@ def get_target(
     return target_dto_to_schema(result)
 
 
-# ---------------------------------------------------------------------
-# PATCH /targets/{target_id}  ターゲット部分更新
-# ---------------------------------------------------------------------
-
-
+# --- PATCH /targets/{target_id}  ターゲット部分更新 ----------------------
 @router.patch(
     "/{target_id}",
     response_model=TargetResponse,
@@ -235,11 +218,7 @@ def update_target(
     return target_dto_to_schema(result)
 
 
-# ---------------------------------------------------------------------
-# POST /targets/{target_id}/activate  ターゲットをアクティブ化
-# ---------------------------------------------------------------------
-
-
+# --- POST /targets/{target_id}/activate  ターゲットをアクティブ化 --------
 @router.post(
     "/{target_id}/activate",
     response_model=TargetResponse,

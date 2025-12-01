@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Nutrition Backend - Auth, Profile & Target API
+  title: Nutrition Backend - Auth, Profile, Target & Meal API
   version: 0.1.0
 
 servers:
@@ -13,6 +13,8 @@ tags:
     description: User basic profile (sex, birthdate, height, weight, optional image)
   - name: Target
     description: Nutrition target (daily recommended intake for 17 nutrients)
+  - name: Meal
+    description: Food entries (per-item meal logs for each day)
 
 paths:
   # ==========
@@ -498,6 +500,176 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ==========
+  # Meal
+  # ==========
+  /meal-items:
+    post:
+      tags: [Meal]
+      summary: Create a new food entry
+      description: >
+        1品分の食事ログ（FoodEntry）を新規作成する。
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealItemRequest'
+      responses:
+        '201':
+          description: Food entry created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemResponse'
+        '400':
+          description: Invalid meal input (type/index/amount)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Meal]
+      summary: List food entries for a given date
+      description: >
+        指定した1日分の FoodEntry 一覧を取得する（main / snack 含む）。
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Target date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: List of food entries for the given date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meal-items/{id}:
+    patch:
+      tags: [Meal]
+      summary: Update a food entry
+      description: >
+        既存の FoodEntry を更新する。（現時点ではフル更新）
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Food entry ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealItemRequest'
+      responses:
+        '200':
+          description: Updated food entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemResponse'
+        '400':
+          description: Invalid meal input (type/index/amount)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Food entry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Meal]
+      summary: Delete a food entry
+      description: >
+        FoodEntry を削除する（ソフトデリート想定）。  
+        既に削除済みでも 204 を返し、冪等性を保つ。
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Food entry ID
+      responses:
+        '204':
+          description: Deleted successfully (or already deleted)
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Food entry not found (belongs to another user, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     AccessTokenCookieAuth:
@@ -640,6 +812,14 @@ components:
           minimum: 0
           exclusiveMinimum: true
           maximum: 500
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
+          minimum: 1
+          maximum: 6
 
     ProfileResponse:
       type: object
@@ -665,6 +845,12 @@ components:
           description: >
             Optional profile image identifier in the storage backend
             (object key, file name, etc.)
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
         created_at:
           type: string
           format: date-time
@@ -876,6 +1062,70 @@ components:
           items:
             $ref: '#/components/schemas/UpdateTargetNutrient'
       additionalProperties: false
+
+    # ==========
+    # Meal
+    # ==========
+    MealType:
+      type: string
+      enum: [main, snack]
+      description: |
+        main: メインの食事（1回目/2回目/...）
+        snack: 間食
+
+    MealItemRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        meal_type:
+          $ref: '#/components/schemas/MealType'
+        meal_index:
+          type: integer
+          nullable: true
+          description: |
+            meal_type == main のとき: 1..meals_per_day
+            meal_type == snack のとき: null
+        name:
+          type: string
+        amount_value:
+          type: number
+          format: float
+          nullable: true
+        amount_unit:
+          type: string
+          nullable: true
+        serving_count:
+          type: number
+          format: float
+          nullable: true
+        note:
+          type: string
+          nullable: true
+      required:
+        - date
+        - meal_type
+        - name
+
+    MealItemResponse:
+      allOf:
+        - $ref: '#/components/schemas/MealItemRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+          required: [id]
+
+    MealItemListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealItemResponse'
+      required: [items]
 
     # ==========
     # Error

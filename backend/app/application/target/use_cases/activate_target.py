@@ -42,7 +42,6 @@ class ActivateTargetUseCase:
             target.update_timestamp(datetime.now(timezone.utc))
 
             uow.target_repo.save(target)
-            uow.commit()
 
             return _to_dto(target)
 

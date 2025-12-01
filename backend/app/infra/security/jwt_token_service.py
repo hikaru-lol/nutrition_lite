@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 
 from app.application.auth.ports.token_service_port import (
-    TokenServicePort,
     TokenPayload,
     TokenPair,
+    TokenServicePort,
 )
-from app.domain.auth.value_objects import UserPlan
 from app.domain.auth.errors import InvalidCredentialsError
+from app.domain.auth.value_objects import UserPlan
 from app.settings import settings
 
 
@@ -18,9 +18,13 @@ class JwtTokenService(TokenServicePort):
     """
     JWT ベースの TokenServicePort 実装。
 
-    - HS256 + シークレットキー（設定ファイルから取得）
-    - Access / Refresh で TTL を分けて管理
+    - HS256 + シークレットキー（settings から取得）
+    - Access / Refresh で有効期限 (TTL) を分けて管理
     """
+
+    # ------------------------------------------------------------------
+    # コンストラクタ
+    # ------------------------------------------------------------------
 
     def __init__(
         self,
@@ -43,6 +47,9 @@ class JwtTokenService(TokenServicePort):
     # ------------------------------------------------------------------
 
     def _encode(self, payload: dict, ttl: timedelta) -> tuple[str, datetime]:
+        """
+        任意の payload に有効期限 (exp) を付与して JWT を生成する。
+        """
         now = datetime.now(timezone.utc)
         exp = now + ttl
         to_encode = {**payload, "exp": exp}
@@ -51,20 +58,33 @@ class JwtTokenService(TokenServicePort):
         return token, exp
 
     def _decode(self, token: str) -> dict:
+        """
+        JWT を検証・デコードして claims を返す。
+
+        Raises:
+            JWTError: 署名不正 / 期限切れ など JWT レベルのエラー
+        """
         return jwt.decode(token, self._secret_key, algorithms=[self._algorithm])
 
     def _payload_from_claims(self, claims: dict) -> TokenPayload:
+        """
+        JWT の claims からアプリケーションで使う TokenPayload へ変換する。
+        """
+        # sub: subject = user_id
         user_id = str(claims.get("sub"))
+
+        # plan は Enum(UserPlan) 前提だが、念のため文字列なども許容
         plan_raw = claims.get("plan")
         try:
             plan = UserPlan(plan_raw)
         except Exception:
-            # enum じゃなかったときも一応動くように
+            # enum にマッチしなくても動くようにフォールバック
             plan = plan_raw  # type: ignore[assignment]
+
         return TokenPayload(user_id=user_id, plan=plan)
 
     # ------------------------------------------------------------------
-    # Port 実装
+    # Port 実装 (TokenServicePort)
     # ------------------------------------------------------------------
 
     def issue_tokens(self, payload: TokenPayload) -> TokenPair:
@@ -74,6 +94,7 @@ class JwtTokenService(TokenServicePort):
         """
         base_payload = {
             "sub": payload.user_id,
+            # Enum の場合は .value、それ以外は str にフォールバック
             "plan": getattr(payload.plan, "value", str(payload.plan)),
         }
 
@@ -91,22 +112,26 @@ class JwtTokenService(TokenServicePort):
     def verify_access_token(self, token: str) -> TokenPayload:
         """
         Access Token の検証。
-        無効 / 期限切れの場合は InvalidCredentialsError を投げる。
-        （/auth/me などで直接ドメインエラーとして扱いたいのでここで包む）
+
+        - 有効なトークンなら TokenPayload を返す。
+        - 無効 / 期限切れなど JWT レベルのエラーは InvalidCredentialsError に包んで投げる。
+          （/auth/me, get_current_user_dto などからドメインエラーとして扱いやすくするため）
         """
         try:
             claims = self._decode(token)
         except JWTError as e:
             raise InvalidCredentialsError(
                 "Invalid or expired access token") from e
+
         return self._payload_from_claims(claims)
 
     def verify_refresh_token(self, token: str) -> TokenPayload:
         """
         Refresh Token の検証。
-        無効 / 期限切れの場合は JWTError を投げるが、
-        呼び出し側（RefreshTokenUseCase）で InvalidRefreshTokenError にまとめているので、
-        ここではあえてドメインエラーに包まない。
+
+        - 有効なトークンなら TokenPayload を返す。
+        - 無効 / 期限切れなど JWTError はあえてここでは包まず、
+          呼び出し側（RefreshTokenUseCase）で InvalidRefreshTokenError にまとめる。
         """
-        claims = self._decode(token)  # JWTError はそのまま投げる
+        claims = self._decode(token)  # JWTError はそのまま上に伝える
         return self._payload_from_claims(claims)

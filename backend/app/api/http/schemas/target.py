@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional, Literal
 from uuid import UUID
+from typing import Literal
 
 from pydantic import BaseModel
 
-from app.application.target.dto.target_dto import TargetDTO, TargetNutrientDTO
+from app.application.target.dto.target_dto import TargetDTO
 from app.domain.target.value_objects import NutrientSourceLiteral
 
+
+# === Literal 型定義 =========================================================
+
 # Auth の UserPlanLiteral と同じノリで Literal 型を用意
-GoalTypeLiteral = Literal["weight_loss",
-                          "maintain", "weight_gain", "health_improve"]
+GoalTypeLiteral = Literal[
+    "weight_loss",   # 減量
+    "maintain",      # 体重維持
+    "weight_gain",   # 増量
+    "health_improve"  # 健康改善
+]
+
 ActivityLevelLiteral = Literal["low", "normal", "high"]
 
 NutrientCodeLiteral = Literal[
@@ -39,6 +47,9 @@ NutrientCodeLiteral = Literal[
 ]
 
 
+# === Response Schemas =======================================================
+
+
 class TargetNutrientSchema(BaseModel):
     """
     1つの栄養素に対するターゲット値（API用スキーマ）。
@@ -60,15 +71,15 @@ class TargetResponse(BaseModel):
 
     title: str
     goal_type: GoalTypeLiteral
-    goal_description: Optional[str]
+    goal_description: str | None
     activity_level: ActivityLevelLiteral
 
     is_active: bool
 
-    nutrients: List[TargetNutrientSchema]
+    nutrients: list[TargetNutrientSchema]
 
-    llm_rationale: Optional[str]
-    disclaimer: Optional[str]
+    llm_rationale: str | None
+    disclaimer: str | None
 
     created_at: datetime
     updated_at: datetime
@@ -79,12 +90,10 @@ class TargetListResponse(BaseModel):
     ターゲット一覧レスポンス。
     """
 
-    items: List[TargetResponse]
+    items: list[TargetResponse]
 
 
-# ---------------------------------------------------------------------
-# リクエスト用スキーマ
-# ---------------------------------------------------------------------
+# === Request Schemas ========================================================
 
 
 class CreateTargetRequest(BaseModel):
@@ -96,7 +105,7 @@ class CreateTargetRequest(BaseModel):
 
     title: str
     goal_type: GoalTypeLiteral
-    goal_description: Optional[str] = None
+    goal_description: str | None = None
     activity_level: ActivityLevelLiteral
 
 
@@ -105,10 +114,10 @@ class UpdateTargetNutrientSchema(BaseModel):
     ターゲット内の特定栄養素の部分更新用。
     """
 
-    # code: NutrientCodeLiteral
+    # TODO: バリデーションを厳しくするなら NutrientCodeLiteral に戻してもよい
     code: str
-    amount: Optional[float] = None
-    unit: Optional[str] = None
+    amount: float | None = None
+    unit: str | None = None
 
 
 class UpdateTargetRequest(BaseModel):
@@ -118,21 +127,19 @@ class UpdateTargetRequest(BaseModel):
     - None / 未指定のフィールドは更新しない。
     """
 
-    title: Optional[str] = None
-    goal_type: Optional[GoalTypeLiteral] = None
-    goal_description: Optional[str] = None
-    activity_level: Optional[ActivityLevelLiteral] = None
-    llm_rationale: Optional[str] = None
-    disclaimer: Optional[str] = None
-    nutrients: Optional[List[UpdateTargetNutrientSchema]] = None
+    title: str | None = None
+    goal_type: GoalTypeLiteral | None = None
+    goal_description: str | None = None
+    activity_level: ActivityLevelLiteral | None = None
+    llm_rationale: str | None = None
+    disclaimer: str | None = None
+    nutrients: list[UpdateTargetNutrientSchema] | None = None
 
     class Config:
         extra = "forbid"  # 余計なフィールドは受け取らない
 
 
-# ---------------------------------------------------------------------
-# DTO -> Schema 変換ヘルパー
-# ---------------------------------------------------------------------
+# === DTO -> Schema 変換ヘルパー ============================================
 
 
 def target_dto_to_schema(dto: TargetDTO) -> TargetResponse:
@@ -141,7 +148,7 @@ def target_dto_to_schema(dto: TargetDTO) -> TargetResponse:
     """
     nutrients = [
         TargetNutrientSchema(
-            code=nut.code,          # str -> NutrientCodeLiteral
+            code=nut.code,          # str -> NutrientCodeLiteral（Pydantic が変換 / バリデーション）
             amount=nut.amount,
             unit=nut.unit,
             source=nut.source,      # str -> NutrientSourceLiteral
@@ -150,7 +157,7 @@ def target_dto_to_schema(dto: TargetDTO) -> TargetResponse:
     ]
 
     return TargetResponse(
-        id=dto.id,                  # str -> UUID
+        id=dto.id,                  # str -> UUID（Pydantic が変換）
         user_id=dto.user_id,
         title=dto.title,
         goal_type=dto.goal_type,    # str -> GoalTypeLiteral
@@ -165,7 +172,10 @@ def target_dto_to_schema(dto: TargetDTO) -> TargetResponse:
     )
 
 
-def target_list_dto_to_schema(dtos: List[TargetDTO]) -> TargetListResponse:
+def target_list_dto_to_schema(dtos: list[TargetDTO]) -> TargetListResponse:
+    """
+    TargetDTO のリスト -> TargetListResponse への変換。
+    """
     return TargetListResponse(
         items=[target_dto_to_schema(dto) for dto in dtos]
     )

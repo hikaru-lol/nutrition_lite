@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app.application.auth.ports.clock_port import ClockPort
 from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
+from app.application.auth.ports.clock_port import ClockPort
+
 from app.domain.auth.value_objects import UserId
 from app.domain.auth.errors import UserNotFoundError
 
@@ -24,4 +25,3 @@ class DeleteAccountUseCase:
             now = self._clock.now()
             user.mark_deleted(now)
             uow.user_repo.save(user)
-            # commit は __exit__ で行われる

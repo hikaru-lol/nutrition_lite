@@ -26,8 +26,9 @@ class Profile:
     # 任意のプロフィール画像（無ければ None）
     image_id: ProfileImageId | None
 
-    created_at: datetime
-    updated_at: datetime
+    meals_per_day: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @property
     def age(self) -> int:

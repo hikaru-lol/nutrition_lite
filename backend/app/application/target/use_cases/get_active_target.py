@@ -5,8 +5,11 @@ from app.application.target.dto.target_dto import (
     TargetDTO,
     TargetNutrientDTO,
 )
-from app.application.target.errors import TargetNotFoundError
+
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
+
+from app.application.target.errors import TargetNotFoundError
+
 from app.domain.auth.value_objects import UserId
 from app.domain.target.entities import TargetDefinition
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.auth.value_objects import UserId, UserPlan
+from app.domain.auth.value_objects import UserPlan
 
 
 @dataclass(frozen=True)

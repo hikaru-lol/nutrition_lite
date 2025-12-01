@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select, update
 
 from app.application.target.ports.target_repository_port import TargetRepositoryPort
+
 from app.domain.auth.value_objects import UserId
 from app.domain.target.entities import TargetDefinition, TargetNutrient
 from app.domain.target.value_objects import (
@@ -17,6 +18,7 @@ from app.domain.target.value_objects import (
     NutrientAmount,
     NutrientSource,
 )
+
 from app.infra.db.models.target import TargetModel, TargetNutrientModel
 
 

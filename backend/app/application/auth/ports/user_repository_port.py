@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, Sequence
 
 from app.domain.auth.entities import User
 from app.domain.auth.value_objects import EmailAddress, UserId
@@ -22,3 +22,9 @@ class UserRepositoryPort(Protocol):
         新規 or 更新を抽象化。
         """
         ...
+
+    def list_active_users(self) -> Sequence[User]:
+        """
+        提案生成対象となるアクティブユーザー一覧を返す。
+        """
+        raise NotImplementedError

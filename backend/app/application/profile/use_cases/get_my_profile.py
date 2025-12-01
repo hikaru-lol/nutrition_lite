@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from app.application.profile.dto.profile_dto import ProfileDTO
+
 from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
+
 from app.domain.auth.value_objects import UserId
-from app.domain.auth.errors import UserNotFoundError  # 暫定的に流用
+from app.domain.auth.errors import UserNotFoundError
 
 
 class GetMyProfileUseCase:
@@ -18,12 +20,11 @@ class GetMyProfileUseCase:
         self._uow = uow
 
     def execute(self, user_id: str) -> ProfileDTO:
-        user_id_vo = UserId(user_id)
+        user_id = UserId(user_id)
 
         with self._uow as uow:
-            profile = uow.profile_repo.get_by_user_id(user_id_vo)
+            profile = uow.profile_repo.get_by_user_id(user_id)
             if profile is None:
-                # TODO: 必要であれば profile 用の専用エラーにする
                 raise UserNotFoundError("Profile not found.")
 
         return ProfileDTO(
@@ -33,6 +34,7 @@ class GetMyProfileUseCase:
             height_cm=profile.height_cm.value,
             weight_kg=profile.weight_kg.value,
             image_id=profile.image_id.value if profile.image_id else None,
+            meals_per_day=profile.meals_per_day,
             created_at=profile.created_at,
             updated_at=profile.updated_at,
         )
