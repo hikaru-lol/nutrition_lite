@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.application.nutrition.dto.recommendation_llm_dto import (
+from app.application.nutrition.dto.meal_recommendation_llm_dto import (
     MealRecommendationLLMInput,
     MealRecommendationLLMOutput,
 )
@@ -10,8 +10,11 @@ from app.application.nutrition.dto.recommendation_llm_dto import (
 
 class MealRecommendationGeneratorPort(Protocol):
     """
-    食事提案 (Recommendation) を生成するための LLM ポート。
+    MealRecommendation を LLM などで生成するポート。
     """
 
-    def generate(self, input: MealRecommendationLLMInput) -> MealRecommendationLLMOutput:
-        raise NotImplementedError
+    def generate(
+        self,
+        input: MealRecommendationLLMInput,
+    ) -> MealRecommendationLLMOutput:
+        ...
