@@ -1,52 +1,83 @@
+from __future__ import annotations
 
-from typing import Sequence
+import os
+from datetime import date as DateType
+from pathlib import Path
 
-from app.domain.auth.entities import User  # 実際のパスに合わせて
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
-from app.infra.db.repositories.user_repository import SqlAlchemyUserRepository  # 実装に合わせて
-from app.application.meal.use_cases.generate_meal_recommendation import (
+from dotenv import load_dotenv
+
+from app.application.nutrition.use_cases.generate_meal_recommendation import (
+    GenerateMealRecommendationInput,
     GenerateMealRecommendationUseCase,
 )
-from app.di.container import (
-    get_generate_meal_recommendation_use_case,
-)
-from app.infra.db.session import get_session
+from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.errors import (
     NotEnoughDailyReportsError,
     MealRecommendationAlreadyExistsError,
 )
+from app.domain.meal.errors import DailyLogProfileNotFoundError
+from app.di.container import (
+    get_auth_uow,
+    get_generate_meal_recommendation_use_case,
+)
+
+# プロジェクトルート（backend/）を基準に .env を読む
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
-def run_generate_meal_recommendations_job() -> None:
+def _list_active_user_ids() -> list[UserId]:
     """
-    全ユーザーに対して食事提案を生成するバッチジョブ。
+    Auth UoW 経由でアクティブユーザー一覧を取得する。
 
-    - 直近 N 日分の日次レポートが揃っているユーザーのみ対象。
-    - すでに本日の提案が存在する場合はスキップ。
+    - SqlAlchemyUserRepository に list_active_users() がある前提。
+    - 無ければ TODO にしておいてもOK。
     """
+    from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
 
-    session = get_session()
-    user_repo: UserRepositoryPort = SqlAlchemyUserRepository(session)
-    uc: GenerateMealRecommendationUseCase = get_generate_meal_recommendation_use_case()
+    uow: AuthUnitOfWorkPort = get_auth_uow()
+    with uow as tx:
+        users = tx.user_repo.list_active_users()  # TODO: 実装に合わせて名称調整
+        return [user.id for user in users]
 
-    users: Sequence[User] = user_repo.list_active_users()
 
-    for user in users:
-        user_id = user.id  # UserId 型 or 生 UUID → UseCase 側に合わせて変換
+def main() -> None:
+    # 今日の日付
+    # GenerateMealRecommendationUseCase 側が None を today に解決するので省略も可
+    base_date_str = os.getenv("JOB_RECOMMEND_BASE_DATE")
+    base_date: DateType | None = (
+        DateType.fromisoformat(base_date_str) if base_date_str else None
+    )
 
+    use_case: GenerateMealRecommendationUseCase = (
+        get_generate_meal_recommendation_use_case()
+    )
+
+    user_ids = _list_active_user_ids()
+    print("=== Job: GenerateMealRecommendations ===")
+    print(f"target users: {len(user_ids)}")
+    print(f"base_date   : {base_date.isoformat() if base_date else '(today)'}")
+    print()
+
+    for uid in user_ids:
+        print(f"[User] {uid.value} ... ", end="", flush=True)
         try:
-            # User エンティティの user.id が UserId の場合はそのまま、
-            # UUID の場合は UserId(str(user.id)) に包むなどプロジェクト側に合わせて。
-            recommendation = uc.execute(user_id=user_id)
-            print(
-                f"[OK] Generated recommendation for user_id={user_id} "
-                f"date={recommendation.generated_for_date}"
+            input_dto = GenerateMealRecommendationInput(
+                user_id=uid,
+                base_date=base_date,
             )
+            rec = use_case.execute(input_dto)
+        except DailyLogProfileNotFoundError:
+            print("SKIP (no profile)")
         except NotEnoughDailyReportsError:
-            print(f"[SKIP] Not enough daily reports for user_id={user_id}")
+            print("SKIP (not enough daily reports)")
         except MealRecommendationAlreadyExistsError:
-            print(
-                f"[SKIP] Recommendation already exists for user_id={user_id}")
+            print("SKIP (already exists)")
         except Exception as e:
-            print(
-                f"[ERROR] Failed to generate recommendation for user_id={user_id}: {e}")
+            print(f"ERROR ({type(e).__name__}: {e})")
+        else:
+            print(f"OK (generated for {rec.generated_for_date})")
+
+
+if __name__ == "__main__":
+    main()

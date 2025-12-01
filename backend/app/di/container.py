@@ -41,8 +41,8 @@ from app.infra.security.password_hasher import BcryptPasswordHasher
 from app.application.profile.ports.profile_image_storage_port import (
     ProfileImageStoragePort,
 )
-from app.application.profile.ports.profile_repository_port import ProfileRepositoryPort
 from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
+from app.application.profile.ports.profile_query_port import ProfileQueryPort
 
 # Use cases
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
@@ -138,6 +138,22 @@ from app.infra.llm.estimator_openai import (
     OpenAINutritionEstimatorConfig,
 )
 
+# === Nutrition: MealRecommendation ==========================================
+# Ports
+from app.application.nutrition.ports.recommendation_generator_port import (
+    MealRecommendationGeneratorPort,
+)
+# Use cases
+from app.application.nutrition.use_cases.generate_meal_recommendation import (
+    GenerateMealRecommendationUseCase,
+    GenerateMealRecommendationInput,  # JOB から使うなら import
+)
+# infra
+from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
+from app.infra.llm.meal_recommendation_generator_openai import (
+    OpenAIMealRecommendationGenerator,
+    OpenAIMealRecommendationGeneratorConfig,
+)
 
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
@@ -321,7 +337,7 @@ def get_target_generator() -> TargetGeneratorPort:
 
 
 # プロフィール情報取得用の QueryService を返す
-def get_profile_query_service() -> ProfileQueryService:
+def get_profile_query_service() -> ProfileQueryPort:
     return ProfileQueryService(
         get_my_profile_uc=get_my_profile_use_case(),
     )
@@ -593,48 +609,51 @@ def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
         uow=get_nutrition_uow(),
     )
 
+
 # === MealRecommendation (今は Stub のみ) ====================================
 # 食事レコメンド（将来の機能）の DI 定義
-
+_USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR = os.getenv(
+    "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false"
+).lower() in ("1", "true", "yes", "on")
 
 # 食事レコメンドを生成する Generator のシングルトンインスタンス
 _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None
 
 
-# 食事レコメンド生成ロジック（Stub）の実装を返す
 def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
+    """
+    MealRecommendation 生成ロジック（LLM / Stub）の DI。
+    """
     global _recommendation_generator_singleton
     if _recommendation_generator_singleton is None:
-        _recommendation_generator_singleton = StubMealRecommendationGenerator()
+        if _USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR:
+            model = os.getenv(
+                "OPENAI_MEAL_RECOMMENDATION_MODEL", "gpt-4o-mini")
+            temperature = float(
+                os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4")
+            )
+            _recommendation_generator_singleton = OpenAIMealRecommendationGenerator(
+                config=OpenAIMealRecommendationGeneratorConfig(
+                    model=model,
+                    temperature=temperature,
+                )
+            )
+        else:
+            _recommendation_generator_singleton = StubMealRecommendationGenerator()
     return _recommendation_generator_singleton
 
 
-# ここから下は将来の実装用にコメントのまま残しておくイメージ
-# def get_meal_recommendation_repository() -> MealRecommendationRepositoryPort:
-#     session = get_db_session()
-#     return SqlAlchemyMealRecommendationRepository(session)
-#
-#
-# def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUseCase:
-#     session = get_db_session()
-#
-#     profile_repo: ProfileRepositoryPort = get_profile_repository(session=session)
-#     target_repo: TargetRepositoryPort = SqlAlchemyTargetRepository(session)
-#     daily_report_repo: DailyNutritionReportRepositoryPort = (
-#         SqlAlchemyDailyNutritionReportRepository(session)
-#     )xz
-#     recommendation_repo: MealRecommendationRepositoryPort = (
-#         SqlAlchemyMealRecommendationRepository(session)
-#     )
-#     generator: MealRecommendationGeneratorPort = get_meal_recommendation_generator()
-#     clock: ClockPort = get_clock()
-#
-#     return GenerateMealRecommendationUseCase(
-#         profile_repo=profile_repo,
-#         target_repo=target_repo,
-#         daily_report_repo=daily_report_repo,
-#         recommendation_repo=recommendation_repo,
-#         generator=generator,
-#         clock=clock,
-#         required_days=5,
-#     )
+def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUseCase:
+    """
+    MealRecommendation 生成 UseCase の DI。
+
+    - Profile は QueryService 経由
+    - DailyReport / Recommendation は NutritionUnitOfWorkPort 経由
+    """
+    return GenerateMealRecommendationUseCase(
+        profile_query=get_profile_query_service(),
+        nutrition_uow=get_nutrition_uow(),
+        generator=get_meal_recommendation_generator(),
+        clock=get_clock(),
+        required_days=5,
+    )

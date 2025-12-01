@@ -56,3 +56,9 @@ class MealRecommendationAlreadyExistsError(Exception):
     """
 
     pass
+
+
+class DailyReportGenerationFailedError(NutritionDomainError):
+    """
+    日次レポート生成（LLM）が失敗した場合のエラー。
+    """

@@ -4,6 +4,7 @@ from app.application.profile.ports.profile_query_port import (
     ProfileQueryPort,
     ProfileForTarget,
     ProfileForDailyLog,
+    ProfileForRecommendation,
 )
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.domain.auth.value_objects import UserId
@@ -51,5 +52,29 @@ class ProfileQueryService(ProfileQueryPort):
             return None
 
         return ProfileForDailyLog(
+            meals_per_day=getattr(output, "meals_per_day", None),
+        )
+
+# --- Recommendation 用 --------------------------------------------
+
+    def get_profile_for_recommendation(
+        self,
+        user_id: UserId,
+    ) -> ProfileForRecommendation | None:
+        """
+        MealRecommendation 用に、提案に使いたいプロフィール情報だけを返す。
+
+        - sex / birthdate / height_cm / weight_kg / meals_per_day を含む。
+        """
+        output = self._get_profile_output(user_id)
+        if output is None:
+            return None
+
+        return ProfileForRecommendation(
+            sex=(output.sex.value if getattr(
+                output, "sex", None) is not None else None),
+            birthdate=getattr(output, "birthdate", None),
+            height_cm=getattr(output, "height_cm", None),
+            weight_kg=getattr(output, "weight_kg", None),
             meals_per_day=getattr(output, "meals_per_day", None),
         )

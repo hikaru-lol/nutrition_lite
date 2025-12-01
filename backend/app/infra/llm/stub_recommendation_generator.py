@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.application.nutrition.dto.recommendation_llm_dto import (
+from app.application.nutrition.dto.meal_recommendation_llm_dto import (
     MealRecommendationLLMInput,
     MealRecommendationLLMOutput,
 )
