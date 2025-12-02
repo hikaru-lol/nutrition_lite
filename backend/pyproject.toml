@@ -16,6 +16,7 @@ dependencies = [
   "minio>=7.2.18",
   "bcrypt==4.3.0",
   "openai>=2.8.1",
+  "stripe>=14.0.1",
 ]
 
 [project.optional-dependencies]

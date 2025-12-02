@@ -3,12 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date as DateType
 
-from app.application.nutrition.ports.daily_nutrition_repository_port import (
-    DailyNutritionSummaryRepositoryPort,
-)
-from app.application.nutrition.ports.meal_nutrition_repository_port import (
-    MealNutritionSummaryRepositoryPort,
-)
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
 from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.daily_nutrition import (
     DailyNutritionSummary,
