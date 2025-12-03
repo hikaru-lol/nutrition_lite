@@ -547,6 +547,7 @@ def get_compute_daily_nutrition_summary_use_case(
     """
     return ComputeDailyNutritionSummaryUseCase(
         uow=get_nutrition_uow(),
+        plan_checker=get_plan_checker(),
     )
 
 
@@ -617,6 +618,7 @@ def get_generate_daily_nutrition_report_use_case(
     daily_nutrition_uc = get_compute_daily_nutrition_summary_use_case()
     report_generator = get_daily_nutrition_report_generator()
     clock = get_clock()
+    plan_checker = get_plan_checker()
 
     return GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
@@ -626,6 +628,7 @@ def get_generate_daily_nutrition_report_use_case(
         nutrition_uow=get_nutrition_uow(),
         report_generator=report_generator,
         clock=clock,
+        plan_checker=plan_checker,
     )
 
 
@@ -636,7 +639,7 @@ def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
     )
 
 
-# === MealRecommendation (今は Stub のみ) ====================================
+# === MealRecommendation ====================================
 # 食事レコメンド（将来の機能）の DI 定義
 _USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR = os.getenv(
     "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false"
@@ -682,6 +685,7 @@ def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUse
         generator=get_meal_recommendation_generator(),
         clock=get_clock(),
         required_days=5,
+        plan_checker=get_plan_checker(),
     )
 
 

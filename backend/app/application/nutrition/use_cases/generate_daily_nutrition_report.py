@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import date as DateType
 
 from app.application.auth.ports.clock_port import ClockPort
-from app.application.meal.use_cases.check_daily_log_completion import (
-    CheckDailyLogCompletionUseCase,
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
+from app.application.nutrition.ports.daily_report_generator_port import (
+    DailyNutritionReportGeneratorPort,
 )
+from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
+from app.application.profile.ports.profile_query_port import ProfileQueryPort
+
 from app.application.meal.dto.daily_log_completion_dto import (
     DailyLogCompletionResultDTO,
 )
@@ -13,8 +17,8 @@ from app.application.nutrition.dto.daily_report_llm_dto import (
     DailyReportLLMInput,
     DailyReportLLMOutput,
 )
-from app.application.nutrition.ports.daily_report_generator_port import (
-    DailyNutritionReportGeneratorPort,
+from app.application.meal.use_cases.check_daily_log_completion import (
+    CheckDailyLogCompletionUseCase,
 )
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
     ComputeDailyNutritionSummaryUseCase,
@@ -22,6 +26,7 @@ from app.application.nutrition.use_cases.compute_daily_nutrition import (
 from app.application.target.use_cases.ensure_daily_snapshot import (
     EnsureDailyTargetSnapshotUseCase,
 )
+
 from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.daily_report import DailyNutritionReport
 from app.domain.nutrition.errors import (
@@ -32,8 +37,6 @@ from app.domain.profile.entities import Profile  # 実際のパスに合わせ�
 from app.domain.target.entities import DailyTargetSnapshot  # 実際のパスに合わせて調整
 from app.domain.nutrition.daily_nutrition import DailyNutritionSummary
 from app.domain.nutrition.meal_nutrition import MealNutritionSummary  # 実際のパスに合わせて
-from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
-from app.application.profile.ports.profile_query_port import ProfileQueryPort
 
 
 class GenerateDailyNutritionReportUseCase:
@@ -61,6 +64,7 @@ class GenerateDailyNutritionReportUseCase:
         nutrition_uow: NutritionUnitOfWorkPort,
         report_generator: DailyNutritionReportGeneratorPort,
         clock: ClockPort,
+        plan_checker: PlanCheckerPort,
     ) -> None:
         self._daily_log_uc = daily_log_uc
         self._profile_query = profile_query
@@ -69,6 +73,7 @@ class GenerateDailyNutritionReportUseCase:
         self._uow = nutrition_uow
         self._report_generator = report_generator
         self._clock = clock
+        self._plan_checker = plan_checker
 
     def execute(
         self,
@@ -83,7 +88,11 @@ class GenerateDailyNutritionReportUseCase:
             - DailyLogNotCompletedError
             - DailyNutritionReportAlreadyExistsError
             - ProfileNotFound / TargetSnapshotNotFound 等（各 Repo / UC 由来）
+            - PremiumFeatureRequiredError（プレミアム機能が不足している場合）
         """
+
+        # --- 0. プレミアム機能チェック --------------------------------
+        self._plan_checker.ensure_premium_feature(user_id)
 
         # --- 1. 記録完了チェック --------------------------------------
         completion: DailyLogCompletionResultDTO = self._daily_log_uc.execute(
