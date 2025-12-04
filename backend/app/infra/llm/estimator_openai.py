@@ -39,30 +39,23 @@ You MUST return a JSON object with the following structure:
 
 {
   "nutrients": {
-    "carbohydrate":        {"amount": <number>, "unit": "g"},
-    "fat":                 {"amount": <number>, "unit": "g"},
-    "protein":             {"amount": <number>, "unit": "g"},
-    "vitamin_a":           {"amount": <number>, "unit": "µg"},
-    "vitamin_b_complex":   {"amount": <number>, "unit": "mg"},
-    "vitamin_c":           {"amount": <number>, "unit": "mg"},
-    "vitamin_d":           {"amount": <number>, "unit": "µg"},
-    "vitamin_e":           {"amount": <number>, "unit": "mg"},
-    "vitamin_k":           {"amount": <number>, "unit": "µg"},
-    "calcium":             {"amount": <number>, "unit": "mg"},
-    "iron":                {"amount": <number>, "unit": "mg"},
-    "magnesium":           {"amount": <number>, "unit": "mg"},
-    "zinc":                {"amount": <number>, "unit": "mg"},
-    "sodium":              {"amount": <number>, "unit": "mg"},
-    "potassium":           {"amount": <number>, "unit": "mg"},
-    "fiber":               {"amount": <number>, "unit": "g"},
-    "water":               {"amount": <number>, "unit": "ml"}
+    "carbohydrate":  {"amount": <number>, "unit": "g"},
+    "fat":           {"amount": <number>, "unit": "g"},
+    "protein":       {"amount": <number>, "unit": "g"},
+    "water":         {"amount": <number>, "unit": "ml"},
+    "fiber":         {"amount": <number>, "unit": "g"},
+    "sodium":        {"amount": <number>, "unit": "mg"},
+    "iron":          {"amount": <number>, "unit": "mg"},
+    "calcium":       {"amount": <number>, "unit": "mg"},
+    "vitamin_d":     {"amount": <number>, "unit": "µg"},
+    "potassium":     {"amount": <number>, "unit": "mg"}
   }
 }
 
 Requirements:
 
-- "nutrients" must be an object whose keys are exactly these 17 nutrient codes.
-- Do NOT omit any of the 17 codes above.
+- "nutrients" must be an object whose keys are exactly these 10 nutrient codes.
+- Do NOT omit any of the 10 codes above.
 - Do NOT add any extra keys in "nutrients".
 - Each nutrient object must have:
     - "amount": a numeric value
@@ -74,46 +67,32 @@ Requirements:
 """
 
 
-# === 17栄養素セット & 単位定義 ==============================================
+# === 10栄養素セット & 単位定義 ==============================================
 
-EXPECTED_CODES_17 = [
+EXPECTED_CODES: list[NutrientCode] = [
     NutrientCode.CARBOHYDRATE,
     NutrientCode.FAT,
     NutrientCode.PROTEIN,
-    NutrientCode.VITAMIN_A,
-    NutrientCode.VITAMIN_B_COMPLEX,
-    NutrientCode.VITAMIN_C,
-    NutrientCode.VITAMIN_D,
-    NutrientCode.VITAMIN_E,
-    NutrientCode.VITAMIN_K,
-    NutrientCode.CALCIUM,
-    NutrientCode.IRON,
-    NutrientCode.MAGNESIUM,
-    NutrientCode.ZINC,
-    NutrientCode.SODIUM,
-    NutrientCode.POTASSIUM,
-    NutrientCode.FIBER,
     NutrientCode.WATER,
+    NutrientCode.FIBER,
+    NutrientCode.SODIUM,
+    NutrientCode.IRON,
+    NutrientCode.CALCIUM,
+    NutrientCode.VITAMIN_D,
+    NutrientCode.POTASSIUM,
 ]
 
 EXPECTED_UNITS: dict[NutrientCode, str] = {
     NutrientCode.CARBOHYDRATE: "g",
     NutrientCode.FAT: "g",
     NutrientCode.PROTEIN: "g",
-    NutrientCode.VITAMIN_A: "µg",
-    NutrientCode.VITAMIN_B_COMPLEX: "mg",
-    NutrientCode.VITAMIN_C: "mg",
-    NutrientCode.VITAMIN_D: "µg",
-    NutrientCode.VITAMIN_E: "mg",
-    NutrientCode.VITAMIN_K: "µg",
-    NutrientCode.CALCIUM: "mg",
-    NutrientCode.IRON: "mg",
-    NutrientCode.MAGNESIUM: "mg",
-    NutrientCode.ZINC: "mg",
-    NutrientCode.SODIUM: "mg",
-    NutrientCode.POTASSIUM: "mg",
-    NutrientCode.FIBER: "g",
     NutrientCode.WATER: "ml",
+    NutrientCode.FIBER: "g",
+    NutrientCode.SODIUM: "mg",
+    NutrientCode.IRON: "mg",
+    NutrientCode.CALCIUM: "mg",
+    NutrientCode.VITAMIN_D: "µg",
+    NutrientCode.POTASSIUM: "mg",
 }
 
 
@@ -203,25 +182,25 @@ class OpenAINutritionEstimator(NutritionEstimatorPort):
 
         try:
             data: dict[str, Any] = json.loads(content)
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.exception(
                 "Failed to parse JSON from OpenAI nutrition response: %s",
                 content,
             )
             raise NutritionEstimationFailedError(
                 "Failed to parse JSON from OpenAI response"
-            ) from e
+            )
 
         try:
             nutrients = self._parse_nutrients(data.get("nutrients", {}))
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to map nutrients from OpenAI nutrition response: %s",
                 data,
             )
             raise NutritionEstimationFailedError(
                 "Failed to map nutrients from OpenAI response"
-            ) from e
+            )
 
         return nutrients
 
@@ -251,7 +230,11 @@ class OpenAINutritionEstimator(NutritionEstimatorPort):
 
         lines.append("Meal entries:")
         for idx, e in enumerate(entries, start=1):
-            amount_str = f"{e.amount_value} {e.amount_unit}" if e.amount_unit else f"{e.amount_value}"
+            amount_str = (
+                f"{e.amount_value} {e.amount_unit}"
+                if e.amount_unit
+                else f"{e.amount_value}"
+            )
             serving_str = (
                 f"{e.serving_count} servings"
                 if e.serving_count is not None
@@ -259,7 +242,8 @@ class OpenAINutritionEstimator(NutritionEstimatorPort):
             )
             note_str = f"note: {e.note}" if e.note else "note: (none)"
             lines.append(
-                f"{idx}. name: {e.name}, amount: {amount_str}, {serving_str}, {note_str}"
+                f"{idx}. name: {e.name}, amount: {amount_str}, "
+                f"{serving_str}, {note_str}"
             )
 
         lines.append("")
@@ -276,7 +260,7 @@ class OpenAINutritionEstimator(NutritionEstimatorPort):
         """
         LLM から返ってきた JSON の "nutrients" 部分を MealNutrientIntake のリストに変換する。
 
-        - 必須17栄養素が揃っているか
+        - 必須 10 栄養素が揃っているか
         - 余計なキーが混ざっていないか
         - unit が期待通りか
         を検証する。
@@ -285,22 +269,24 @@ class OpenAINutritionEstimator(NutritionEstimatorPort):
             raise ValueError("nutrients must be an object")
 
         keys = set(raw_nutrients.keys())
-        expected_keys = {code.value for code in EXPECTED_CODES_17}
+        expected_keys = {code.value for code in EXPECTED_CODES}
 
         missing = expected_keys - keys
         extra = keys - expected_keys
 
         if missing:
             raise ValueError(
-                f"Missing nutrients in response: {sorted(missing)}")
+                f"Missing nutrients in response: {sorted(missing)}"
+            )
         if extra:
             # ここでは余計なキーもエラーとして扱う（挙動を厳しめにしておく）
             raise ValueError(
-                f"Unexpected nutrients in response: {sorted(extra)}")
+                f"Unexpected nutrients in response: {sorted(extra)}"
+            )
 
         results: list[MealNutrientIntake] = []
 
-        for code in EXPECTED_CODES_17:
+        for code in EXPECTED_CODES:
             key = code.value
             entry = raw_nutrients[key]
 

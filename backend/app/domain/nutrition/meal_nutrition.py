@@ -11,6 +11,7 @@ from app.domain.target.value_objects import (
     NutrientCode,
     NutrientAmount,
     NutrientSource,
+    ALL_NUTRIENT_CODES,
 )
 
 
@@ -91,6 +92,20 @@ class MealNutritionSummary:
                 raise ValueError(
                     f"MealType=SNACK の場合、meal_index は None である必要があります: {self.meal_index}"
                 )
+
+    def ensure_full_nutrients(self) -> None:
+        """
+        この食事の栄養情報が、必要な 10 栄養素をすべて含んでいるかチェックする。
+
+        - LLM / Estimator の実装ミス検出用。
+        """
+        present = {n.code for n in self.nutrients}
+        missing = [code for code in ALL_NUTRIENT_CODES if code not in present]
+        if missing:
+            raise ValueError(
+                "MealNutritionSummary is missing nutrients: "
+                + ", ".join(m.value for m in missing)
+            )
 
     # --- ユーティリティ -------------------------------------------------
 

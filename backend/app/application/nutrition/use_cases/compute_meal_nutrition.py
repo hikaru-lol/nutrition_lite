@@ -113,5 +113,6 @@ class ComputeMealNutritionUseCase:
             )
 
             uow.meal_nutrition_repo.save(summary)
+            summary.ensure_full_nutrients()
 
             return summary

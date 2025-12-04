@@ -9,6 +9,7 @@ from app.application.profile.ports.profile_query_port import (
     ProfileForTarget,
     ProfileQueryPort,
 )
+from app.application.auth.ports.clock_port import ClockPort
 from app.application.target.dto.target_dto import (
     CreateTargetInputDTO,
     TargetDTO,
@@ -26,7 +27,7 @@ from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 from app.domain.auth.value_objects import UserId
 from app.domain.profile.errors import ProfileNotFoundError
 from app.domain.target.entities import TargetDefinition
-from app.domain.target.value_objects import ActivityLevel, GoalType, TargetId
+from app.domain.target.value_objects import ActivityLevel, GoalType, TargetId, ALL_NUTRIENT_CODES
 
 MAX_TARGETS_PER_USER = 5
 
@@ -35,7 +36,7 @@ class CreateTargetUseCase:
     """
     新しい TargetDefinition を作成するユースケース。
 
-    - プロフィール + 目標情報から TargetGeneratorPort を使って 17 栄養素を生成
+    - プロフィール + 目標情報から TargetGeneratorPort を使って 10 栄養素を生成
     - 初めての Target なら is_active=True、それ以外は is_active=False
     """
 
@@ -44,10 +45,12 @@ class CreateTargetUseCase:
         uow: TargetUnitOfWorkPort,
         generator: TargetGeneratorPort,
         profile_query: ProfileQueryPort,
+        clock: ClockPort,
     ) -> None:
         self._uow = uow
         self._generator = generator
         self._profile_query = profile_query
+        self._clock = clock
 
     def execute(self, input_dto: CreateTargetInputDTO) -> TargetDTO:
         """
@@ -91,12 +94,22 @@ class CreateTargetUseCase:
             )
             gen_result = self._generator.generate(ctx)
 
+            # ここで「10 栄養素そろっているか」を検査
+            present = {n.code for n in gen_result.nutrients}
+            missing = [
+                code for code in ALL_NUTRIENT_CODES if code not in present]
+            if missing:
+                codes_str = ", ".join(c.value for c in missing)
+                raise ValueError(
+                    f"TargetGenerator returned nutrients missing codes: {codes_str}"
+                )
+
             # 既にアクティブなターゲットがなければ、このターゲットを is_active=True に
             already_active = uow.target_repo.get_active(user_id)
             is_active = already_active is None
 
             # --- 4. TargetDefinition を組み立て -----------------------
-            now = datetime.now(timezone.utc)
+            now = self._clock.now()
             target = TargetDefinition(
                 id=TargetId(str(uuid4())),
                 user_id=user_id,

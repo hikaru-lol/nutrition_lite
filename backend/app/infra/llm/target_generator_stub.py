@@ -9,6 +9,7 @@ from app.application.target.ports.target_generator_port import (
 )
 from app.domain.target.entities import TargetNutrient
 from app.domain.target.value_objects import (
+    ALL_NUTRIENT_CODES,
     GoalType,
     ActivityLevel,
     NutrientCode,
@@ -22,7 +23,7 @@ class StubTargetGenerator(TargetGeneratorPort):
     TargetGeneratorPort のスタブ実装。
 
     - ユーザーの体重・活動レベル・目標に基づいて、
-      ざっくりとした 17 栄養素のターゲットを決める。
+      ざっくりとした 10 栄養素のターゲットを決める。
     - あくまで「開発・テスト用のダミー実装」であり、
       実際の栄養指導や医療的な根拠は持たない。
     """
@@ -76,18 +77,11 @@ class StubTargetGenerator(TargetGeneratorPort):
 
             # ビタミン（かなりざっくり）
             # 男性の目安に近い値
-            NutrientCode.VITAMIN_A: NutrientAmount(900.0, "µg"),
-            NutrientCode.VITAMIN_B_COMPLEX: NutrientAmount(50.0, "mg"),
-            NutrientCode.VITAMIN_C: NutrientAmount(100.0, "mg"),
             NutrientCode.VITAMIN_D: NutrientAmount(20.0, "µg"),
-            NutrientCode.VITAMIN_E: NutrientAmount(10.0, "mg"),
-            NutrientCode.VITAMIN_K: NutrientAmount(150.0, "µg"),
 
             # ミネラル（これもざっくり）
             NutrientCode.CALCIUM: NutrientAmount(700.0, "mg"),
             NutrientCode.IRON: NutrientAmount(10.0, "mg"),
-            NutrientCode.MAGNESIUM: NutrientAmount(300.0, "mg"),
-            NutrientCode.ZINC: NutrientAmount(10.0, "mg"),
             NutrientCode.SODIUM: NutrientAmount(1500.0, "mg"),
             NutrientCode.POTASSIUM: NutrientAmount(2500.0, "mg"),
 
@@ -98,7 +92,7 @@ class StubTargetGenerator(TargetGeneratorPort):
 
         # すべての NutrientCode に対して TargetNutrient を作成
         nutrients: list[TargetNutrient] = []
-        for code in NutrientCode:
+        for code in ALL_NUTRIENT_CODES:
             amount = nutrient_values.get(
                 code,
                 # 万が一 dict に抜けがあったときのフォールバック

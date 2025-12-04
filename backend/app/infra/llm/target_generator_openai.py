@@ -30,25 +30,18 @@ You are a registered dietitian and nutrition expert.
 
 Your task:
 Given a user's profile (sex, age, height, weight), activity level, and goal,
-you must propose a daily target amount for the following 17 nutrients:
+you must propose a daily target amount for the following 10 nutrients:
 
-- carbohydrate (g)
-- fat (g)
-- protein (g)
-- vitamin_a (µg)
-- vitamin_b_complex (mg)
-- vitamin_c (mg)
-- vitamin_d (µg)
-- vitamin_e (mg)
-- vitamin_k (µg)
-- calcium (mg)
-- iron (mg)
-- magnesium (mg)
-- zinc (mg)
-- sodium (mg)
-- potassium (mg)
-- fiber (g)
-- water (ml)
+- carbohydrate (g)  # 炭水化物
+- fat (g)           # 脂質
+- protein (g)       # たんぱく質
+- water (ml)        # 水分
+- fiber (g)         # 食物繊維
+- sodium (mg)       # ナトリウム
+- iron (mg)         # 鉄
+- calcium (mg)      # カルシウム
+- vitamin_d (µg)    # ビタミンD
+- potassium (mg)    # カリウム
 
 Output requirements (IMPORTANT):
 
@@ -60,20 +53,13 @@ Output requirements (IMPORTANT):
     "carbohydrate": {"amount": <number>, "unit": "g"},
     "fat":          {"amount": <number>, "unit": "g"},
     "protein":      {"amount": <number>, "unit": "g"},
-    "vitamin_a":        {"amount": <number>, "unit": "µg"},
-    "vitamin_b_complex":{"amount": <number>, "unit": "mg"},
-    "vitamin_c":        {"amount": <number>, "unit": "mg"},
-    "vitamin_d":        {"amount": <number>, "unit": "µg"},
-    "vitamin_e":        {"amount": <number>, "unit": "mg"},
-    "vitamin_k":        {"amount": <number>, "unit": "µg"},
-    "calcium":      {"amount": <number>, "unit": "mg"},
-    "iron":         {"amount": <number>, "unit": "mg"},
-    "magnesium":    {"amount": <number>, "unit": "mg"},
-    "zinc":         {"amount": <number>, "unit": "mg"},
-    "sodium":       {"amount": <number>, "unit": "mg"},
-    "potassium":    {"amount": <number>, "unit": "mg"},
+    "water":        {"amount": <number>, "unit": "ml"},
     "fiber":        {"amount": <number>, "unit": "g"},
-    "water":        {"amount": <number>, "unit": "ml"}
+    "sodium":       {"amount": <number>, "unit": "mg"},
+    "iron":         {"amount": <number>, "unit": "mg"},
+    "calcium":      {"amount": <number>, "unit": "mg"},
+    "vitamin_d":    {"amount": <number>, "unit": "µg"},
+    "potassium":    {"amount": <number>, "unit": "mg"}
   },
   "llm_rationale": "<string explaining the reasoning>",
   "disclaimer": "<string reminding it is not medical advice>"
@@ -95,7 +81,7 @@ class OpenAITargetGeneratorConfig:
 
 class OpenAITargetGenerator(TargetGeneratorPort):
     """
-    OpenAI Chat Completions API を使って 17 栄養素のターゲットを生成する実装。
+    OpenAI Chat Completions API を使って 10 栄養素のターゲットを生成する実装。
 
     - env の OPENAI_API_KEY を利用して認証する想定。
     """
@@ -110,7 +96,7 @@ class OpenAITargetGenerator(TargetGeneratorPort):
 
     def generate(self, ctx: TargetGenerationContext) -> TargetGenerationResult:
         """
-        Profile + goal 情報をもとに LLM に JSON 形式で 17 栄養素のターゲット生成を依頼。
+        Profile + goal 情報をもとに LLM に JSON 形式で 10 栄養素のターゲット生成を依頼。
         """
         user_prompt = self._build_user_prompt(ctx)
 
@@ -127,7 +113,8 @@ class OpenAITargetGenerator(TargetGeneratorPort):
         except OpenAIError as e:
             logger.exception("OpenAI API error while generating target: %s", e)
             raise TargetGenerationFailedError(
-                "Failed to generate target via OpenAI") from e
+                "Failed to generate target via OpenAI"
+            ) from e
 
         content = completion.choices[0].message.content
         if content is None:
@@ -137,17 +124,21 @@ class OpenAITargetGenerator(TargetGeneratorPort):
             data: dict[str, Any] = json.loads(content)
         except json.JSONDecodeError as e:
             logger.exception(
-                "Failed to parse JSON from OpenAI response: %s", content)
+                "Failed to parse JSON from OpenAI response: %s", content
+            )
             raise TargetGenerationFailedError(
-                "Failed to parse JSON from OpenAI response") from e
+                "Failed to parse JSON from OpenAI response"
+            ) from e
 
         try:
             nutrients = self._parse_nutrients(data.get("nutrients", {}))
         except Exception as e:
             logger.exception(
-                "Failed to map nutrients from OpenAI response: %s", data)
+                "Failed to map nutrients from OpenAI response: %s", data
+            )
             raise TargetGenerationFailedError(
-                "Failed to map nutrients from OpenAI response") from e
+                "Failed to map nutrients from OpenAI response"
+            ) from e
 
         llm_rationale = data.get("llm_rationale")
         disclaimer = data.get("disclaimer")
@@ -171,14 +162,18 @@ class OpenAITargetGenerator(TargetGeneratorPort):
         if ctx.birthdate is not None:
             today = date.today()
             age = today.year - ctx.birthdate.year - (
-                (today.month, today.day) < (
-                    ctx.birthdate.month, ctx.birthdate.day)
+                (today.month, today.day)
+                < (ctx.birthdate.month, ctx.birthdate.day)
             )
             age_str = f"{age} years"
 
         sex_str = ctx.sex or "unknown"
-        height_str = f"{ctx.height_cm:.1f} cm" if ctx.height_cm is not None else "unknown"
-        weight_str = f"{ctx.weight_kg:.1f} kg" if ctx.weight_kg is not None else "unknown"
+        height_str = (
+            f"{ctx.height_cm:.1f} cm" if ctx.height_cm is not None else "unknown"
+        )
+        weight_str = (
+            f"{ctx.weight_kg:.1f} kg" if ctx.weight_kg is not None else "unknown"
+        )
 
         prompt = f"""
 User profile:
@@ -191,7 +186,7 @@ Goal information:
 - Goal type: {ctx.goal_type.value}
 - Activity level: {ctx.activity_level.value}
 
-Please propose daily target amounts for the 17 nutrients described in the system prompt.
+Please propose daily target amounts for the 10 nutrients described in the system prompt.
 """.strip()
 
         return prompt
@@ -199,6 +194,8 @@ Please propose daily target amounts for the 17 nutrients described in the system
     def _parse_nutrients(self, raw_nutrients: dict[str, Any]) -> list[TargetNutrient]:
         """
         LLM から返ってきた JSON の "nutrients" 部分を TargetNutrient のリストに変換する。
+
+        - NutrientCode Enum に定義されている 10 栄養素分をすべて揃っている前提。
         """
         nutrients: list[TargetNutrient] = []
 

@@ -18,7 +18,6 @@ from app.application.auth.ports.clock_port import ClockPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort
 from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
 
 # Use cases
 from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
@@ -376,6 +375,7 @@ def get_create_target_use_case() -> CreateTargetUseCase:
         uow=get_target_uow(),
         generator=get_target_generator(),
         profile_query=get_profile_query_service(),
+        clock=get_clock(),
     )
 
 
