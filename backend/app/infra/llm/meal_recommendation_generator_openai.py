@@ -14,6 +14,7 @@ from app.application.nutrition.dto.meal_recommendation_llm_dto import (
 from app.application.nutrition.ports.recommendation_generator_port import (
     MealRecommendationGeneratorPort,
 )
+
 from app.domain.nutrition.errors import NutritionDomainError  # 既存のベース
 # なければ専用エラーを追加してもOK
 # from app.domain.nutrition.errors import MealRecommendationGenerationFailedError など
@@ -30,7 +31,7 @@ You are a registered dietitian and nutrition coach.
 
 Your task:
 Given a user's recent daily nutrition reports and profile,
-propose practical suggestions on how they can eat in the next few days.
+propose practical suggestions on how they can eat in the next few days. 
 
 You MUST return ONLY a single JSON object with the following structure:
 
@@ -68,10 +69,10 @@ class OpenAIMealRecommendationGenerator(MealRecommendationGeneratorPort):
         self,
         client: OpenAI | None = None,
         config: OpenAIMealRecommendationGeneratorConfig | None = None,
+
     ) -> None:
         self._client = client or OpenAI()
         self._config = config or OpenAIMealRecommendationGeneratorConfig()
-
     # ------------------------------------------------------------------
     # Port 実装
     # ------------------------------------------------------------------
@@ -80,6 +81,7 @@ class OpenAIMealRecommendationGenerator(MealRecommendationGeneratorPort):
         self,
         input: MealRecommendationLLMInput,
     ) -> MealRecommendationLLMOutput:
+
         user_prompt = self._build_user_prompt(input)
 
         try:

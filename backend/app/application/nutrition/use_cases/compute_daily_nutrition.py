@@ -3,12 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date as DateType
 
-from app.application.nutrition.ports.daily_nutrition_repository_port import (
-    DailyNutritionSummaryRepositoryPort,
-)
-from app.application.nutrition.ports.meal_nutrition_repository_port import (
-    MealNutritionSummaryRepositoryPort,
-)
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
 from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.daily_nutrition import (
     DailyNutritionSummary,
@@ -31,15 +26,24 @@ class ComputeDailyNutritionSummaryUseCase:
         4. 既存サマリがあれば上書き、なければ新規作成
     - 出力:
         最新の DailyNutritionSummary
+
+    追加: プレミアム機能チェック
+      - trial / paid のユーザーのみ実行可能。
+      - FREE の場合は PremiumFeatureRequiredError を投げる。
     """
 
     def __init__(
         self,
         uow: NutritionUnitOfWorkPort,
+        plan_checker: PlanCheckerPort,
     ) -> None:
         self._uow = uow
+        self._plan_checker = plan_checker
 
     def execute(self, user_id: UserId, date_: DateType) -> DailyNutritionSummary:
+        # --- 0. プレミアム機能チェック --------------------------------
+        self._plan_checker.ensure_premium_feature(user_id)
+
         with self._uow as uow:
             meals = uow.meal_nutrition_repo.list_by_user_and_date(
                 user_id=user_id,

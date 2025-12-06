@@ -33,3 +33,11 @@ class InvalidRefreshTokenError(AuthError):
 class InvalidEmailFormatError(AuthError):
     """メールアドレスの形式が不正なときのエラー。"""
     pass
+
+
+class PremiumFeatureRequiredError(AuthError):
+    """
+    有料機能（trial / paid ユーザーのみ利用可能）の呼び出し時に、
+    プランが不足している場合に投げるエラー。
+    """
+    pass

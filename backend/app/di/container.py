@@ -18,7 +18,6 @@ from app.application.auth.ports.clock_port import ClockPort
 from app.application.auth.ports.password_hasher_port import PasswordHasherPort
 from app.application.auth.ports.token_service_port import TokenServicePort
 from app.application.auth.ports.uow_port import AuthUnitOfWorkPort
-from app.application.auth.ports.user_repository_port import UserRepositoryPort
 
 # Use cases
 from app.application.auth.use_cases.account.delete_account import DeleteAccountUseCase
@@ -31,10 +30,15 @@ from app.application.auth.use_cases.session.logout_user import LogoutUserUseCase
 from app.application.auth.use_cases.session.refresh_token import RefreshTokenUseCase
 
 # Infra (repo / security / uow)
-from app.infra.db.repositories.user_repository import SqlAlchemyUserRepository
 from app.infra.db.uow.auth import SqlAlchemyAuthUnitOfWork
 from app.infra.security.jwt_token_service import JwtTokenService
 from app.infra.security.password_hasher import BcryptPasswordHasher
+
+# === Auth: PlanChecker ======================================================
+# Ports
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
+# Infra
+from app.infra.auth.plan_checker_service import PlanCheckerService
 
 # === Profile ================================================================
 # Ports
@@ -49,7 +53,6 @@ from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.application.profile.use_cases.upsert_profile import UpsertProfileUseCase
 
 # Infra (repo / uow / storage / query service)
-from app.infra.db.repositories.profile_repository import SqlAlchemyProfileRepository
 from app.infra.db.uow.profile import SqlAlchemyProfileUnitOfWork
 from app.infra.profile.profile_query_service import ProfileQueryService
 from app.infra.storage.minio_profile_image_storage import MinioProfileImageStorage
@@ -58,7 +61,6 @@ from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
 # === Target ================================================================
 # Ports
 from app.application.target.ports.target_generator_port import TargetGeneratorPort
-from app.application.target.ports.target_repository_port import TargetRepositoryPort
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 
 # Use cases
@@ -73,7 +75,6 @@ from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
 
 # Infra (repo / uow / llm)
-from app.infra.db.repositories.target_repository import SqlAlchemyTargetRepository
 from app.infra.db.uow.target import SqlAlchemyTargetUnitOfWork
 from app.infra.llm.target_generator_openai import (
     OpenAITargetGenerator,
@@ -83,7 +84,6 @@ from app.infra.llm.target_generator_stub import StubTargetGenerator
 
 # === Meal ===================================================================
 # Ports
-from app.application.meal.ports.food_entry_repository_port import FoodEntryRepositoryPort
 from app.application.meal.ports.uow_port import MealUnitOfWorkPort
 
 # Use cases
@@ -98,7 +98,6 @@ from app.application.meal.use_cases.list_food_entries_by_date import (
 from app.application.meal.use_cases.update_food_entry import UpdateFoodEntryUseCase
 
 # Infra (repo)
-from app.infra.db.repositories.food_entry_repository import SqlAlchemyFoodEntryRepository
 from app.infra.db.uow.meal import SqlAlchemyMealUnitOfWork
 from app.infra.meal.meal_entry_query_service import MealEntryQueryService
 
@@ -109,9 +108,6 @@ from app.application.nutrition.ports.meal_entry_query_port import MealEntryQuery
 
 from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
-)
-from app.application.nutrition.ports.daily_report_repository_port import (
-    DailyNutritionReportRepositoryPort,
 )
 from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
 from app.application.nutrition.ports.recommendation_generator_port import (
@@ -158,23 +154,11 @@ from app.infra.llm.meal_recommendation_generator_openai import (
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
 
-from app.infra.db.repositories.daily_nutrition_report_repository import (
-    SqlAlchemyDailyNutritionReportRepository,
-)
-from app.infra.db.repositories.daily_nutrition_repository import (
-    SqlAlchemyDailyNutritionSummaryRepository,
-)
-from app.infra.db.repositories.meal_nutrition_repository import (
-    SqlAlchemyMealNutritionSummaryRepository,
-)
 
 from app.infra.llm.daily_report_generator_openai import (
     OpenAIDailyNutritionReportGenerator,
     OpenAIDailyReportGeneratorConfig,
 )
-# from app.infra.db.repositories.recommendation_repository import (
-#     SqlAlchemyMealRecommendationRepository,
-# )
 
 # LLM / estimators
 from app.infra.llm.stub_daily_report_generator import (
@@ -182,6 +166,26 @@ from app.infra.llm.stub_daily_report_generator import (
 )
 from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
 from app.infra.nutrition.estimator_stub import StubNutritionEstimator
+
+# === Billing ================================================================
+# Ports
+from app.application.billing.ports.uow_port import BillingUnitOfWorkPort
+from app.application.billing.ports.stripe_client_port import StripeClientPort
+
+# Use cases
+from app.application.billing.use_cases.create_checkout_session import (
+    CreateCheckoutSessionUseCase,
+)
+from app.application.billing.use_cases.get_billing_portal_url import (
+    GetBillingPortalUrlUseCase,
+)
+from app.application.billing.use_cases.handle_stripe_webhook import (
+    HandleStripeWebhookUseCase,
+)
+
+# Infra (uow / stripe client / repo)
+from app.infra.db.uow.billing import SqlAlchemyBillingUnitOfWork
+from app.infra.billing.stripe_client import StripeClient
 
 
 # === Common / DB / UoW =====================================================
@@ -260,6 +264,25 @@ def get_current_user_use_case() -> GetCurrentUserUseCase:
     return GetCurrentUserUseCase(
         uow=get_auth_uow(),
     )
+
+
+# プレミアム機能のプランチェックを行うサービスのシングルトンインスタンス
+_plan_checker_singleton: PlanCheckerPort | None = None
+
+# プレミアム機能のプランチェックを行うサービスの実装を返す
+
+
+def get_plan_checker() -> PlanCheckerPort:
+    """
+    プレミアム機能のプランチェックを行うサービスの DI。
+    """
+    global _plan_checker_singleton
+    if _plan_checker_singleton is None:
+        _plan_checker_singleton = PlanCheckerService(
+            auth_uow=get_auth_uow(),
+            clock=get_clock(),
+        )
+    return _plan_checker_singleton
 
 
 # === Profile ================================================================
@@ -352,6 +375,7 @@ def get_create_target_use_case() -> CreateTargetUseCase:
         uow=get_target_uow(),
         generator=get_target_generator(),
         profile_query=get_profile_query_service(),
+        clock=get_clock(),
     )
 
 
@@ -503,11 +527,13 @@ def get_compute_meal_nutrition_use_case() -> ComputeMealNutritionUseCase:
     meal_entry_query_service = get_meal_entry_query_service()
     nutrition_uow = get_nutrition_uow()
     estimator = get_nutrition_estimator()
+    plan_checker = get_plan_checker()
 
     return ComputeMealNutritionUseCase(
         meal_entry_query_service=meal_entry_query_service,
         nutrition_uow=nutrition_uow,
         estimator=estimator,
+        plan_checker=plan_checker,
     )
 
 
@@ -521,6 +547,7 @@ def get_compute_daily_nutrition_summary_use_case(
     """
     return ComputeDailyNutritionSummaryUseCase(
         uow=get_nutrition_uow(),
+        plan_checker=get_plan_checker(),
     )
 
 
@@ -591,6 +618,7 @@ def get_generate_daily_nutrition_report_use_case(
     daily_nutrition_uc = get_compute_daily_nutrition_summary_use_case()
     report_generator = get_daily_nutrition_report_generator()
     clock = get_clock()
+    plan_checker = get_plan_checker()
 
     return GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
@@ -600,6 +628,7 @@ def get_generate_daily_nutrition_report_use_case(
         nutrition_uow=get_nutrition_uow(),
         report_generator=report_generator,
         clock=clock,
+        plan_checker=plan_checker,
     )
 
 
@@ -610,7 +639,7 @@ def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
     )
 
 
-# === MealRecommendation (今は Stub のみ) ====================================
+# === MealRecommendation ====================================
 # 食事レコメンド（将来の機能）の DI 定義
 _USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR = os.getenv(
     "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false"
@@ -656,4 +685,69 @@ def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUse
         generator=get_meal_recommendation_generator(),
         clock=get_clock(),
         required_days=5,
+        plan_checker=get_plan_checker(),
+    )
+
+
+# === Billing ================================================================
+# Stripe クライアントと Billing UoW の DI 定義
+
+_stripe_client_singleton: StripeClientPort | None = None
+
+
+def get_stripe_client() -> StripeClientPort:
+    """
+    StripeClientPort 実装を返す。
+
+    - STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET は StripeClient 内で env から読む前提。
+    """
+    global _stripe_client_singleton
+    if _stripe_client_singleton is None:
+        _stripe_client_singleton = StripeClient()
+    return _stripe_client_singleton
+
+
+def get_billing_uow() -> BillingUnitOfWorkPort:
+    """
+    Billing ドメイン用の UnitOfWork 実装を返す。
+    """
+    return SqlAlchemyBillingUnitOfWork()
+
+# Checkout セッション作成 UC
+
+
+def get_create_checkout_session_use_case() -> CreateCheckoutSessionUseCase:
+    """
+    Stripe Checkout セッション作成 UseCase の DI。
+    """
+    return CreateCheckoutSessionUseCase(
+        billing_uow=get_billing_uow(),
+        auth_uow=get_auth_uow(),
+        stripe_client=get_stripe_client(),
+        clock=get_clock(),
+        price_id=settings.STRIPE_PRICE_ID,  # env or settings に定義しておく
+    )
+
+
+# Billing Portal URL UC
+def get_billing_portal_url_use_case() -> GetBillingPortalUrlUseCase:
+    """
+    Stripe Billing Portal URL 取得 UseCase の DI。
+    """
+    return GetBillingPortalUrlUseCase(
+        billing_uow=get_billing_uow(),
+        stripe_client=get_stripe_client(),
+    )
+
+
+# Webhook ハンドラ UC
+def get_handle_stripe_webhook_use_case() -> HandleStripeWebhookUseCase:
+    """
+    Stripe Webhook イベント処理 UseCase の DI。
+    """
+    return HandleStripeWebhookUseCase(
+        billing_uow=get_billing_uow(),
+        auth_uow=get_auth_uow(),
+        stripe_client=get_stripe_client(),
+        clock=get_clock(),
     )

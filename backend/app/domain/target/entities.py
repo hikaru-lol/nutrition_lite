@@ -14,6 +14,8 @@ from app.domain.target.value_objects import (
     NutrientCode,
     NutrientAmount,
     NutrientSource,
+    ALL_NUTRIENT_CODES,
+    DEFAULT_NUTRIENT_UNITS,
 )
 
 
@@ -44,7 +46,7 @@ class TargetDefinition:
     """
     1日の栄養ターゲット定義。
 
-    - プロフィール情報 + 目標情報を元に 17 栄養素の目標値を決定したもの。
+    - プロフィール情報 + 目標情報を元に 10 栄養素の目標値を決定したもの。
     - ユーザーは複数のターゲットを持てるが、アクティブなのは常に 1 つだけ。
     """
 
@@ -56,7 +58,7 @@ class TargetDefinition:
     goal_description: str | None
     activity_level: ActivityLevel
 
-    # 1 日あたりのターゲット栄養素セット（常に 17 要素を想定）
+    # 1 日あたりのターゲット栄養素セット（常に 10 要素を想定）
     nutrients: list[TargetNutrient]
 
     is_active: bool
@@ -151,7 +153,7 @@ class TargetDefinition:
                 （実際にどこで呼ぶかはユースケース次第）
         """
         if required_codes is None:
-            required_codes = list(NutrientCode)
+            required_codes = ALL_NUTRIENT_CODES
 
         present = {n.code for n in self.nutrients}
         missing = [code for code in required_codes if code not in present]
@@ -176,7 +178,7 @@ class DailyTargetSnapshot:
     date: date
     target_id: TargetId
 
-    # スナップショット時点の栄養ターゲット（17 要素）
+    # スナップショット時点の栄養ターゲット（10 要素）
     nutrients: tuple[TargetNutrient, ...]
     created_at: datetime
 

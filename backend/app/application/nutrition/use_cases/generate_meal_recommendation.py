@@ -4,14 +4,16 @@ from dataclasses import dataclass
 from datetime import date as DateType
 
 from app.application.auth.ports.clock_port import ClockPort
-from app.application.nutrition.dto.meal_recommendation_llm_dto import (
-    MealRecommendationLLMInput,
-)
-from app.application.profile.ports.profile_query_port import ProfileQueryPort, ProfileForRecommendation
 from app.application.nutrition.ports.recommendation_generator_port import (
     MealRecommendationGeneratorPort,
 )
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
+from app.application.profile.ports.profile_query_port import ProfileQueryPort, ProfileForRecommendation
 from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
+
+from app.application.nutrition.dto.meal_recommendation_llm_dto import (
+    MealRecommendationLLMInput,
+)
 
 from app.domain.auth.value_objects import UserId
 from app.domain.meal.errors import DailyLogProfileNotFoundError
@@ -49,14 +51,20 @@ class GenerateMealRecommendationUseCase:
         generator: MealRecommendationGeneratorPort,
         clock: ClockPort,
         required_days: int = 5,
+        plan_checker: PlanCheckerPort | None = None,
     ) -> None:
         self._profile_query = profile_query
         self._nutrition_uow = nutrition_uow
         self._generator = generator
         self._clock = clock
         self._required_days = required_days
+        self._plan_checker = plan_checker
 
     def execute(self, input: GenerateMealRecommendationInput) -> MealRecommendation:
+
+        # --- 0. プレミアム機能チェック --------------------------------
+        self._plan_checker.ensure_premium_feature(input.user_id)
+
         user_id = input.user_id
         base_date = input.base_date or self._clock.now().date()
 

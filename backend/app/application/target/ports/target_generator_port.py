@@ -38,7 +38,7 @@ class TargetGenerationResult:
     """
     ターゲット生成の結果。
 
-    - TargetDefinition を作るために必要な「17栄養素 + 説明文」をまとめたもの。
+    - TargetDefinition を作るために必要な「10栄養素 + 説明文」をまとめたもの。
     """
 
     nutrients: list[TargetNutrient]
@@ -53,10 +53,13 @@ class TargetGeneratorPort(Protocol):
 
     - 開発中は Stub 実装（一定のロジックで固定値を返す）
     - 本番では OpenAI などの LLM 実装に差し替える
+    - 戻り値の `list[TargetNutrient]` は、必ず
+      ALL_NUTRIENT_CODES（carbohydrate, fat, protein, water, fiber, sodium,
+      iron, calcium, vitamin_d, potassium）のみをコードとして含むこと。
     """
 
     def generate(self, ctx: TargetGenerationContext) -> TargetGenerationResult:
         """
-        ターゲット生成を行い、17栄養素 + 説明文を返す。
+        ターゲット生成を行い、10栄養素 + 説明文を返す。
         """
         ...

@@ -61,5 +61,16 @@ class Settings:
     # OPENAI_ORG_ID: str | None = os.getenv("OPENAI_ORG_ID") or None
     # OPENAI_PROJECT_ID: str | None = os.getenv("OPENAI_PROJECT_ID") or None
 
+    # ===== Stripe API 関連 =====
+    STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
+    STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    STRIPE_PRICE_ID: str = os.getenv("STRIPE_PRICE_ID", "")
+    STRIPE_CHECKOUT_SUCCESS_URL: str = os.getenv(
+        "STRIPE_CHECKOUT_SUCCESS_URL", "")
+    STRIPE_CHECKOUT_CANCEL_URL: str = os.getenv(
+        "STRIPE_CHECKOUT_CANCEL_URL", "")
+    STRIPE_PORTAL_RETURN_URL: str = os.getenv(
+        "STRIPE_PORTAL_RETURN_URL", "")
+
 
 settings = Settings()

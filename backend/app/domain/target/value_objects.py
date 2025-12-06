@@ -29,35 +29,63 @@ class ActivityLevel(str, Enum):
 
 
 class NutrientCode(str, Enum):
-    """1日あたりのターゲットを持つ 17 種類の栄養素コード。"""
+    """
+    1日あたりのターゲットを持つ 10 種類の栄養素コード。
 
-    # エネルギー源
+    - carbohydrate : 炭水化物 (g)
+    - fat          : 脂質 (g)
+    - protein      : たんぱく質 (g)
+    - water        : 水分 (ml)
+    - fiber        : 食物繊維 (g)
+    - sodium       : ナトリウム (mg)
+    - iron         : 鉄 (mg)
+    - calcium      : カルシウム (mg)
+    - vitamin_d    : ビタミンD (µg)
+    - potassium    : カリウム (mg)
+    """
+
     CARBOHYDRATE = "carbohydrate"
     FAT = "fat"
     PROTEIN = "protein"
-
-    # ビタミン
-    VITAMIN_A = "vitamin_a"
-    VITAMIN_B_COMPLEX = "vitamin_b_complex"
-    VITAMIN_C = "vitamin_c"
-    VITAMIN_D = "vitamin_d"
-    VITAMIN_E = "vitamin_e"
-    VITAMIN_K = "vitamin_k"
-
-    # ミネラル
-    CALCIUM = "calcium"
-    IRON = "iron"
-    MAGNESIUM = "magnesium"
-    ZINC = "zinc"
-    SODIUM = "sodium"
-    POTASSIUM = "potassium"
-
-    # その他
-    FIBER = "fiber"
     WATER = "water"
+    FIBER = "fiber"
+    SODIUM = "sodium"
+    IRON = "iron"
+    CALCIUM = "calcium"
+    VITAMIN_D = "vitamin_d"
+    POTASSIUM = "potassium"
 
     def __str__(self) -> str:
         return self.value
+
+
+# このアプリで扱う全栄養素コード（10種類）
+ALL_NUTRIENT_CODES: tuple[NutrientCode, ...] = (
+    NutrientCode.CARBOHYDRATE,
+    NutrientCode.FAT,
+    NutrientCode.PROTEIN,
+    NutrientCode.WATER,
+    NutrientCode.FIBER,
+    NutrientCode.SODIUM,
+    NutrientCode.IRON,
+    NutrientCode.CALCIUM,
+    NutrientCode.VITAMIN_D,
+    NutrientCode.POTASSIUM,
+)
+
+# 各栄養素のデフォルト単位
+DEFAULT_NUTRIENT_UNITS: dict[NutrientCode, str] = {
+    NutrientCode.CARBOHYDRATE: "g",
+    NutrientCode.FAT: "g",
+    NutrientCode.PROTEIN: "g",
+    NutrientCode.WATER: "ml",
+    NutrientCode.FIBER: "g",
+    NutrientCode.SODIUM: "mg",
+    NutrientCode.IRON: "mg",
+    NutrientCode.CALCIUM: "mg",
+    NutrientCode.VITAMIN_D: "µg",
+    NutrientCode.POTASSIUM: "mg",
+}
 
 
 NutrientSourceLiteral = Literal["llm", "manual", "user_input"]

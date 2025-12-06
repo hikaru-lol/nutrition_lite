@@ -7,6 +7,7 @@ from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 from app.application.nutrition.ports.nutrition_estimator_port import (
     NutritionEstimatorPort,
 )
+from app.application.auth.ports.plan_checker_port import PlanCheckerPort
 
 from app.domain.auth.value_objects import UserId
 from app.domain.meal.value_objects import MealType
@@ -20,13 +21,15 @@ class ComputeMealNutritionUseCase:
     1回の食事（main/snack）に対する栄養サマリを計算し、DBに保存する UseCase。
 
     フロー:
-      1. (user_id, date, meal_type, meal_index) に対応する FoodEntry を取得
+      1. (user_id, date, meal_type, meal_index) に対応する FoodEntry 一覧を取得
       2. NutritionEstimatorPort で栄養ベクトルを推定
-      3. 既存の MealNutritionSummary があれば ID を引き継いで再計算
-      4. Repository.save(...) で upsert
+      3. 既存の MealNutritionSummary があれば ID を引き継いで再計算 (upsert)
+      4. nutrition_uow.meal_nutrition_repo.save(...) で保存
       5. 最新の MealNutritionSummary を返す
 
-    ※ 計算タイミングは「評価したい瞬間」（パターンB）を想定。
+    追加: プレミアム機能チェック
+      - trial / paid のユーザーのみ実行可能。
+      - FREE の場合は PremiumFeatureRequiredError を投げる。
     """
 
     def __init__(
@@ -34,10 +37,12 @@ class ComputeMealNutritionUseCase:
         meal_entry_query_service: MealEntryQueryPort,
         nutrition_uow: NutritionUnitOfWorkPort,
         estimator: NutritionEstimatorPort,
+        plan_checker: PlanCheckerPort,
     ) -> None:
         self._meal_entry_query_service = meal_entry_query_service
         self._nutrition_uow = nutrition_uow
         self._estimator = estimator
+        self._plan_checker = plan_checker
 
     def execute(
         self,
@@ -46,6 +51,9 @@ class ComputeMealNutritionUseCase:
         meal_type_str: str,
         meal_index: int | None,
     ) -> MealNutritionSummary:
+        # --- 0. プレミアム機能チェック --------------------------------
+        self._plan_checker.ensure_premium_feature(user_id)
+
         # --- meal_type の文字列 → Enum 変換 ----------------------------
         try:
             meal_type = MealType(meal_type_str)
@@ -105,5 +113,6 @@ class ComputeMealNutritionUseCase:
             )
 
             uow.meal_nutrition_repo.save(summary)
+            summary.ensure_full_nutrients()
 
             return summary

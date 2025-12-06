@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -29,3 +29,4 @@ class DailyNutritionReportResponse(BaseModel):
     good_points: List[str]
     improvement_points: List[str]
     tomorrow_focus: List[str]
+    created_at: datetime

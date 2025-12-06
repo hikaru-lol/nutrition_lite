@@ -41,6 +41,13 @@ class StubNutritionEstimator(NutritionEstimatorPort):
             NutrientCode.PROTEIN: 0.0,
             NutrientCode.FAT: 0.0,
             NutrientCode.CARBOHYDRATE: 0.0,
+            NutrientCode.WATER: 0.0,
+            NutrientCode.FIBER: 0.0,
+            NutrientCode.SODIUM: 0.0,
+            NutrientCode.IRON: 0.0,
+            NutrientCode.CALCIUM: 0.0,
+            NutrientCode.VITAMIN_D: 0.0,
+            NutrientCode.POTASSIUM: 0.0,
         }
 
         for e in entries:
@@ -52,6 +59,13 @@ class StubNutritionEstimator(NutritionEstimatorPort):
             totals[NutrientCode.PROTEIN] += base * 0.20  # 20% がタンパク質
             totals[NutrientCode.FAT] += base * 0.10      # 10% が脂質
             totals[NutrientCode.CARBOHYDRATE] += base * 0.50  # 50% が炭水化物
+            totals[NutrientCode.WATER] += base * 0.10  # 10% が水分
+            totals[NutrientCode.FIBER] += base * 0.05  # 5% が食物繊維
+            totals[NutrientCode.SODIUM] += base * 0.05  # 5% がナトリウム
+            totals[NutrientCode.IRON] += base * 0.05  # 5% が鉄
+            totals[NutrientCode.CALCIUM] += base * 0.05  # 5% がカルシウム
+            totals[NutrientCode.VITAMIN_D] += base * 0.05  # 5% がビタミンD
+            totals[NutrientCode.POTASSIUM] += base * 0.05  # 5% がカリウム
 
         # 由来は「LLM などによる推定値」という扱いで "llm" を使う
         source = NutrientSource("llm")
