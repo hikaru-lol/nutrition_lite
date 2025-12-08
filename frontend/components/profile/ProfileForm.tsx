@@ -1,18 +1,18 @@
+// frontend/components/profile/ProfileForm.tsx
 'use client';
 
 import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-
-export type Sex = 'male' | 'female' | 'other' | 'unspecified';
+import type { Sex } from '@/lib/api/profile';
 
 export type ProfileFormValues = {
   sex: Sex;
-  birthdate: string;
-  heightCm: string;
+  birthdate: string; // "" or "YYYY-MM-DD"
+  heightCm: string; // 入力は string で保持
   weightKg: string;
-  mealsPerDay: string;
+  mealsPerDay: string; // "2" | "3" | "4" など
 };
 
 export type ProfileFormProps = {
@@ -24,7 +24,7 @@ export type ProfileFormProps = {
 };
 
 const defaultValues: ProfileFormValues = {
-  sex: 'unspecified',
+  sex: 'undisclosed',
   birthdate: '',
   heightCm: '',
   weightKg: '',
@@ -54,19 +54,21 @@ export function ProfileForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 簡易バリデーション
-    if (!values.mealsPerDay || Number(values.mealsPerDay) < 1) {
-      setFieldError('1日のメイン食事回数を正しく入力してください。');
+    // 簡易バリデーション（必要になったら強化）
+    if (!values.birthdate) {
+      setFieldError('生年月日を入力してください。');
       return;
     }
-
-    // 身長・体重の数値チェック（あれば）
-    if (values.heightCm && Number(values.heightCm) <= 0) {
+    if (!values.heightCm || Number(values.heightCm) <= 0) {
       setFieldError('身長は0より大きい値を入力してください。');
       return;
     }
-    if (values.weightKg && Number(values.weightKg) <= 0) {
+    if (!values.weightKg || Number(values.weightKg) <= 0) {
       setFieldError('体重は0より大きい値を入力してください。');
+      return;
+    }
+    if (!values.mealsPerDay || Number(values.mealsPerDay) < 1) {
+      setFieldError('1日のメイン食事回数を正しく入力してください。');
       return;
     }
 
@@ -91,7 +93,7 @@ export function ProfileForm({
           value={values.sex}
           onChange={handleChange('sex')}
         >
-          <option value="unspecified">選択しない</option>
+          <option value="undisclosed">選択しない</option>
           <option value="male">男性</option>
           <option value="female">女性</option>
           <option value="other">その他</option>
@@ -100,7 +102,7 @@ export function ProfileForm({
 
       {/* birthdate */}
       <div>
-        <Label htmlFor="birthdate">生年月日（任意）</Label>
+        <Label htmlFor="birthdate">生年月日</Label>
         <Input
           id="birthdate"
           type="date"

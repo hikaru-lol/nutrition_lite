@@ -1,3 +1,4 @@
+// frontend/app/(public)/auth/register/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -8,7 +9,8 @@ import {
   RegisterForm,
   type RegisterFormValues,
 } from '@/components/auth/RegisterForm';
-// import { register, fetchMe } from "@/lib/api/auth"; // 実装予定
+import { register } from '@/lib/api/auth';
+import { ApiError } from '@/lib/api/client';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -20,20 +22,25 @@ export default function RegisterPage() {
       setIsSubmitting(true);
       setServerError(null);
 
-      // TODO: 実際のAPI呼び出しに差し替え
-      // await register(values.name, values.email, values.password);
-      // const me = await fetchMe();
-      // if (!me.hasProfile) {
-      //   router.push("/onboarding/profile");
-      // } else {
-      //   router.push("/");
-      // }
-
-      router.push('/onboarding/profile');
-    } catch (e: any) {
-      setServerError(
-        e?.message ?? '登録に失敗しました。時間をおいて再度お試しください。'
+      const user = await register(
+        values.name || null,
+        values.email,
+        values.password
       );
+
+      if (!user.hasProfile) {
+        router.push('/onboarding/profile');
+      } else {
+        router.push('/');
+      }
+    } catch (e: any) {
+      if (e instanceof ApiError && e.status === 409) {
+        setServerError('このメールアドレスは既に登録されています。');
+      } else {
+        setServerError(
+          e?.message ?? '登録に失敗しました。時間をおいて再度お試しください。'
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }

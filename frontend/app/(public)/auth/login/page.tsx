@@ -1,3 +1,4 @@
+// frontend/app/(public)/auth/login/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -5,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { LoginForm, type LoginFormValues } from '@/components/auth/LoginForm';
-// import { login, fetchMe } from "@/lib/api/auth"; // 実装予定
+import { login } from '@/lib/api/auth';
+import { ApiError } from '@/lib/api/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,21 +19,22 @@ export default function LoginPage() {
       setIsSubmitting(true);
       setServerError(null);
 
-      // TODO: 実際のAPI呼び出しに差し替え
-      // await login(values.email, values.password);
-      // const me = await fetchMe();
-      // if (!me.hasProfile) {
-      //   router.push("/onboarding/profile");
-      // } else {
-      //   router.push("/");
-      // }
+      const user = await login(values.email, values.password);
 
-      // 一旦はダミー遷移
-      router.push('/');
+      if (!user.hasProfile) {
+        router.push('/onboarding/profile');
+      } else {
+        router.push('/');
+      }
     } catch (e: any) {
-      setServerError(
-        e?.message ?? 'ログインに失敗しました。時間をおいて再度お試しください。'
-      );
+      if (e instanceof ApiError && e.status === 401) {
+        setServerError('メールアドレスかパスワードが正しくありません。');
+      } else {
+        setServerError(
+          e?.message ??
+            'ログインに失敗しました。時間をおいて再度お試しください。'
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }

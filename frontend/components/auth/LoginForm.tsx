@@ -1,3 +1,4 @@
+// frontend/components/auth/LoginForm.tsx
 'use client';
 
 import * as React from 'react';
@@ -28,7 +29,6 @@ export function LoginForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 簡易バリデーション
     if (!email || !password) {
       setFieldError('メールアドレスとパスワードを入力してください。');
       return;
@@ -40,14 +40,9 @@ export function LoginForm({
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      {fieldError && (
+      {(fieldError || serverError) && (
         <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
-          {fieldError}
-        </p>
-      )}
-      {serverError && (
-        <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
-          {serverError}
+          {fieldError || serverError}
         </p>
       )}
 

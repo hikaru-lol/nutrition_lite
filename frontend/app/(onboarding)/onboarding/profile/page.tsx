@@ -1,3 +1,4 @@
+// frontend/app/(onboarding)/onboarding/profile/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -6,8 +7,12 @@ import {
   ProfileForm,
   type ProfileFormValues,
 } from '@/components/profile/ProfileForm';
-// import { fetchProfile, upsertProfile } from "@/lib/api/profile";
-// import { fetchMe } from "@/lib/api/auth";
+import {
+  fetchProfile,
+  upsertProfile,
+  type ProfileResponseApi,
+} from '@/lib/api/profile';
+import { ApiError } from '@/lib/api/client';
 
 export default function OnboardingProfilePage() {
   const router = useRouter();
@@ -18,30 +23,38 @@ export default function OnboardingProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // 初期表示時に /profile を読みに行く（あればプリセット）
+  // 初期ロードで /profile/me を取得（あればフォームに反映）
   useEffect(() => {
+    let cancelled = false;
+
     const load = async () => {
       try {
         setIsLoading(true);
         setServerError(null);
-        // TODO: 実際のAPI呼び出しに置き換え
-        // const profile = await fetchProfile();
-        // if (profile) {
-        //   setInitialValues({
-        //     sex: profile.sex,
-        //     birthdate: profile.birthdate ?? "",
-        //     heightCm: profile.height_cm?.toString() ?? "",
-        //     weightKg: profile.weight_kg?.toString() ?? "",
-        //     mealsPerDay: profile.meals_per_day.toString(),
-        //   });
-        // }
+
+        const profile = await fetchProfile();
+        if (cancelled) return;
+
+        setInitialValues(mapApiToFormValues(profile));
       } catch (e: any) {
-        setServerError(e?.message ?? 'プロフィールの取得に失敗しました。');
+        if (e instanceof ApiError && e.status === 404) {
+          // プロフィール未作成 → initialValues は undefined のまま
+          if (!cancelled) setInitialValues(undefined);
+        } else {
+          console.error('Failed to fetch profile', e);
+          if (!cancelled) {
+            setServerError(e?.message ?? 'プロフィールの取得に失敗しました。');
+          }
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
+
     load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSubmit = async (values: ProfileFormValues) => {
@@ -49,25 +62,15 @@ export default function OnboardingProfilePage() {
       setIsSubmitting(true);
       setServerError(null);
 
-      // TODO: 実際のAPI用に整形して送信
-      // await upsertProfile({
-      //   sex: values.sex,
-      //   birthdate: values.birthdate || null,
-      //   height_cm: values.heightCm ? Number(values.heightCm) : null,
-      //   weight_kg: values.weightKg ? Number(values.weightKg) : null,
-      //   meals_per_day: Number(values.mealsPerDay),
-      // });
+      // フォーム値 → API リクエスト形式に変換
+      const body = mapFormToApiRequest(values);
+      await upsertProfile(body);
 
-      // const me = await fetchMe();
-      // if (me.hasProfile) {
-      //   router.push("/");
-      // } else {
-      //   router.push("/");
-      // }
-
-      // ひとまずダミーでトップに遷移
+      // バックエンド側で has_profile が true になる前提なので、
+      // ここではそのまま Today に飛ばしてOK
       router.push('/');
     } catch (e: any) {
+      console.error('Failed to save profile', e);
       setServerError(e?.message ?? 'プロフィールの保存に失敗しました。');
     } finally {
       setIsSubmitting(false);
@@ -91,4 +94,24 @@ export default function OnboardingProfilePage() {
       submitLabel="保存してはじめる"
     />
   );
+}
+
+function mapApiToFormValues(profile: ProfileResponseApi): ProfileFormValues {
+  return {
+    sex: profile.sex,
+    birthdate: profile.birthdate,
+    heightCm: profile.height_cm.toString(),
+    weightKg: profile.weight_kg.toString(),
+    mealsPerDay: profile.meals_per_day ? profile.meals_per_day.toString() : '3',
+  };
+}
+
+function mapFormToApiRequest(values: ProfileFormValues) {
+  return {
+    sex: values.sex,
+    birthdate: values.birthdate,
+    height_cm: Number(values.heightCm),
+    weight_kg: Number(values.weightKg),
+    meals_per_day: Number(values.mealsPerDay),
+  };
 }

@@ -1,3 +1,4 @@
+// frontend/app/(onboarding)/onboarding/layout.tsx
 import type { ReactNode } from 'react';
 
 export default function OnboardingLayout({

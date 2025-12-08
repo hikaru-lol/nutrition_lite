@@ -1,22 +1,21 @@
+// frontend/components/layout/AppHeader.tsx
 'use client';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
+type Plan = 'trial' | 'free' | 'paid';
+
 type AppHeaderProps = {
   appName?: string;
   userName?: string;
-  plan?: 'trial' | 'free' | 'paid';
+  plan?: Plan;
   trialEndsAt?: string | null;
   onLogout?: () => void;
 };
 
-function renderPlanBadge(
-  plan?: 'trial' | 'free' | 'paid',
-  trialEndsAt?: string | null
-) {
+function renderPlanBadge(plan?: Plan, trialEndsAt?: string | null) {
   if (!plan) return null;
-
   if (plan === 'trial') {
     return (
       <Badge variant="warning">
@@ -29,11 +28,9 @@ function renderPlanBadge(
       </Badge>
     );
   }
-
   if (plan === 'paid') {
     return <Badge variant="success">PAID</Badge>;
   }
-
   return <Badge variant="default">FREE</Badge>;
 }
 

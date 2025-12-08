@@ -1,15 +1,39 @@
-export type CurrentUser = {
-  id: string;
-  name: string;
-  plan: 'trial' | 'free' | 'paid';
-  trialEndsAt?: string | null;
-  hasProfile: boolean;
-};
+// frontend/lib/hooks/useCurrentUser.ts
+'use client';
 
-export function useCurrentUser(): {
-  user: CurrentUser | null;
-  isLoading: boolean;
-} {
-  // 実装は後でAPI連携
-  return { user: null, isLoading: true };
+import { useEffect, useState } from 'react';
+import { fetchMe, type CurrentUser } from '@/lib/api/auth';
+import { ApiError } from '@/lib/api/client';
+
+export function useCurrentUser() {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const me = await fetchMe();
+        if (!cancelled) setUser(me);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          // 未ログイン
+          if (!cancelled) setUser(null);
+        } else {
+          console.error('Failed to fetch current user', e);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { user, isLoading };
 }

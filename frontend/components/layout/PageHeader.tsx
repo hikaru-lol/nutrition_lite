@@ -1,3 +1,4 @@
+// frontend/components/layout/PageHeader.tsx
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 

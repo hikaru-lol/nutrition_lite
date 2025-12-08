@@ -1,3 +1,4 @@
+// frontend/components/meals/MealsPage.tsx
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -7,6 +8,11 @@ import { MainMealsSection } from './MainMealsSection';
 import { SnackMealsSection } from './SnackMealsSection';
 import { MealItemDialog, type MealItemFormValues } from './MealItemDialog';
 import { useMealsByDate } from '@/lib/hooks/useMealsByDate';
+import {
+  createMealItem,
+  updateMealItem,
+  deleteMealItem,
+} from '@/lib/api/meals';
 
 export function MealsPage() {
   const router = useRouter();
@@ -15,7 +21,7 @@ export function MealsPage() {
   const today = new Date().toISOString().slice(0, 10);
   const date = paramDate ?? today;
 
-  const { data, isLoading, error } = useMealsByDate(date);
+  const { data, isLoading, error, refresh } = useMealsByDate(date);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
@@ -27,6 +33,8 @@ export function MealsPage() {
   const [initialFormValues, setInitialFormValues] = useState<
     Partial<MealItemFormValues> | undefined
   >(undefined);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [dialogSubmitting, setDialogSubmitting] = useState(false);
 
   const changeDate = (newDate: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -47,6 +55,7 @@ export function MealsPage() {
     setDialogMealIndex(mealIndex);
     setEditingItemId(null);
     setInitialFormValues(undefined);
+    setDialogError(null);
     setDialogOpen(true);
   };
 
@@ -65,24 +74,77 @@ export function MealsPage() {
     setEditingItemId(entryId);
     setInitialFormValues({
       name: item.name,
-      amountValue: '', // TODO: parse amountText から復元するなら
+      amountValue: '', // amountText から値と単位を厳密に復元するのは後でやってもOK
       amountUnit: '',
       servingCount: '',
       note: item.note ?? '',
     });
+    setDialogError(null);
     setDialogOpen(true);
   };
 
   const handleSubmitDialog = async (values: MealItemFormValues) => {
-    // TODO: 実際の API 呼び出し:
-    // if (dialogMode === "create") { POST /meal-items }
-    // if (dialogMode === "edit") { PATCH /meal-items/{editingItemId} }
-    // その後 useMealsByDate の再フェッチ
-    setDialogOpen(false);
+    try {
+      setDialogSubmitting(true);
+      setDialogError(null);
+
+      const amountValue = values.amountValue
+        ? Number(values.amountValue)
+        : null;
+      const servingCount = values.servingCount
+        ? Number(values.servingCount)
+        : null;
+      const amountUnit = values.amountUnit || null;
+      const note = values.note || null;
+
+      if (dialogMode === 'create') {
+        await createMealItem({
+          date,
+          meal_type: dialogMealType,
+          meal_index: dialogMealType === 'main' ? dialogMealIndex : null,
+          name: values.name,
+          amount_value: amountValue,
+          amount_unit: amountUnit,
+          serving_count: servingCount,
+          note,
+        });
+      } else {
+        if (!editingItemId) {
+          throw new Error('編集対象のIDがありません。');
+        }
+        await updateMealItem(editingItemId, {
+          date,
+          meal_type: dialogMealType,
+          meal_index: dialogMealType === 'main' ? dialogMealIndex : null,
+          name: values.name,
+          amount_value: amountValue,
+          amount_unit: amountUnit,
+          serving_count: servingCount,
+          note,
+        });
+      }
+
+      setDialogOpen(false);
+      refresh();
+    } catch (e: any) {
+      console.error('Failed to save meal item', e);
+      setDialogError(
+        e?.message ?? '食事の保存に失敗しました。入力内容を確認してください。'
+      );
+    } finally {
+      setDialogSubmitting(false);
+    }
   };
 
   const handleDeleteItem = async (entryId: string) => {
-    // TODO: DELETE /meal-items/{entryId} → 再フェッチ
+    if (!confirm('この記録を削除しますか？')) return;
+    try {
+      await deleteMealItem(entryId);
+      refresh();
+    } catch (e) {
+      console.error('Failed to delete meal item', e);
+      alert('削除に失敗しました。時間をおいて再度お試しください。');
+    }
   };
 
   if (isLoading) {
@@ -136,6 +198,8 @@ export function MealsPage() {
         initialValues={initialFormValues}
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmitDialog}
+        isSubmitting={dialogSubmitting}
+        errorMessage={dialogError}
       />
     </>
   );

@@ -1,7 +1,8 @@
+// frontend/components/layout/AppSidebar.tsx
 'use client';
 
-import { NavLink } from './NavLink';
 import { usePathname } from 'next/navigation';
+import { NavLink } from './NavLink';
 
 export function AppSidebar() {
   const pathname = usePathname();
