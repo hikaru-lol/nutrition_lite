@@ -1,12 +1,25 @@
 // frontend/lib/api/client.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api/v1';
 
+// バックエンドの ErrorResponse に対応する最低限の型
+type ErrorPayload = {
+  error?: {
+    code?: string;
+    message?: string;
+  };
+  message?: string;
+};
+
 export class ApiError extends Error {
   status: number;
-  body: any;
+  body: unknown | ErrorPayload;
 
-  constructor(status: number, body: any) {
-    super(body?.error?.message ?? body?.message ?? `API Error (${status})`);
+  constructor(status: number, body: unknown | ErrorPayload) {
+    const errorMessage =
+      (body as ErrorPayload)?.error?.message ??
+      (body as ErrorPayload)?.message ??
+      `API Error (${status})`;
+    super(errorMessage);
     this.status = status;
     this.body = body;
   }
@@ -25,7 +38,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   const text = await res.text();
-  let data: any = null;
+  let data: unknown | null = null;
   if (text) {
     try {
       data = JSON.parse(text);

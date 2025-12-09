@@ -33,13 +33,15 @@ export default function RegisterPage() {
       } else {
         router.push('/');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 409) {
         setServerError('このメールアドレスは既に登録されています。');
       } else {
-        setServerError(
-          e?.message ?? '登録に失敗しました。時間をおいて再度お試しください。'
-        );
+        const message =
+          e instanceof Error
+            ? e.message
+            : '登録に失敗しました。時間をおいて再度お試しください。';
+        setServerError(message);
       }
     } finally {
       setIsSubmitting(false);

@@ -36,14 +36,18 @@ export default function OnboardingProfilePage() {
         if (cancelled) return;
 
         setInitialValues(mapApiToFormValues(profile));
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (e instanceof ApiError && e.status === 404) {
           // プロフィール未作成 → initialValues は undefined のまま
           if (!cancelled) setInitialValues(undefined);
         } else {
           console.error('Failed to fetch profile', e);
           if (!cancelled) {
-            setServerError(e?.message ?? 'プロフィールの取得に失敗しました。');
+            const message =
+              e instanceof Error
+                ? e.message
+                : 'プロフィールの取得に失敗しました。';
+            setServerError(message);
           }
         }
       } finally {
@@ -69,9 +73,11 @@ export default function OnboardingProfilePage() {
       // バックエンド側で has_profile が true になる前提なので、
       // ここではそのまま Today に飛ばしてOK
       router.push('/');
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Failed to save profile', e);
-      setServerError(e?.message ?? 'プロフィールの保存に失敗しました。');
+      const message =
+        e instanceof Error ? e.message : 'プロフィールの保存に失敗しました。';
+      setServerError(message);
     } finally {
       setIsSubmitting(false);
     }

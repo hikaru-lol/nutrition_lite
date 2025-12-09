@@ -26,12 +26,12 @@ export default function LoginPage() {
       } else {
         router.push('/');
       }
-    } catch (e: any) {
-      if (e instanceof ApiError && e.status === 401) {
+    } catch (e: unknown) {
+      if (e instanceof ApiError && (e as ApiError).status === 401) {
         setServerError('メールアドレスかパスワードが正しくありません。');
       } else {
         setServerError(
-          e?.message ??
+          (e as Error & { message?: string })?.message ??
             'ログインに失敗しました。時間をおいて再度お試しください。'
         );
       }

@@ -36,14 +36,18 @@ export default function ProfilePage() {
         if (cancelled) return;
 
         setInitialValues(mapApiToFormValues(profile));
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (e instanceof ApiError && e.status === 404) {
           // プロフィール未作成 → 空フォームとして扱う
           if (!cancelled) setInitialValues(undefined);
         } else {
           console.error('Failed to fetch profile', e);
           if (!cancelled) {
-            setServerError(e?.message ?? 'プロフィールの取得に失敗しました。');
+            const message =
+              e instanceof Error
+                ? e.message
+                : 'プロフィールの取得に失敗しました。';
+            setServerError(message);
           }
         }
       } finally {
@@ -68,9 +72,11 @@ export default function ProfilePage() {
       // プロフィール編集の場合はそのままページに留まる or 軽いフィードバック
       // とりあえずリロードして最新を反映
       router.refresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Failed to save profile', e);
-      setServerError(e?.message ?? 'プロフィールの保存に失敗しました。');
+      const message =
+        e instanceof Error ? e.message : 'プロフィールの保存に失敗しました。';
+      setServerError(message);
     } finally {
       setIsSubmitting(false);
     }
