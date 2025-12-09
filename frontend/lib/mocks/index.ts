@@ -9,11 +9,10 @@
  * 2. 開発サーバーを再起動
  */
 
-export const isMockEnabled = () => {
-  if (typeof window === 'undefined') {
-    // サーバーサイドでは環境変数を直接確認
-    return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
-  }
-  // クライアントサイドでは window に設定された値を確認
-  return (window as any).__USE_MOCK__ === true;
+/**
+ * モックが有効化されているかどうかを判定
+ * @returns モックが有効化されている場合 true
+ */
+export const isMockEnabled = (): boolean => {
+  return process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 };

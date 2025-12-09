@@ -1,3 +1,5 @@
+// frontend/app/layout.tsx
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { JetBrains_Mono } from 'next/font/google';

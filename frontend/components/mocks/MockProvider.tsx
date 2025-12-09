@@ -1,18 +1,17 @@
 // frontend/components/mocks/MockProvider.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { isMockEnabled } from '@/lib/mocks';
 
 /**
  * 開発環境でMSWを有効化するコンポーネント
  * 環境変数 NEXT_PUBLIC_USE_MOCK が 'true' の場合のみ有効化
  */
 export function MockProvider({ children }: { children: React.ReactNode }) {
-  const [isMockEnabled, setIsMockEnabled] = useState(false);
-
   useEffect(() => {
     // 環境変数の確認
-    const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+    const useMock = isMockEnabled();
 
     if (useMock && typeof window !== 'undefined') {
       // クライアントサイドでのみMSWを初期化
@@ -28,7 +27,6 @@ export function MockProvider({ children }: { children: React.ReactNode }) {
             },
           });
           console.log('✅ MSWモックが有効化されました');
-          setIsMockEnabled(true);
         }
       };
 
