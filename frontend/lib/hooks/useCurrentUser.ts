@@ -13,6 +13,7 @@ export function useCurrentUser() {
     let cancelled = false;
 
     const load = async () => {
+      console.log('useCurrentUser load');
       try {
         setIsLoading(true);
         const me = await fetchMe();

@@ -37,6 +37,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
   });
 
+  console.log('request', res);
+
   const text = await res.text();
   let data: unknown | null = null;
   if (text) {
@@ -55,6 +57,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export function apiGet<T>(path: string): Promise<T> {
+  console.log('Client apiGet', `${API_BASE_URL}${path}`);
   return request<T>(path, { method: 'GET' });
 }
 

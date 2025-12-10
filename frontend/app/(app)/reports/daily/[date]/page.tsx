@@ -5,7 +5,7 @@ type PageProps = {
   params: { date: string };
 };
 
-export default function Page({ params }: PageProps) {
-  const { date } = params;
+export default async function Page({ params }: PageProps) {
+  const { date } = await params;
   return <DailyReportPage date={date} />;
 }

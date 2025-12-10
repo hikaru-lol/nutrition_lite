@@ -4,7 +4,7 @@ import type { UserSummaryApi, AuthUserResponse } from '@/lib/api/auth';
 import type { MealItemListResponse, MealItemResponse } from '@/lib/api/meals';
 import type { DailyNutritionReportResponse } from '@/lib/api/dailyReport';
 import type {
-  TargetListResponseApi,
+  // TargetListResponseApi,
   TargetResponseApi,
 } from '@/lib/api/targets';
 import type { ProfileResponseApi, ProfileRequestApi } from '@/lib/api/profile';
@@ -15,6 +15,8 @@ import type {
 import type { RecommendationResponseApi } from '@/lib/api/recommendation';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api/v1';
+
+console.log('Mock handlers API_BASE_URL', API_BASE_URL);
 
 // モックデータ
 const mockUser: UserSummaryApi = {
@@ -214,7 +216,7 @@ export const handlers = [
         { status: 404 }
       );
     }
-    return HttpResponse.json(null, { status: 204 });
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // 日次レポート関連
