@@ -13,13 +13,22 @@ import type {
   BillingPortalResponse,
 } from '@/lib/api/billing';
 import type { RecommendationResponseApi } from '@/lib/api/recommendation';
+import type {
+  MealNutritionSummaryApi,
+  DailyNutritionSummaryApi,
+  MealAndDailyNutritionResponse,
+} from '@/lib/api/nutrition';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api/v1';
 
 console.log('Mock handlers API_BASE_URL', API_BASE_URL);
 
-// モックデータ
-const mockUser: UserSummaryApi = {
+/* ================================
+ * 認証 / ユーザー（インメモリ）
+ * ================================ */
+
+// 初期ユーザーデータ
+const initialUser: UserSummaryApi = {
   id: 'mock-user-id',
   email: 'test@example.com',
   name: 'テストユーザー',
@@ -29,7 +38,15 @@ const mockUser: UserSummaryApi = {
   created_at: new Date().toISOString(),
 };
 
-const mockMealItems: MealItemResponse[] = [
+// インメモリ「現在のユーザー」
+let currentUser: UserSummaryApi = { ...initialUser };
+
+/* ================================
+ * 食事（インメモリ）
+ * ================================ */
+
+// 初期データ
+const initialMealItems: MealItemResponse[] = [
   {
     id: 'meal-1',
     date: new Date().toISOString().split('T')[0],
@@ -54,7 +71,15 @@ const mockMealItems: MealItemResponse[] = [
   },
 ];
 
-const mockDailyReport: DailyNutritionReportResponse = {
+// インメモリ「食事DB」
+const mealItems: MealItemResponse[] = [...initialMealItems];
+
+/* ================================
+ * 日次レポート（インメモリ）
+ * ================================ */
+
+// ひとつのレポートの初期値
+const initialDailyReport: DailyNutritionReportResponse = {
   date: new Date().toISOString().split('T')[0],
   summary: '本日の栄養バランスは良好です。',
   good_points: ['タンパク質の摂取量が適切です', '野菜をしっかり摂れています'],
@@ -66,7 +91,16 @@ const mockDailyReport: DailyNutritionReportResponse = {
   created_at: new Date().toISOString(),
 };
 
-const mockTargets: TargetResponseApi[] = [
+// 日付ごとのレポートを保持（超ざっくりインメモリDB）
+const dailyReports: Record<string, DailyNutritionReportResponse> = {
+  [initialDailyReport.date]: initialDailyReport,
+};
+
+/* ================================
+ * ターゲット（インメモリ）
+ * ================================ */
+
+const initialTargets: TargetResponseApi[] = [
   {
     id: 'target-1',
     user_id: 'mock-user-id',
@@ -102,7 +136,14 @@ const mockTargets: TargetResponseApi[] = [
   },
 ];
 
-const mockProfile: ProfileResponseApi = {
+// インメモリ「ターゲットDB」
+let targets: TargetResponseApi[] = [...initialTargets];
+
+/* ================================
+ * プロフィール（インメモリ）
+ * ================================ */
+
+const initialProfile: ProfileResponseApi = {
   user_id: 'mock-user-id',
   sex: 'male',
   birthdate: '1990-01-01',
@@ -114,7 +155,13 @@ const mockProfile: ProfileResponseApi = {
   updated_at: new Date().toISOString(),
 };
 
-const mockRecommendation: RecommendationResponseApi = {
+let currentProfile: ProfileResponseApi = { ...initialProfile };
+
+/* ================================
+ * レコメンデーション（インメモリ）
+ * ================================ */
+
+const initialRecommendation: RecommendationResponseApi = {
   id: 'rec-1',
   user_id: 'mock-user-id',
   generated_for_date: new Date().toISOString().split('T')[0],
@@ -127,19 +174,74 @@ const mockRecommendation: RecommendationResponseApi = {
   created_at: new Date().toISOString(),
 };
 
+// インメモリ「レコメンDB」
+const recommendations: RecommendationResponseApi[] = [initialRecommendation];
+
+/* ================================
+ * 栄養計算（擬似）
+ * ================================ */
+
+function computeMockNutrients(
+  entries: MealItemResponse[]
+): NutritionNutrientIntakeApi[] {
+  // amount_value を適当に PFC に割り振る簡易ロジック
+  let totalAmount = 0;
+  for (const e of entries) {
+    if (typeof e.amount_value === 'number') {
+      totalAmount += e.amount_value;
+    }
+  }
+
+  // 適当な比率で割り振る（例：炭水化物50%, タンパク質30%, 脂質20%)
+  const energy = totalAmount * 2; // 適当な "kcal" っぽい値
+  const carb = totalAmount * 0.5;
+  const protein = totalAmount * 0.3;
+  const fat = totalAmount * 0.2;
+
+  const nutrients: NutritionNutrientIntakeApi[] = [
+    {
+      code: 'carbohydrate',
+      amount: Math.round(carb),
+      unit: 'g',
+      source: 'llm',
+    },
+    {
+      code: 'protein',
+      amount: Math.round(protein),
+      unit: 'g',
+      source: 'llm',
+    },
+    {
+      code: 'fat',
+      amount: Math.round(fat),
+      unit: 'g',
+      source: 'llm',
+    },
+    // 必要なら他の栄養素も適当に追加
+  ];
+
+  return nutrients;
+}
+
 export const handlers = [
-  // 認証関連
+  /* ========== Auth ========== */
+
   http.get(`${API_BASE_URL}/auth/me`, () => {
     return HttpResponse.json<AuthUserResponse>({
-      user: mockUser,
+      user: currentUser,
     });
   }),
 
   http.post(`${API_BASE_URL}/auth/login`, async ({ request }) => {
     const body = (await request.json()) as { email: string; password: string };
-    // モックでは常に成功
+
+    currentUser = {
+      ...currentUser,
+      email: body.email,
+    };
+
     return HttpResponse.json<AuthUserResponse>({
-      user: { ...mockUser, email: body.email },
+      user: currentUser,
     });
   }),
 
@@ -149,26 +251,31 @@ export const handlers = [
       password: string;
       name?: string;
     };
+
+    currentUser = {
+      ...currentUser,
+      email: body.email,
+      name: body.name ?? null,
+    };
+
     return HttpResponse.json<AuthUserResponse>({
-      user: {
-        ...mockUser,
-        email: body.email,
-        name: body.name ?? null,
-      },
+      user: currentUser,
     });
   }),
 
   http.post(`${API_BASE_URL}/auth/logout`, () => {
+    // とりあえず何もしないで OK を返す
     return HttpResponse.json({ ok: true });
   }),
 
-  // 食事関連
+  /* ========== Meal Items ========== */
+
   http.get(`${API_BASE_URL}/meal-items`, ({ request }) => {
     const url = new URL(request.url);
     const date = url.searchParams.get('date');
 
     return HttpResponse.json<MealItemListResponse>({
-      items: mockMealItems.map((item) => ({
+      items: mealItems.map((item) => ({
         ...item,
         date: date ?? item.date,
       })),
@@ -188,65 +295,89 @@ export const handlers = [
       serving_count: body.serving_count ?? null,
       note: body.note ?? null,
     };
+
+    mealItems.push(newItem);
+
     return HttpResponse.json<MealItemResponse>(newItem, { status: 201 });
   }),
 
   http.patch(`${API_BASE_URL}/meal-items/:id`, async ({ params, request }) => {
     const body = (await request.json()) as Partial<MealItemResponse>;
-    const existingItem = mockMealItems.find((item) => item.id === params.id);
+    const index = mealItems.findIndex((item) => item.id === params.id);
 
-    if (!existingItem) {
+    if (index === -1) {
       return HttpResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Meal item not found' } },
         { status: 404 }
       );
     }
 
-    return HttpResponse.json<MealItemResponse>({
-      ...existingItem,
+    const updated: MealItemResponse = {
+      ...mealItems[index],
       ...body,
-    });
+    };
+
+    mealItems[index] = updated;
+
+    return HttpResponse.json<MealItemResponse>(updated);
   }),
 
   http.delete(`${API_BASE_URL}/meal-items/:id`, ({ params }) => {
-    const exists = mockMealItems.some((item) => item.id === params.id);
-    if (!exists) {
+    const index = mealItems.findIndex((item) => item.id === params.id);
+
+    if (index === -1) {
       return HttpResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Meal item not found' } },
         { status: 404 }
       );
     }
+
+    mealItems.splice(index, 1);
+
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // 日次レポート関連
+  /* ========== Daily Nutrition Report ========== */
+
   http.get(`${API_BASE_URL}/nutrition/daily/report`, ({ request }) => {
     const url = new URL(request.url);
-    const date = url.searchParams.get('date');
+    const date = url.searchParams.get('date') ?? initialDailyReport.date;
 
-    return HttpResponse.json<DailyNutritionReportResponse>({
-      ...mockDailyReport,
-      date: date ?? mockDailyReport.date,
-    });
+    const report =
+      dailyReports[date] ??
+      ({
+        ...initialDailyReport,
+        date,
+      } satisfies DailyNutritionReportResponse);
+
+    return HttpResponse.json<DailyNutritionReportResponse>(report);
   }),
 
   http.post(`${API_BASE_URL}/nutrition/daily/report`, async ({ request }) => {
     const body = (await request.json()) as { date: string };
-    return HttpResponse.json<DailyNutritionReportResponse>({
-      ...mockDailyReport,
-      date: body.date,
-    });
+    const date = body.date;
+
+    const newReport: DailyNutritionReportResponse = {
+      ...initialDailyReport,
+      date,
+      created_at: new Date().toISOString(),
+    };
+
+    dailyReports[date] = newReport;
+
+    return HttpResponse.json<DailyNutritionReportResponse>(newReport);
   }),
 
-  // ターゲット関連
+  /* ========== Targets ========== */
+
   http.get(`${API_BASE_URL}/targets`, () => {
     return HttpResponse.json<{ items: TargetResponseApi[] }>({
-      items: mockTargets,
+      items: targets,
     });
   }),
 
   http.get(`${API_BASE_URL}/targets/active`, () => {
-    const activeTarget = mockTargets.find((t) => t.is_active);
+    const activeTarget = targets.find((t) => t.is_active);
     if (!activeTarget) {
       return HttpResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Active target not found' } },
@@ -272,38 +403,50 @@ export const handlers = [
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+
+    targets.push(newTarget);
+
     return HttpResponse.json<TargetResponseApi>(newTarget, { status: 201 });
   }),
 
   http.post(`${API_BASE_URL}/targets/:id/activate`, ({ params }) => {
-    const target = mockTargets.find((t) => t.id === params.id);
-    if (!target) {
+    const index = targets.findIndex((t) => t.id === params.id);
+    if (index === -1) {
       return HttpResponse.json(
         { error: { code: 'NOT_FOUND', message: 'Target not found' } },
         { status: 404 }
       );
     }
-    return HttpResponse.json<TargetResponseApi>({
-      ...target,
-      is_active: true,
-    });
+
+    // シンプルにそのターゲットだけ active にする例
+    targets = targets.map((t, i) => ({
+      ...t,
+      is_active: i === index,
+    }));
+
+    return HttpResponse.json<TargetResponseApi>(targets[index]);
   }),
 
-  // プロフィール関連
+  /* ========== Profile ========== */
+
   http.get(`${API_BASE_URL}/profile/me`, () => {
-    return HttpResponse.json<ProfileResponseApi>(mockProfile);
+    return HttpResponse.json<ProfileResponseApi>(currentProfile);
   }),
 
   http.put(`${API_BASE_URL}/profile/me`, async ({ request }) => {
     const body = (await request.json()) as ProfileRequestApi;
-    return HttpResponse.json<ProfileResponseApi>({
-      ...mockProfile,
+
+    currentProfile = {
+      ...currentProfile,
       ...body,
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    return HttpResponse.json<ProfileResponseApi>(currentProfile);
   }),
 
-  // 請求関連
+  /* ========== Billing（状態なしでOK） ========== */
+
   http.post(`${API_BASE_URL}/billing/checkout-session`, () => {
     return HttpResponse.json<CheckoutSessionResponse>({
       checkout_url: 'https://checkout.stripe.com/mock-session',
@@ -316,28 +459,115 @@ export const handlers = [
     });
   }),
 
-  // レコメンデーション関連
+  /* ========== Recommendation ========== */
+
   http.get(`${API_BASE_URL}/nutrition/recommendation/latest`, () => {
-    return HttpResponse.json<RecommendationResponseApi>(mockRecommendation);
+    // 一番新しいもの（created_at 降順）を返す
+    const latest =
+      recommendations
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0] ?? initialRecommendation;
+
+    return HttpResponse.json<RecommendationResponseApi>(latest);
   }),
 
   http.get(`${API_BASE_URL}/nutrition/recommendation`, ({ request }) => {
     const url = new URL(request.url);
     const date = url.searchParams.get('date');
 
-    return HttpResponse.json<RecommendationResponseApi>({
-      ...mockRecommendation,
-      generated_for_date: date ?? mockRecommendation.generated_for_date,
-    });
+    if (!date) {
+      // date がないときは latest と同じ扱い
+      const latest =
+        recommendations
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )[0] ?? initialRecommendation;
+
+      return HttpResponse.json<RecommendationResponseApi>(latest);
+    }
+
+    const found =
+      recommendations.find((rec) => rec.generated_for_date === date) ??
+      ({
+        ...initialRecommendation,
+        generated_for_date: date,
+      } satisfies RecommendationResponseApi);
+
+    return HttpResponse.json<RecommendationResponseApi>(found);
   }),
 
   http.post(`${API_BASE_URL}/nutrition/recommendation`, async ({ request }) => {
     const body = (await request.json()) as { base_date: string };
-    return HttpResponse.json<RecommendationResponseApi>({
-      ...mockRecommendation,
+
+    const newRec: RecommendationResponseApi = {
+      ...initialRecommendation,
       id: `rec-${Date.now()}`,
       generated_for_date: body.base_date,
       created_at: new Date().toISOString(),
+    };
+
+    recommendations.push(newRec);
+
+    return HttpResponse.json<RecommendationResponseApi>(newRec);
+  }),
+
+  /* ========== Daily Meal Nutrition (/nutrition/meal) ========== */
+
+  http.get(`${API_BASE_URL}/nutrition/meal`, ({ request }) => {
+    const url = new URL(request.url);
+    const date =
+      url.searchParams.get('date') ?? new Date().toISOString().split('T')[0];
+    const mealType =
+      (url.searchParams.get('meal_type') as 'main' | 'snack') ?? 'main';
+    const mealIndexParam = url.searchParams.get('meal_index');
+    const mealIndex =
+      mealType === 'main' && mealIndexParam ? Number(mealIndexParam) : null;
+
+    // 対象ミールに紐づく FoodEntry を抽出
+    const mealEntries = mealItems.filter((item) => {
+      if (item.date !== date) return false;
+      if (item.meal_type !== mealType) return false;
+      if (mealType === 'main') {
+        return item.meal_index === mealIndex;
+      }
+      // snack のときは meal_index は見ない
+      return item.meal_type === 'snack';
     });
+
+    // その日の全 FoodEntry から Daily 用も作る
+    const dailyEntries = mealItems.filter((item) => item.date === date);
+
+    // めちゃくちゃ簡易な擬似計算（実際のロジックはバックエンド側に任せる）
+    const mealNutrients = computeMockNutrients(mealEntries);
+    const dailyNutrients = computeMockNutrients(dailyEntries);
+
+    const mealSummary: MealNutritionSummaryApi = {
+      id: `meal-nut-${mealType}-${mealIndex ?? 'snack'}`,
+      date,
+      meal_type: mealType,
+      meal_index: mealIndex,
+      nutrients: mealNutrients,
+      generated_at: new Date().toISOString(),
+    };
+
+    const dailySummary: DailyNutritionSummaryApi = {
+      id: `daily-nut-${date}`,
+      date,
+      nutrients: dailyNutrients,
+      generated_at: new Date().toISOString(),
+    };
+
+    const response: MealAndDailyNutritionResponse = {
+      meal: mealSummary,
+      daily: dailySummary,
+    };
+
+    return HttpResponse.json<MealAndDailyNutritionResponse>(response);
   }),
 ];

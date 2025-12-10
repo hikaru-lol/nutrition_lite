@@ -1,4 +1,4 @@
-// components/meals/MealItemDialog.tsx
+// frontend/components/meals/MealItemDialog.tsx
 'use client';
 
 import * as React from 'react';
@@ -22,6 +22,8 @@ export type MealItemDialogProps = {
   initialValues?: Partial<MealItemFormValues>;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: MealItemFormValues) => Promise<void> | void;
+  isSubmitting?: boolean;
+  errorMessage?: string | null;
 };
 
 const defaultValues: MealItemFormValues = {
@@ -40,20 +42,22 @@ export function MealItemDialog({
   initialValues,
   onOpenChange,
   onSubmit,
+  isSubmitting = false,
+  errorMessage,
 }: MealItemDialogProps) {
   const [values, setValues] = React.useState<MealItemFormValues>({
     ...defaultValues,
     ...initialValues,
   });
 
+  const [fieldError, setFieldError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (open) {
       setValues({ ...defaultValues, ...initialValues });
+      setFieldError(null);
     }
   }, [open, initialValues]);
-
-  const [fieldError, setFieldError] = React.useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleChange =
     (field: keyof MealItemFormValues) =>
@@ -68,15 +72,12 @@ export function MealItemDialog({
       return;
     }
     setFieldError(null);
-    setIsSubmitting(true);
     await onSubmit(values);
-    setIsSubmitting(false);
   };
 
-  if (!open) return null; // 後でちゃんとモーダルにする。ここでは簡易実装。
+  if (!open) return null;
 
   const title = mode === 'create' ? '食事を追加' : '食事を編集';
-
   const subtitle =
     mealType === 'main'
       ? mealIndex
@@ -93,9 +94,9 @@ export function MealItemDialog({
         </div>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
-          {fieldError && (
+          {(fieldError || errorMessage) && (
             <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
-              {fieldError}
+              {fieldError || errorMessage}
             </p>
           )}
 

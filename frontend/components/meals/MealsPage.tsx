@@ -3,16 +3,17 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { MealsHeader } from './MealsHeader';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Card } from '@/components/ui/card';
+import { useMealsByDate, type MealSlot } from '@/lib/hooks/useMealsByDate';
+import {
+  recomputeMealAndDailyNutrition,
+  type MealNutritionSummaryApi,
+  type DailyNutritionSummaryApi,
+} from '@/lib/api/nutrition';
+import { MealItemDialog, type MealItemFormValues } from './MealItemDialog';
 import { MainMealsSection } from './MainMealsSection';
 import { SnackMealsSection } from './SnackMealsSection';
-import { MealItemDialog, type MealItemFormValues } from './MealItemDialog';
-import { useMealsByDate } from '@/lib/hooks/useMealsByDate';
-import {
-  createMealItem,
-  updateMealItem,
-  deleteMealItem,
-} from '@/lib/api/meals';
 
 export function MealsPage() {
   const router = useRouter();
@@ -33,8 +34,19 @@ export function MealsPage() {
   const [initialFormValues, setInitialFormValues] = useState<
     Partial<MealItemFormValues> | undefined
   >(undefined);
+
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [dialogSubmitting, setDialogSubmitting] = useState(false);
+
+  const [mealNutritions, setMealNutritions] = useState<
+    Record<string, MealNutritionSummaryApi>
+  >({});
+  const [dailyNutrition, setDailyNutrition] =
+    useState<DailyNutritionSummaryApi | null>(null);
+  const [nutritionLoadingKey, setNutritionLoadingKey] = useState<string | null>(
+    null
+  );
+  const [nutritionError, setNutritionError] = useState<string | null>(null);
 
   const changeDate = (newDate: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -62,7 +74,7 @@ export function MealsPage() {
   const openEditDialog = (entryId: string) => {
     if (!data) return;
     const allItems = [
-      ...data.mainSlots.flatMap((s) => s.items),
+      ...data.mainSlots.flatMap((s: MealSlot) => s.items),
       ...data.snacks,
     ];
     const item = allItems.find((i) => i.id === entryId);
@@ -70,11 +82,11 @@ export function MealsPage() {
 
     setDialogMode('edit');
     setDialogMealType(item.mealType);
-    setDialogMealIndex(item.mealIndex);
+    setDialogMealIndex(item.mealIndex ?? null);
     setEditingItemId(entryId);
     setInitialFormValues({
       name: item.name,
-      amountValue: '', // amountText から値と単位を厳密に復元するのは後でやってもOK
+      amountValue: '', // amountText から復元するならここでパース
       amountUnit: '',
       servingCount: '',
       note: item.note ?? '',
@@ -98,6 +110,8 @@ export function MealsPage() {
       const note = values.note || null;
 
       if (dialogMode === 'create') {
+        // createMealItem は lib/api/meals.ts から import して使う想定
+        const { createMealItem } = await import('@/lib/api/meals');
         await createMealItem({
           date,
           meal_type: dialogMealType,
@@ -112,6 +126,7 @@ export function MealsPage() {
         if (!editingItemId) {
           throw new Error('編集対象のIDがありません。');
         }
+        const { updateMealItem } = await import('@/lib/api/meals');
         await updateMealItem(editingItemId, {
           date,
           meal_type: dialogMealType,
@@ -126,38 +141,81 @@ export function MealsPage() {
 
       setDialogOpen(false);
       refresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Failed to save meal item', e);
-      setDialogError(
-        e?.message ?? '食事の保存に失敗しました。入力内容を確認してください。'
-      );
+      const message =
+        e instanceof Error
+          ? e.message
+          : '食事の保存に失敗しました。入力内容を確認してください。';
+      setDialogError(message);
     } finally {
       setDialogSubmitting(false);
     }
   };
 
   const handleDeleteItem = async (entryId: string) => {
-    if (!confirm('この記録を削除しますか？')) return;
+    const ok = window.confirm('この記録を削除しますか？');
+    if (!ok) return;
+
     try {
+      const { deleteMealItem } = await import('@/lib/api/meals');
       await deleteMealItem(entryId);
       refresh();
     } catch (e) {
       console.error('Failed to delete meal item', e);
-      alert('削除に失敗しました。時間をおいて再度お試しください。');
+      window.alert('削除に失敗しました。時間をおいて再度お試しください。');
+    }
+  };
+
+  const handleRecomputeMealNutrition = async (
+    mealType: 'main' | 'snack',
+    mealIndex?: number | null
+  ) => {
+    const key = `${mealType}-${mealIndex ?? 'snack'}-${date}`;
+    try {
+      setNutritionLoadingKey(key);
+      setNutritionError(null);
+
+      const res = await recomputeMealAndDailyNutrition({
+        date,
+        mealType,
+        mealIndex: mealType === 'main' ? mealIndex ?? undefined : undefined,
+      });
+
+      setMealNutritions((prev) => ({
+        ...prev,
+        [key]: res.meal,
+      }));
+      setDailyNutrition(res.daily);
+    } catch (e: unknown) {
+      console.error('Failed to recompute meal nutrition', e);
+      const message =
+        e instanceof Error
+          ? e.message
+          : '栄養情報の計算に失敗しました。時間をおいて再度お試しください。';
+      setNutritionError(message);
+    } finally {
+      setNutritionLoadingKey(null);
     }
   };
 
   if (isLoading) {
-    return <p className="text-sm text-slate-400">読み込み中...</p>;
+    return (
+      <div className="space-y-4">
+        <PageHeader title="食事記録" />
+        <p className="text-sm text-slate-400">読み込み中...</p>
+      </div>
+    );
   }
 
   if (error || !data) {
     return (
       <div className="space-y-2">
+        <PageHeader title="食事記録" />
         <p className="text-sm text-rose-400">食事記録の取得に失敗しました。</p>
         <button
           className="text-xs text-emerald-400 underline"
-          onClick={() => location.reload()}
+          onClick={() => window.location.reload()}
         >
           再読み込み
         </button>
@@ -169,11 +227,36 @@ export function MealsPage() {
 
   return (
     <>
-      <MealsHeader
-        date={date}
-        onChangeDate={changeDate}
-        onBackToToday={backToToday}
+      <PageHeader
+        title={`${formatDateJP(new Date(date))} の食事記録`}
+        description="1日の食事内容を記録・編集し、必要に応じて栄養サマリを確認できます。"
       />
+
+      {nutritionError && (
+        <p className="mb-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/40 rounded-lg px-3 py-2">
+          {nutritionError}
+        </p>
+      )}
+
+      {dailyNutrition && (
+        <Card className="mb-4">
+          <p className="text-sm font-semibold text-slate-50 mb-2">
+            この日の栄養サマリ（モック）
+          </p>
+          <p className="text-xs text-slate-400 mb-2">
+            各ミールの「栄養を計算」ボタンを押すと、この日の総合的な栄養サマリが更新されます。
+          </p>
+          <ul className="flex flex-wrap gap-2 text-xs text-slate-200">
+            {dailyNutrition.nutrients.map((n) => (
+              <li key={n.code} className="rounded-full bg-slate-800 px-2 py-1">
+                {n.code}: {n.amount}
+                {n.unit}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <div className="mt-4 grid gap-4 md:grid-cols-[2fr,1fr]">
         <MainMealsSection
           mealsPerDay={mealsPerDay}
@@ -181,12 +264,25 @@ export function MealsPage() {
           onAddItem={(mealIndex) => openCreateDialog('main', mealIndex)}
           onEditItem={openEditDialog}
           onDeleteItem={handleDeleteItem}
+          onRecomputeNutrition={(mealIndex) =>
+            handleRecomputeMealNutrition('main', mealIndex)
+          }
+          getNutrition={(mealIndex) =>
+            mealNutritions[`main-${mealIndex}-${date}`]
+          }
+          nutritionLoadingKey={nutritionLoadingKey}
+          date={date}
         />
         <SnackMealsSection
           items={snacks}
           onAddItem={() => openCreateDialog('snack', null)}
           onEditItem={openEditDialog}
           onDeleteItem={handleDeleteItem}
+          onRecomputeNutrition={() =>
+            handleRecomputeMealNutrition('snack', null)
+          }
+          nutrition={mealNutritions[`snack-null-${date}`]}
+          nutritionLoadingKey={nutritionLoadingKey}
         />
       </div>
 
@@ -203,4 +299,12 @@ export function MealsPage() {
       />
     </>
   );
+}
+
+function formatDateJP(date: Date) {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const w = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+  return `${y}年${m}月${d}日(${w})`;
 }

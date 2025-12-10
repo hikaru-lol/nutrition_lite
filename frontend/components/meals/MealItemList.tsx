@@ -1,4 +1,6 @@
-// components/meals/MealItemList.tsx
+// frontend/components/meals/MealItemList.tsx
+'use client';
+
 import type { MealItemVM } from '@/lib/hooks/useMealsByDate';
 import { MealItemRow } from './MealItemRow';
 

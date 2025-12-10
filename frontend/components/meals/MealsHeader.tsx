@@ -1,10 +1,11 @@
+// frontend/components/meals/MealsHeader.tsx
 'use client';
 
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 
 type MealsHeaderProps = {
-  date: string; // "YYYY-MM-DD"
+  date: string;
   onChangeDate: (newDate: string) => void;
   onBackToToday: () => void;
 };
@@ -23,12 +24,10 @@ export function MealsHeader({
     onChangeDate(iso);
   };
 
-  const title = formatDateJP(current);
-
   return (
     <PageHeader
-      title={`${title} の食事記録`}
-      description="1日の食事内容を記録・振り返ることができます。"
+      title={`${formatDateJP(current)} の食事記録`}
+      description="1日の食事内容を記録・編集できます。"
       actions={
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => shiftDate(-1)}>
