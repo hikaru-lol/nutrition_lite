@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import type { MealItemVM } from '@/lib/hooks/useMealsByDate';
 import type { MealNutritionSummaryApi } from '@/lib/api/nutrition';
 import { MealItemList } from '@/components/meals/MealItemList';
+import { MealNutritionChart } from '@/components/meals/MealNutritionChart';
 
 type MealSlotCardProps = {
   mealIndex: number;
@@ -39,12 +40,11 @@ export function MealSlotCard({
         <div>
           <p className="text-xs text-slate-400">{mealIndex} 回目の食事</p>
           {nutrition && (
-            <p className="mt-1 text-[11px] text-slate-300">
-              {nutrition.nutrients
-                .slice(0, 3)
-                .map((n) => `${n.code}: ${n.amount}${n.unit}`)
-                .join(' / ')}
-            </p>
+            <MealNutritionChart
+              nutrients={nutrition.nutrients}
+              height={160}
+              title="この食事の栄養バランス（モック）"
+            />
           )}
         </div>
         <div className="flex items-center gap-2">

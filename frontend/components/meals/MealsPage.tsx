@@ -14,6 +14,7 @@ import {
 import { MealItemDialog, type MealItemFormValues } from './MealItemDialog';
 import { MainMealsSection } from './MainMealsSection';
 import { SnackMealsSection } from './SnackMealsSection';
+import { MealNutritionChart } from './MealNutritionChart';
 
 export function MealsPage() {
   const router = useRouter();
@@ -239,21 +240,17 @@ export function MealsPage() {
       )}
 
       {dailyNutrition && (
-        <Card className="mb-4">
+        <Card className="mb  -4">
           <p className="text-sm font-semibold text-slate-50 mb-2">
             この日の栄養サマリ（モック）
           </p>
-          <p className="text-xs text-slate-400 mb-2">
-            各ミールの「栄養を計算」ボタンを押すと、この日の総合的な栄養サマリが更新されます。
+          <p className="text-xs text-slate-400">
+            各ミールの「栄養を計算」を実行すると、この日の総合的な栄養サマリが更新されます。
           </p>
-          <ul className="flex flex-wrap gap-2 text-xs text-slate-200">
-            {dailyNutrition.nutrients.map((n) => (
-              <li key={n.code} className="rounded-full bg-slate-800 px-2 py-1">
-                {n.code}: {n.amount}
-                {n.unit}
-              </li>
-            ))}
-          </ul>
+          <MealNutritionChart
+            nutrients={dailyNutrition.nutrients}
+            title="1日トータル（代表的な栄養素）"
+          />
         </Card>
       )}
 
