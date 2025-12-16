@@ -14,7 +14,9 @@ export function TodayHeader({ userName, plan, trialEndsAt }: TodayHeaderProps) {
   return (
     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
       <div>
-        <p className="text-xs text-slate-400">今日のコンディション</p>
+        <p className="text-lg font-semibold text-slate-400">
+          今日のコンディション
+        </p>
         <h1 className="mt-1 text-xl md:text-2xl font-semibold text-slate-50">
           おかえりなさい、{userName} さん
         </h1>

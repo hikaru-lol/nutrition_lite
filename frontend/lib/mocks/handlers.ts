@@ -183,7 +183,7 @@ const recommendations: RecommendationResponseApi[] = [initialRecommendation];
 
 function computeMockNutrients(
   entries: MealItemResponse[]
-): NutritionNutrientIntakeApi[] {
+): MealNutritionSummaryApi[] {
   // amount_value を適当に PFC に割り振る簡易ロジック
   let totalAmount = 0;
   for (const e of entries) {

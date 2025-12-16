@@ -22,6 +22,8 @@ export function TodayPage() {
           <div className="h-40 bg-slate-900/60 rounded-2xl border border-slate-800 animate-pulse" />
           <div className="h-40 bg-slate-900/60 rounded-2xl border border-slate-800 animate-pulse hidden xl:block" />
         </div>
+        <div className="h-40 bg-slate-900/60 rounded-2xl border border-slate-800 animate-pulse" />
+        <div className="h-40 bg-slate-900/60 rounded-2xl border border-slate-800 animate-pulse" />
       </div>
     );
   }

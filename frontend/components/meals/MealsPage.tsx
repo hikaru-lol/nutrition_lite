@@ -1,16 +1,25 @@
 // frontend/components/meals/MealsPage.tsx
 'use client';
 
+// next.js components
 import { useRouter, useSearchParams } from 'next/navigation';
+
+// hooks
 import { useState } from 'react';
+
+// ui components
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/card';
+
+// lib
 import { useMealsByDate, type MealSlot } from '@/lib/hooks/useMealsByDate';
 import {
   recomputeMealAndDailyNutrition,
   type MealNutritionSummaryApi,
   type DailyNutritionSummaryApi,
 } from '@/lib/api/nutrition';
+
+// domain components
 import { MealItemDialog, type MealItemFormValues } from './MealItemDialog';
 import { MainMealsSection } from './MainMealsSection';
 import { SnackMealsSection } from './SnackMealsSection';
