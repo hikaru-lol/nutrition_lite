@@ -16,9 +16,6 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const { user, isLoading } = useCurrentUser();
 
-  console.log('AppShell isLoading', isLoading);
-  console.log('AppShell user', user);
-
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/auth/login');

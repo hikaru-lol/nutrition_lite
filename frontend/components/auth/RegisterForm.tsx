@@ -1,7 +1,7 @@
 // frontend/components/auth/RegisterForm.tsx
 'use client';
 
-import * as React from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -23,10 +23,10 @@ export function RegisterForm({
   isSubmitting = false,
   serverError,
 }: RegisterFormProps) {
-  const [name, setName] = React.useState('');
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [fieldError, setFieldError] = React.useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -22,7 +22,7 @@ export function AppSidebar() {
 
   return (
     <aside className="hidden md:block w-56 border-r border-slate-800 px-3 py-6">
-      <nav className="space-y-1">
+      <nav className="space-y-2">
         {links.map((link) => (
           <NavLink
             key={link.href}
