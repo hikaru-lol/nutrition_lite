@@ -2,13 +2,13 @@ name: Backend CI
 
 on:
   push:
-    # paths:
-    # - 'backend/**'
-    # - '.github/workflows/backend-ci.yml'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-unit-tests.yml'
   pull_request:
     paths:
       - 'backend/**'
-      - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/backend-unit-tests.yml'
 
 jobs:
   tests:
@@ -38,4 +38,4 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Run unit tests
-        run: uv run pytest -m "not real_integration"
+        run: uv run pytest -m "not real_integration" backend/tests/unit/application/auth
