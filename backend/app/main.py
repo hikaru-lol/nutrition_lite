@@ -37,21 +37,21 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(profile_router, prefix="/api/v1")
-    app.include_router(target_router, prefix="/api/v1")
-    app.include_router(meal_router, prefix="/api/v1")
-    app.include_router(daily_report_router, prefix="/api/v1")
+    # app.include_router(target_router, prefix="/api/v1")
+    # app.include_router(meal_router, prefix="/api/v1")
+    # app.include_router(daily_report_router, prefix="/api/v1")
     app.add_exception_handler(auth_errors.AuthError, auth_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
-    app.add_exception_handler(
-        target_app_errors.TargetError, target_error_handler)
-    app.add_exception_handler(
-        target_domain_errors.TargetDomainError, target_domain_error_handler)
-    app.add_exception_handler(
-        meal_domain_errors.MealDomainError, meal_domain_error_handler)
-    app.add_exception_handler(
-        nutrition_domain_errors.NutritionDomainError, nutrition_domain_error_handler)
-    app.add_exception_handler(
-        meal_domain_errors.InvalidMealTypeError, meal_slot_error_handler)
+    # app.add_exception_handler(
+    #     target_app_errors.TargetError, target_error_handler)
+    # app.add_exception_handler(
+    #     target_domain_errors.TargetDomainError, target_domain_error_handler)
+    # app.add_exception_handler(
+    #     meal_domain_errors.MealDomainError, meal_domain_error_handler)
+    # app.add_exception_handler(
+    #     nutrition_domain_errors.NutritionDomainError, nutrition_domain_error_handler)
+    # app.add_exception_handler(
+    #     meal_domain_errors.InvalidMealTypeError, meal_slot_error_handler)
     return app
 
 
