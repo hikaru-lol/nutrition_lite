@@ -70,7 +70,7 @@ def create_target(
 ) -> TargetResponse:
     """
     新しいターゲットを作成する。
-    17栄養素はサーバ側で TargetGenerator により決定される。
+    10栄養素はサーバ側で TargetGenerator により決定される。
     """
     input_dto = CreateTargetInputDTO(
         user_id=str(current_user.id),
