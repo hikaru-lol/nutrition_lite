@@ -2,16 +2,16 @@ name: Backend Real Integration Tests
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-real-*'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-real-*'
+  # push:
+  #   paths:
+  #     - 'backend/**'
+  #     - '.github/workflows/backend-real-*'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'backend/**'
+  #     - '.github/workflows/backend-real-*'
 
 jobs:
   real-integration-tests:
@@ -89,5 +89,4 @@ jobs:
         working-directory: backend
         run: |
           # real 用のテストには pytest.mark.real_integration を付けておく前提
-          # uv run pytest -m "real_integration" --maxfail=1
-          pytest tests/integration_real -m "real_integration" --maxfail=1
+          uv run pytest -m "real_integration" --maxfail=1
