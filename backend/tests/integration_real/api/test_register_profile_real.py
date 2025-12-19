@@ -5,6 +5,22 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 
+from datetime import datetime, timezone
+
+
+def _parse_iso_datetime(s: str) -> datetime:
+    # "Z" を fromisoformat が読める "+00:00" に変換
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s)
+
+
+def _assert_same_instant(a: str, b: str, msg: str) -> None:
+    da = _parse_iso_datetime(a).astimezone(timezone.utc)
+    db = _parse_iso_datetime(b).astimezone(timezone.utc)
+    assert da == db, f"{msg}: {a} != {b} (UTC: {da} != {db})"
+
+
 pytestmark = pytest.mark.real_integration  # このファイル内のテストは real_integration マーク付き
 
 
@@ -40,7 +56,7 @@ def _assert_meals_per_day(profile: dict, *, expected: int | None = None) -> None
         return
 
     assert isinstance(value, int), f"meals_per_day の型が不正です: {type(value)}"
-    assert 1 <= value <= 6, "meals_per_day が有効な範囲外です"
+    assert 1 <= value <= 6, "meals_per_day が 有効な範囲外です"
 
 
 def _assert_request_validation_error_400(resp) -> None:
@@ -184,8 +200,10 @@ def test_register_to_profile_creation_flow_real():
     assert get_profile_data["meals_per_day"] == profile_data["meals_per_day"], (
         "meals_per_day が一致しません"
     )
-    assert get_profile_data["created_at"] == profile_data["created_at"], (
-        "created_at が一致しません"
+    _assert_same_instant(
+        get_profile_data["created_at"],
+        profile_data["created_at"],
+        "created_at が同一時刻ではありません",
     )
 
     # ========================================================================
@@ -224,8 +242,10 @@ def test_register_to_profile_creation_flow_real():
     # meals_per_day は「None or 4」を許容（現状の実装都合で反映されない可能性があるため）
     _assert_meals_per_day(updated_profile_data, expected=4)
 
-    assert updated_profile_data["created_at"] == profile_data["created_at"], (
-        "created_at は変更されるべきではありません"
+    _assert_same_instant(
+        updated_profile_data["created_at"],
+        profile_data["created_at"],
+        "created_at は変更されるべきではありません",
     )
     assert updated_profile_data["updated_at"] != profile_data["updated_at"], (
         "updated_at が更新されていません"
@@ -236,8 +256,36 @@ def test_register_to_profile_creation_flow_real():
         f"更新後のプロフィール取得が失敗しました: {get_updated_resp.text}"
     )
     get_updated_data = get_updated_resp.json()
-    assert get_updated_data == updated_profile_data, (
-        "更新後のプロフィールが正しく取得できていません"
+
+    # タイムゾーンの違いを考慮して各フィールドを比較
+    assert get_updated_data["user_id"] == updated_profile_data["user_id"], (
+        "ユーザーIDが一致しません"
+    )
+    assert get_updated_data["sex"] == updated_profile_data["sex"], "性別が一致しません"
+    assert get_updated_data["birthdate"] == updated_profile_data["birthdate"], (
+        "生年月日が一致しません"
+    )
+    assert get_updated_data["height_cm"] == updated_profile_data["height_cm"], (
+        "身長が一致しません"
+    )
+    assert get_updated_data["weight_kg"] == updated_profile_data["weight_kg"], (
+        "体重が一致しません"
+    )
+    assert get_updated_data["meals_per_day"] == updated_profile_data["meals_per_day"], (
+        "meals_per_day が一致しません"
+    )
+    assert get_updated_data["image_id"] == updated_profile_data["image_id"], (
+        "image_id が一致しません"
+    )
+    _assert_same_instant(
+        get_updated_data["created_at"],
+        updated_profile_data["created_at"],
+        "created_at が一致しません",
+    )
+    _assert_same_instant(
+        get_updated_data["updated_at"],
+        updated_profile_data["updated_at"],
+        "updated_at が一致しません",
     )
 
 
