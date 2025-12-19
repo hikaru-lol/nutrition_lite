@@ -1,60 +1,64 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    ForeignKey,
-    String,
-    UniqueConstraint,
-    func,
-)
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import sqlalchemy as sa
+import sqlalchemy.dialects.postgresql as pg
+from sqlalchemy.orm import Mapped, relationship
 
 from app.infra.db.base import Base
 
+if TYPE_CHECKING:
+    from app.infra.db.models.user import UserModel
+
 
 class BillingAccountModel(Base):
-    """
-    BillingAccount 用の SQLAlchemy モデル。
-
-    - 1ユーザーにつき 1 レコード（user_id に unique 制約）。
-    """
-
     __tablename__ = "billing_accounts"
 
-    id = Column(
-        PG_UUID(as_uuid=True),
+    id = sa.Column(
+        pg.UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )
 
-    user_id = Column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+    # ★unique/index は付けず、名前付き UniqueConstraint に一本化
+    user_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,   # 1ユーザー1アカウント
-        index=True,
     )
 
-    # Stripe 連携用
-    stripe_customer_id = Column(String(255), nullable=True, index=True)
-    stripe_subscription_id = Column(String(255), nullable=True, index=True)
+    stripe_customer_id = sa.Column(sa.String(255), nullable=True, index=True)
+    stripe_subscription_id = sa.Column(
+        sa.String(255), nullable=True, index=True)
 
-    # サブスクリプション状態（文字列化した BillingSubscriptionStatus）
-    subscription_status = Column(
-        String(32), nullable=False, default="NONE")
-
-    # 論理プラン（UserPlan と同期: "trial" / "free" / "paid"）
-    current_plan = Column(String(16), nullable=False, default="free")
-
-    updated_at = Column(
-        DateTime(timezone=True),
+    # ★DB側default（migrationに合わせる）
+    subscription_status = sa.Column(
+        sa.String(32),
         nullable=False,
-        server_default=func.now(),
+        default="NONE",  # Python側
+        server_default=sa.text("'NONE'"),  # DB側
+    )
+
+    current_plan = sa.Column(
+        sa.String(16),
+        nullable=False,
+        default="free",  # Python側
+        server_default=sa.text("'free'"),  # DB側
+    )
+
+    updated_at = sa.Column(
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
     )
 
     __table_args__ = (
-        UniqueConstraint("user_id", name="uq_billing_account_user_id"),
+        sa.UniqueConstraint("user_id", name="uq_billing_account_user_id"),
+    )
+
+    user: Mapped["UserModel"] = relationship(
+        "UserModel",
+        back_populates="billing_account",
     )

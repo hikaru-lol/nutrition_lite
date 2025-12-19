@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+import datetime
 from enum import Enum
 from typing import Optional
 
@@ -43,13 +43,13 @@ class MealNutrientResponse(BaseModel):
 
 class MealNutritionSummaryResponse(BaseModel):
     id: str = Field(..., description="MealNutritionSummary ID (UUID 文字列)")
-    date: date = Field(..., description="対象日 (YYYY-MM-DD)")
+    date: datetime.date = Field(..., description="対象日 (YYYY-MM-DD)")
     meal_type: MealType = Field(..., description='"main" または "snack"')
     meal_index: Optional[int] = Field(
         default=None,
         description="main のとき: 1..N / snack のとき: null",
     )
-    generated_at: datetime = Field(..., description="このサマリを計算した日時")
+    generated_at: datetime.datetime = Field(..., description="このサマリを計算した日時")
     nutrients: list[MealNutrientResponse] = Field(
         ..., description="この食事で摂取した栄養素ごとの一覧"
     )
@@ -74,8 +74,8 @@ class DailyNutritionSummaryResponse(BaseModel):
     """
 
     id: str = Field(..., description="DailyNutritionSummary ID (UUID 文字列)")
-    date: date = Field(..., description="対象日 (YYYY-MM-DD)")
-    generated_at: datetime = Field(..., description="このサマリを計算した日時")
+    date: datetime.date = Field(..., description="対象日 (YYYY-MM-DD)")
+    generated_at: datetime.datetime = Field(..., description="このサマリを計算した日時")
     nutrients: list[DailyNutrientResponse] = Field(
         ..., description="1日分の栄養素ごとの合計一覧"
     )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+import datetime
 from enum import Enum
 from typing import Optional
 
@@ -34,7 +34,7 @@ class MealItemRequest(BaseModel):
       詳細な整合性チェックはドメイン側（FoodEntry.__post_init__）で行う。
     """
 
-    date: date = Field(..., description="対象日 (YYYY-MM-DD)")
+    date: datetime.date = Field(..., description="対象日 (YYYY-MM-DD)")
     meal_type: MealType = Field(..., description='"main" または "snack"')
     meal_index: Optional[int] = Field(
         default=None,

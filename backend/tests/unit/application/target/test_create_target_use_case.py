@@ -18,8 +18,11 @@ from tests.unit.application.target.fakes import (
     FakeTargetSnapshotRepository,
     FakeTargetUnitOfWork,
     FakeTargetGenerator,
+    FakeProfileQuery,
     make_target,
 )
+from tests.fakes.auth_services import FixedClock
+from app.application.profile.ports.profile_query_port import ProfileForTarget
 
 
 def test_create_target_first_becomes_active():
@@ -28,7 +31,17 @@ def test_create_target_first_becomes_active():
     snap_repo = FakeTargetSnapshotRepository()
     uow = FakeTargetUnitOfWork(repo, snap_repo)
     generator = FakeTargetGenerator()
-    use_case = CreateTargetUseCase(uow, generator)
+    profile_query = FakeProfileQuery()
+    profile_query.set_profile_for_target(
+        ProfileForTarget(
+            sex="male",
+            birthdate=None,
+            height_cm=170.0,
+            weight_kg=70.0,
+        )
+    )
+    clock = FixedClock()
+    use_case = CreateTargetUseCase(uow, generator, profile_query, clock)
 
     input_dto = CreateTargetInputDTO(
         user_id=user_id,
@@ -57,7 +70,17 @@ def test_create_target_additional_is_not_active():
 
     uow = FakeTargetUnitOfWork(repo, snap_repo)
     generator = FakeTargetGenerator()
-    use_case = CreateTargetUseCase(uow, generator)
+    profile_query = FakeProfileQuery()
+    profile_query.set_profile_for_target(
+        ProfileForTarget(
+            sex="male",
+            birthdate=None,
+            height_cm=170.0,
+            weight_kg=70.0,
+        )
+    )
+    clock = FixedClock()
+    use_case = CreateTargetUseCase(uow, generator, profile_query, clock)
 
     input_dto = CreateTargetInputDTO(
         user_id=user_id,
@@ -87,7 +110,9 @@ def test_create_target_limit_exceeded():
 
     uow = FakeTargetUnitOfWork(repo, snap_repo)
     generator = FakeTargetGenerator()
-    use_case = CreateTargetUseCase(uow, generator)
+    profile_query = FakeProfileQuery()
+    clock = FixedClock()
+    use_case = CreateTargetUseCase(uow, generator, profile_query, clock)
 
     input_dto = CreateTargetInputDTO(
         user_id=user_id,

@@ -103,13 +103,14 @@ def test_update_existing_entry_success() -> None:
 
     result = use_case.execute(user_id, dto)
 
-    assert result.id == str(existing.id.value)
-    assert result.date == dto.date
-    assert result.meal_type == "main"
-    assert result.meal_index == 2
-    assert result.name == "鶏むね肉のソテー"
-    assert result.amount_value == 150.0
-    assert result.note == "after"
+    assert result.entry.id == str(existing.id.value)
+    assert result.entry.date == dto.date
+    assert result.entry.meal_type == "main"
+    assert result.entry.meal_index == 2
+    assert result.entry.name == "鶏むね肉のソテー"
+    assert result.entry.amount_value == 150.0
+    assert result.entry.note == "after"
+    assert result.old_date == date(2025, 11, 24)
 
     # Repo に反映されているか確認
     saved = repo.entries[str(existing.id.value)]

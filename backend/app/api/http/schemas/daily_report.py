@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+import datetime
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ class GenerateDailyReportRequest(BaseModel):
 
     - date: 対象日 (YYYY-MM-DD)
     """
-    date: date = Field(..., description="レポート対象日 (YYYY-MM-DD)")
+    date: datetime.date = Field(..., description="レポート対象日 (YYYY-MM-DD)")
 
 
 class DailyNutritionReportResponse(BaseModel):
@@ -22,11 +22,11 @@ class DailyNutritionReportResponse(BaseModel):
     - 今回は基本的にドメインの DailyNutritionReport をそのまま API 用にマッピング。
     """
 
-    date: date
+    date: datetime.date
 
     summary: str
 
     good_points: List[str]
     improvement_points: List[str]
     tomorrow_focus: List[str]
-    created_at: datetime
+    created_at: datetime.datetime

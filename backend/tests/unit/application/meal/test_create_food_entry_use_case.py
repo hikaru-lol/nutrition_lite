@@ -16,6 +16,7 @@ from app.domain.meal.errors import (
     InvalidFoodAmountError,
 )
 from app.domain.meal.value_objects import FoodEntryId, MealType
+from tests.fakes.meal_uow import FakeMealUnitOfWork
 
 pytestmark = pytest.mark.unit
 
@@ -71,7 +72,7 @@ def _make_user_id() -> UserId:
 
 def test_create_main_meal_with_amount_value_and_unit() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = CreateFoodEntryUseCase(repo)
+    use_case = CreateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     dto = CreateFoodEntryInputDTO(
@@ -106,7 +107,7 @@ def test_create_main_meal_with_amount_value_and_unit() -> None:
 
 def test_create_snack_with_serving_count_only() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = CreateFoodEntryUseCase(repo)
+    use_case = CreateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     dto = CreateFoodEntryInputDTO(
@@ -130,7 +131,7 @@ def test_create_snack_with_serving_count_only() -> None:
 
 def test_create_raises_invalid_meal_type() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = CreateFoodEntryUseCase(repo)
+    use_case = CreateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     dto = CreateFoodEntryInputDTO(
@@ -150,7 +151,7 @@ def test_create_raises_invalid_meal_type() -> None:
 
 def test_create_raises_invalid_food_amount_when_no_amount_specified() -> None:
     repo = FakeFoodEntryRepository()
-    use_case = CreateFoodEntryUseCase(repo)
+    use_case = CreateFoodEntryUseCase(FakeMealUnitOfWork(repo))
     user_id = _make_user_id()
 
     dto = CreateFoodEntryInputDTO(
