@@ -1,17 +1,17 @@
 name: Backend Real Integration Tests
 
 on:
-  workflow_dispatch:
-  # push:
-  #   paths:
-  #     - 'backend/**'
-  #     - '.github/workflows/backend-real-*'
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - 'backend/**'
-  #     - '.github/workflows/backend-real-*'
+  # workflow_dispatch:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-real-*'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-real-*'
 
 jobs:
   real-integration-tests:
