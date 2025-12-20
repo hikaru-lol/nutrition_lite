@@ -11,7 +11,6 @@ from app.domain.auth import errors as auth_errors
 from app.domain.meal import errors as meal_domain_errors
 from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError, DailyLogProfileNotFoundError
 from app.domain.nutrition import errors as nutrition_domain_errors
-from app.domain.profile import errors as profile_domain_errors
 from app.domain.target import errors as target_domain_errors
 
 logger = logging.getLogger(__name__)
@@ -55,6 +54,13 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError) -> JS
             code="EMAIL_ALREADY_IN_USE",
             message="このメールアドレスは既に登録されています。",
             status_code=status.HTTP_409_CONFLICT,
+        )
+
+    if isinstance(exc, auth_errors.InvalidAccessTokenError):
+        return error_response(
+            code="INVALID_ACCESS_TOKEN",
+            message="アクセストークンが無効または期限切れです。",
+            status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
     if isinstance(exc, auth_errors.InvalidCredentialsError):
@@ -149,10 +155,10 @@ async def target_error_handler(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    if isinstance(exc, profile_domain_errors.ProfileNotFoundError):
+    if isinstance(exc, target_app_errors.TargetProfileNotFoundError):
         return error_response(
-            code="PROFILE_NOT_FOUND",
-            message="プロフィールが見つかりません。",
+            code="TARGET_PROFILE_NOT_FOUND",
+            message="ターゲットを生成するためのプロフィールが見つかりません。",
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
@@ -242,6 +248,13 @@ async def meal_domain_error_handler(
             status_code=status.HTTP_400_BAD_REQUEST,
             code="DAILY_LOG_PROFILE_NOT_FOUND",
             message="日次ログの判定にはプロフィールの設定が必要です。",
+        )
+
+    if isinstance(exc, meal_domain_errors.InvalidMealsPerDayError):
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="INVALID_MEALS_PER_DAY",
+            message="Invalid meals_per_day",
         )
 
     # 404 系

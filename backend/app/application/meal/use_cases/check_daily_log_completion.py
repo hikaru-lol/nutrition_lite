@@ -67,7 +67,7 @@ class CheckDailyLogCompletionUseCase:
         with self._meal_uow as uow:
             entries: Sequence[FoodEntry] = uow.food_entry_repo.list_by_user_and_date(
                 user_id=user_id,
-                date=date_,
+                target_date=date_,
             )
 
         main_indices: set[int] = set()

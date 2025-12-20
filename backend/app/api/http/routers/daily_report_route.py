@@ -47,6 +47,7 @@ def _report_to_response(report: DailyNutritionReport) -> DailyNutritionReportRes
         good_points=report.good_points,
         improvement_points=report.improvement_points,
         tomorrow_focus=report.tomorrow_focus,
+        created_at=report.created_at,
     )
 
 

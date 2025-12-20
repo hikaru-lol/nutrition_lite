@@ -5,6 +5,7 @@ from datetime import date
 from typing import Protocol, runtime_checkable
 
 from app.domain.auth.value_objects import UserId
+from app.domain.profile.value_objects import Sex, HeightCm, WeightKg
 
 # 既存
 
@@ -19,7 +20,11 @@ class ProfileForTarget:
 
 @dataclass(slots=True)
 class ProfileForDailyLog:
-    meals_per_day: int | None
+    sex: Sex
+    birthdate: date
+    height_cm: HeightCm
+    weight_kg: WeightKg
+    meals_per_day: int | None = None
 
 
 # ★ 追加: Recommendation 用 DTO ----------------------------------------

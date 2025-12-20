@@ -46,7 +46,7 @@ class FoodEntryNotFoundError(MealDomainError):
     pass
 
 
-class DailyLogProfileNotFoundError(Exception):
+class DailyLogProfileNotFoundError(MealDomainError):
     """
     記録完了判定などで、ユーザーの Profile が存在しない場合のエラー。
 
@@ -55,7 +55,7 @@ class DailyLogProfileNotFoundError(Exception):
     pass
 
 
-class InvalidMealsPerDayError(Exception):
+class InvalidMealsPerDayError(MealDomainError):
     """
     Profile.meals_per_day が 1 未満など、無効な値だった場合のエラー。
 

@@ -8,11 +8,13 @@ from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
 )
 from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
-from app.application.profile.ports.profile_query_port import ProfileQueryPort
+from app.application.profile.ports.profile_query_port import ProfileForDailyLog, ProfileQueryPort
 
 from app.application.meal.dto.daily_log_completion_dto import (
     DailyLogCompletionResultDTO,
 )
+from app.application.target.dto.target_dto import EnsureDailySnapshotInputDTO
+
 from app.application.nutrition.dto.daily_report_llm_dto import (
     DailyReportLLMInput,
     DailyReportLLMOutput,
@@ -119,7 +121,7 @@ class GenerateDailyNutritionReportUseCase:
         # --- 3. Profile / TargetSnapshot / Daily / Meal を取得 --------
 
         # 3-1. Profile
-        profile: Profile | None = self._profile_query.get_profile_for_daily_log(
+        profile: ProfileForDailyLog | None = self._profile_query.get_profile_for_daily_log(
             user_id)
         if profile is None:
             # ここは既に DailyLog 側でも ProfileNotFound を投げている想定だが、
@@ -132,9 +134,12 @@ class GenerateDailyNutritionReportUseCase:
 
         # 3-2. DailyTargetSnapshot
         # EnsureDailyTargetSnapshotUseCase 側で「なければ作る」を担保している前提。
+
         target_snapshot: DailyTargetSnapshot = self._ensure_target_snapshot_uc.execute(
-            user_id=user_id,
-            date_=date_,
+            input_dto=EnsureDailySnapshotInputDTO(
+                user_id=user_id,
+                target_date=date_,
+            ),
         )
 
         # 3-3. DailyNutritionSummary（なければ再計算）
@@ -152,11 +157,18 @@ class GenerateDailyNutritionReportUseCase:
         )
 
         # --- 4. LLM 入力 DTO を組み立ててレポート生成 ---------------
+        # input: profile: ProfileForDailyLog, target_snapshot: DailyTargetSnapshot, daily_summary: DailyNutritionSummary, meal_summaries: list[MealNutritionSummary]
 
         llm_input = DailyReportLLMInput(
             user_id=user_id,
             date=date_,
-            profile=profile,
+            profile=ProfileForDailyLog(
+                sex=profile.sex,
+                birthdate=profile.birthdate,
+                height_cm=profile.height_cm,
+                weight_kg=profile.weight_kg,
+                meals_per_day=profile.meals_per_day,
+            ),
             target_snapshot=target_snapshot,
             daily_summary=daily_summary,
             meal_summaries=meal_summaries,

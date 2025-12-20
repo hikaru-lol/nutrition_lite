@@ -25,6 +25,11 @@ class UserNotFoundError(AuthError):
     pass
 
 
+class InvalidAccessTokenError(AuthError):
+    """アクセストークンが不正 / 期限切れのときのエラー。"""
+    pass
+
+
 class InvalidRefreshTokenError(AuthError):
     """リフレッシュトークンが不正 / 期限切れのときのエラー。"""
     pass

@@ -24,3 +24,10 @@ class TargetLimitExceededError(TargetError):
 class TargetGenerationFailedError(TargetError):
     """LLM によるターゲット生成に失敗したときのエラー。"""
     pass
+
+
+class TargetProfileNotFoundError(TargetError):
+    """
+    ターゲットを生成するためのプロフィールが存在しないときのエラー。
+    """
+    pass
