@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date as DateType
 
 from app.application.auth.ports.clock_port import ClockPort
-from app.application.auth.ports.plan_checker_port import PlanCheckerPort
 from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
 )
@@ -35,10 +34,9 @@ from app.domain.nutrition.errors import (
     DailyLogNotCompletedError,
     DailyNutritionReportAlreadyExistsError,
 )
-from app.domain.profile.entities import Profile  # 実際のパスに合わせて調整
-from app.domain.target.entities import DailyTargetSnapshot  # 実際のパスに合わせて調整
+from app.domain.target.entities import DailyTargetSnapshot
 from app.domain.nutrition.daily_nutrition import DailyNutritionSummary
-from app.domain.nutrition.meal_nutrition import MealNutritionSummary  # 実際のパスに合わせて
+from app.domain.nutrition.meal_nutrition import MealNutritionSummary
 
 
 class GenerateDailyNutritionReportUseCase:
@@ -66,7 +64,6 @@ class GenerateDailyNutritionReportUseCase:
         nutrition_uow: NutritionUnitOfWorkPort,
         report_generator: DailyNutritionReportGeneratorPort,
         clock: ClockPort,
-        plan_checker: PlanCheckerPort,
     ) -> None:
         self._daily_log_uc = daily_log_uc
         self._profile_query = profile_query
@@ -75,7 +72,6 @@ class GenerateDailyNutritionReportUseCase:
         self._uow = nutrition_uow
         self._report_generator = report_generator
         self._clock = clock
-        self._plan_checker = plan_checker
 
     def execute(
         self,
@@ -93,9 +89,6 @@ class GenerateDailyNutritionReportUseCase:
             - PremiumFeatureRequiredError（プレミアム機能が不足している場合）
         """
 
-        # --- 0. プレミアム機能チェック --------------------------------
-        self._plan_checker.ensure_premium_feature(user_id)
-
         # --- 1. 記録完了チェック --------------------------------------
         completion: DailyLogCompletionResultDTO = self._daily_log_uc.execute(
             user_id=user_id,
@@ -108,17 +101,7 @@ class GenerateDailyNutritionReportUseCase:
                 f"missing_indices={completion.missing_indices}"
             )
 
-        # --- 2. 既存レポートの有無をチェック -------------------------
-        existing = self._uow.daily_report_repo.get_by_user_and_date(
-            user_id=user_id,
-            target_date=date_,
-        )
-        if existing is not None:
-            raise DailyNutritionReportAlreadyExistsError(
-                f"DailyNutritionReport already exists for user_id={user_id.value}, date={date_}"
-            )
-
-        # --- 3. Profile / TargetSnapshot / Daily / Meal を取得 --------
+        # --- 2. Profile / TargetSnapshot / Daily を取得 ---------------
 
         # 3-1. Profile
         profile: ProfileForDailyLog | None = self._profile_query.get_profile_for_daily_log(
@@ -137,7 +120,7 @@ class GenerateDailyNutritionReportUseCase:
 
         target_snapshot: DailyTargetSnapshot = self._ensure_target_snapshot_uc.execute(
             input_dto=EnsureDailySnapshotInputDTO(
-                user_id=user_id,
+                user_id=user_id.value,
                 target_date=date_,
             ),
         )
@@ -148,48 +131,56 @@ class GenerateDailyNutritionReportUseCase:
             date_=date_,
         )
 
-        # 3-4. その日の MealNutritionSummary 一覧
-        meal_summaries: list[MealNutritionSummary] = list(
-            self._uow.meal_nutrition_repo.list_by_user_and_date(
+        with self._uow as uow:
+            # --- 3. 既存レポートの有無をチェック ---------------------
+            existing = uow.daily_report_repo.get_by_user_and_date(
                 user_id=user_id,
                 target_date=date_,
             )
-        )
+            if existing is not None:
+                raise DailyNutritionReportAlreadyExistsError(
+                    f"DailyNutritionReport already exists for user_id={user_id.value}, date={date_}"
+                )
 
-        # --- 4. LLM 入力 DTO を組み立ててレポート生成 ---------------
-        # input: profile: ProfileForDailyLog, target_snapshot: DailyTargetSnapshot, daily_summary: DailyNutritionSummary, meal_summaries: list[MealNutritionSummary]
+            # --- 4. その日の MealNutritionSummary 一覧 ---------------
+            meal_summaries: list[MealNutritionSummary] = list(
+                uow.meal_nutrition_repo.list_by_user_and_date(
+                    user_id=user_id,
+                    target_date=date_,
+                )
+            )
 
-        llm_input = DailyReportLLMInput(
-            user_id=user_id,
-            date=date_,
-            profile=ProfileForDailyLog(
-                sex=profile.sex,
-                birthdate=profile.birthdate,
-                height_cm=profile.height_cm,
-                weight_kg=profile.weight_kg,
-                meals_per_day=profile.meals_per_day,
-            ),
-            target_snapshot=target_snapshot,
-            daily_summary=daily_summary,
-            meal_summaries=meal_summaries,
-        )
+            # --- 5. LLM 入力 DTO を組み立ててレポート生成 -------------
+            llm_input = DailyReportLLMInput(
+                user_id=user_id,
+                date=date_,
+                profile=ProfileForDailyLog(
+                    sex=profile.sex,
+                    birthdate=profile.birthdate,
+                    height_cm=profile.height_cm,
+                    weight_kg=profile.weight_kg,
+                    meals_per_day=profile.meals_per_day,
+                ),
+                target_snapshot=target_snapshot,
+                daily_summary=daily_summary,
+                meal_summaries=meal_summaries,
+            )
 
-        llm_output: DailyReportLLMOutput = self._report_generator.generate(
-            llm_input)
+            llm_output: DailyReportLLMOutput = self._report_generator.generate(
+                llm_input)
 
-        # --- 5. DailyNutritionReport エンティティを組み立て ---------
+            # --- 6. DailyNutritionReport エンティティを組み立て -----
+            report = DailyNutritionReport.create(
+                user_id=user_id,
+                date=date_,
+                summary=llm_output.summary,
+                good_points=llm_output.good_points,
+                improvement_points=llm_output.improvement_points,
+                tomorrow_focus=llm_output.tomorrow_focus,
+                created_at=self._clock.now(),
+            )
 
-        report = DailyNutritionReport.create(
-            user_id=user_id,
-            date=date_,
-            summary=llm_output.summary,
-            good_points=llm_output.good_points,
-            improvement_points=llm_output.improvement_points,
-            tomorrow_focus=llm_output.tomorrow_focus,
-            created_at=self._clock.now(),
-        )
-
-        # --- 6. 保存 -------------------------------------------------
-        self._uow.daily_report_repo.save(report)
+            # --- 7. 保存 ---------------------------------------------
+            uow.daily_report_repo.save(report)
 
         return report

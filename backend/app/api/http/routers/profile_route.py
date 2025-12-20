@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Response, status
 
 # === API (schemas / dependencies) ==========================================
 from app.api.http.dependencies.auth import get_current_user_dto
-from app.api.http.schemas.auth import ErrorResponse
+from app.api.http.schemas.errors import ErrorResponse
 from app.api.http.schemas.profile import ProfileRequest, ProfileResponse
 
 # === Application (DTO / UseCase) ============================================

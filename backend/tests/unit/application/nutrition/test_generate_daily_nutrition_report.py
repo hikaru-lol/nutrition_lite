@@ -17,17 +17,17 @@ from app.application.meal.use_cases.check_daily_log_completion import (
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
     ComputeDailyNutritionSummaryUseCase,
 )
+from app.application.target.dto.target_dto import EnsureDailySnapshotInputDTO
 from app.application.target.use_cases.ensure_daily_snapshot import (
     EnsureDailyTargetSnapshotUseCase,
 )
-from app.application.target.dto.target_dto import EnsureDailySnapshotInputDTO
+from app.application.profile.ports.profile_query_port import ProfileForDailyLog
 from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.errors import (
     DailyLogNotCompletedError,
     DailyNutritionReportAlreadyExistsError,
 )
 from app.domain.nutrition.daily_nutrition import DailyNutritionSummary
-from app.domain.nutrition.meal_nutrition import MealNutritionSummary
 from app.domain.profile.entities import Profile
 from app.domain.target.entities import DailyTargetSnapshot
 from app.domain.target.value_objects import (
@@ -38,13 +38,10 @@ from app.domain.target.value_objects import (
 from app.domain.meal.errors import DailyLogProfileNotFoundError
 from tests.unit.application.nutrition.fakes import (
     FakeNutritionUnitOfWork,
-    FakePlanChecker,
     FakeDailyNutritionReportGenerator,
     FakeDailyNutritionReportRepository,
 )
 from tests.fakes.auth_services import FixedClock
-from tests.fakes.profile_repositories import InMemoryProfileRepository
-from tests.fakes.profile_uow import FakeProfileUnitOfWork
 
 pytestmark = pytest.mark.unit
 
@@ -65,6 +62,19 @@ def _make_profile(user_id: UserId, meals_per_day: int = 3) -> Profile:
         weight_kg=WeightKg(70.0),
         image_id=ProfileImageId("test-image-id"),
         meals_per_day=meals_per_day,
+    )
+
+
+def _make_profile_for_daily_log(
+    user_id: UserId, meals_per_day: int = 3
+) -> ProfileForDailyLog:
+    profile = _make_profile(user_id, meals_per_day=meals_per_day)
+    return ProfileForDailyLog(
+        sex=profile.sex,
+        birthdate=profile.birthdate,
+        height_cm=profile.height_cm,
+        weight_kg=profile.weight_kg,
+        meals_per_day=profile.meals_per_day,
     )
 
 
@@ -163,10 +173,10 @@ class FakeCheckDailyLogCompletionUseCase(CheckDailyLogCompletionUseCase):
 class FakeProfileQueryPort:
     """Fake実装: ProfileQueryPort"""
 
-    def __init__(self, profile: Profile | None = None) -> None:
+    def __init__(self, profile: ProfileForDailyLog | None = None) -> None:
         self._profile = profile
 
-    def get_profile_for_daily_log(self, user_id: UserId) -> Profile | None:
+    def get_profile_for_daily_log(self, user_id: UserId) -> ProfileForDailyLog | None:
         return self._profile
 
     def get_profile_for_target(self, user_id: UserId):
@@ -184,11 +194,11 @@ class FakeEnsureDailyTargetSnapshotUseCase:
 
     def execute(
         self,
-        user_id: UserId,
-        date_: date,
+        input_dto: EnsureDailySnapshotInputDTO,
     ) -> DailyTargetSnapshot:
         if self._snapshot is None:
-            return _make_daily_target_snapshot(user_id, date_)
+            user_id = UserId(input_dto.user_id)
+            return _make_daily_target_snapshot(user_id, input_dto.target_date)
         return self._snapshot
 
 
@@ -211,7 +221,7 @@ def test_generate_daily_nutrition_report_success() -> None:
     target_date = date(2025, 11, 24)
 
     # セットアップ
-    profile = _make_profile(user_id, meals_per_day=3)
+    profile = _make_profile_for_daily_log(user_id, meals_per_day=3)
     profile_query = FakeProfileQueryPort(profile=profile)
     daily_log_uc = FakeCheckDailyLogCompletionUseCase(is_completed=True)
     snapshot = _make_daily_target_snapshot(user_id, target_date)
@@ -226,7 +236,6 @@ def test_generate_daily_nutrition_report_success() -> None:
         daily_report_repo=daily_report_repo)
     report_generator = FakeDailyNutritionReportGenerator()
     clock = FixedClock()
-    plan_checker = FakePlanChecker()
 
     # UseCase実行
     use_case = GenerateDailyNutritionReportUseCase(
@@ -237,7 +246,6 @@ def test_generate_daily_nutrition_report_success() -> None:
         nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
-        plan_checker=plan_checker,
     )
 
     result = use_case.execute(user_id=user_id, date_=target_date)
@@ -266,7 +274,7 @@ def test_generate_daily_nutrition_report_daily_log_not_completed() -> None:
     target_date = date(2025, 11, 24)
 
     # セットアップ
-    profile = _make_profile(user_id, meals_per_day=3)
+    profile = _make_profile_for_daily_log(user_id, meals_per_day=3)
     profile_query = FakeProfileQueryPort(profile=profile)
     daily_log_uc = FakeCheckDailyLogCompletionUseCase(is_completed=False)
     snapshot = _make_daily_target_snapshot(user_id, target_date)
@@ -279,7 +287,6 @@ def test_generate_daily_nutrition_report_daily_log_not_completed() -> None:
     nutrition_uow = FakeNutritionUnitOfWork()
     report_generator = FakeDailyNutritionReportGenerator()
     clock = FixedClock()
-    plan_checker = FakePlanChecker()
 
     use_case = GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
@@ -289,7 +296,6 @@ def test_generate_daily_nutrition_report_daily_log_not_completed() -> None:
         nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
-        plan_checker=plan_checker,
     )
 
     with pytest.raises(DailyLogNotCompletedError):
@@ -302,7 +308,7 @@ def test_generate_daily_nutrition_report_already_exists() -> None:
     target_date = date(2025, 11, 24)
 
     # セットアップ
-    profile = _make_profile(user_id, meals_per_day=3)
+    profile = _make_profile_for_daily_log(user_id, meals_per_day=3)
     profile_query = FakeProfileQueryPort(profile=profile)
     daily_log_uc = FakeCheckDailyLogCompletionUseCase(is_completed=True)
     snapshot = _make_daily_target_snapshot(user_id, target_date)
@@ -332,7 +338,6 @@ def test_generate_daily_nutrition_report_already_exists() -> None:
         daily_report_repo=daily_report_repo)
     report_generator = FakeDailyNutritionReportGenerator()
     clock = FixedClock()
-    plan_checker = FakePlanChecker()
 
     use_case = GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
@@ -342,7 +347,6 @@ def test_generate_daily_nutrition_report_already_exists() -> None:
         nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
-        plan_checker=plan_checker,
     )
 
     with pytest.raises(DailyNutritionReportAlreadyExistsError):
@@ -367,7 +371,6 @@ def test_generate_daily_nutrition_report_profile_not_found() -> None:
     nutrition_uow = FakeNutritionUnitOfWork()
     report_generator = FakeDailyNutritionReportGenerator()
     clock = FixedClock()
-    plan_checker = FakePlanChecker()
 
     use_case = GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
@@ -377,7 +380,6 @@ def test_generate_daily_nutrition_report_profile_not_found() -> None:
         nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
-        plan_checker=plan_checker,
     )
 
     with pytest.raises(DailyLogProfileNotFoundError):

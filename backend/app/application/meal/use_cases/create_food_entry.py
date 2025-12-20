@@ -20,23 +20,24 @@ class CreateFoodEntryUseCase:
     def __init__(self, meal_uow: MealUnitOfWorkPort) -> None:
         self._meal_uow = meal_uow
 
-    def execute(self, user_id: UserId, dto: CreateFoodEntryInputDTO) -> FoodEntryDTO:
+    def execute(self, user_id: UserId, input_dto: CreateFoodEntryInputDTO) -> FoodEntryDTO:
         try:
-            meal_type = MealType(dto.meal_type)
+            meal_type = MealType(input_dto.meal_type)
         except ValueError:
-            raise InvalidMealTypeError(f"Invalid meal_type: {dto.meal_type}")
+            raise InvalidMealTypeError(
+                f"Invalid meal_type: {input_dto.meal_type}")
 
         entry = FoodEntry(
             id=FoodEntryId.new(),
             user_id=user_id,
-            date=dto.date,
+            date=input_dto.date,
             meal_type=meal_type,
-            meal_index=dto.meal_index,
-            name=dto.name,
-            amount_value=dto.amount_value,
-            amount_unit=dto.amount_unit,
-            serving_count=dto.serving_count,
-            note=dto.note,
+            meal_index=input_dto.meal_index,
+            name=input_dto.name,
+            amount_value=input_dto.amount_value,
+            amount_unit=input_dto.amount_unit,
+            serving_count=input_dto.serving_count,
+            note=input_dto.note,
             created_at=None,
             updated_at=None,
             deleted_at=None,

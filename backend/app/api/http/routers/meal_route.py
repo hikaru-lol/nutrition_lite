@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date as DateType
 
+from app.api.http.schemas.errors import ErrorResponse
+
 # === Third-party ============================================================
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 
@@ -85,9 +87,13 @@ def _recompute_daily_summaries(
     "/meal-items",
     response_model=MealItemResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+    },
 )
 def create_meal_item(
-    body: MealItemRequest,
+    request: MealItemRequest,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: CreateFoodEntryUseCase = Depends(get_create_food_entry_use_case),
 ) -> MealItemResponse:
@@ -96,14 +102,14 @@ def create_meal_item(
     """
 
     input_dto = CreateFoodEntryInputDTO(
-        date=body.date,
-        meal_type=body.meal_type.value,  # Enum -> str ("main" / "snack")
-        meal_index=body.meal_index,
-        name=body.name,
-        amount_value=body.amount_value,
-        amount_unit=body.amount_unit,
-        serving_count=body.serving_count,
-        note=body.note,
+        date=request.date,
+        meal_type=request.meal_type.value,  # Enum -> str ("main" / "snack")
+        meal_index=request.meal_index,
+        name=request.name,
+        amount_value=request.amount_value,
+        amount_unit=request.amount_unit,
+        serving_count=request.serving_count,
+        note=request.note,
     )
 
     dto = use_case.execute(current_user.id, input_dto)
@@ -113,6 +119,9 @@ def create_meal_item(
 @router.get(
     "/meal-items",
     response_model=MealItemListResponse,
+    responses={
+        401: {"model": ErrorResponse},
+    },
 )
 def list_meal_items_by_date(
     date: DateType = Query(..., description="対象日 (YYYY-MM-DD)"),
@@ -134,9 +143,14 @@ def list_meal_items_by_date(
 @router.patch(
     "/meal-items/{entry_id}",
     response_model=MealItemResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
 )
 def update_meal_item(
-    body: MealItemRequest,
+    request: MealItemRequest,
     entry_id: str = Path(..., description="FoodEntry ID (UUID 文字列)"),
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: UpdateFoodEntryUseCase = Depends(get_update_food_entry_use_case),
@@ -151,14 +165,14 @@ def update_meal_item(
 
     input_dto = UpdateFoodEntryInputDTO(
         entry_id=entry_id,
-        date=body.date,
-        meal_type=body.meal_type.value,  # Enum -> str ("main" / "snack")
-        meal_index=body.meal_index,
-        name=body.name,
-        amount_value=body.amount_value,
-        amount_unit=body.amount_unit,
-        serving_count=body.serving_count,
-        note=body.note,
+        date=request.date,
+        meal_type=request.meal_type.value,  # Enum -> str ("main" / "snack")
+        meal_index=request.meal_index,
+        name=request.name,
+        amount_value=request.amount_value,
+        amount_unit=request.amount_unit,
+        serving_count=request.serving_count,
+        note=request.note,
     )
 
     # UpdateFoodEntryUseCase は UpdateFoodEntryResultDTO を返す想定
@@ -179,6 +193,10 @@ def update_meal_item(
 @router.delete(
     "/meal-items/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
 )
 def delete_meal_item(
     entry_id: str = Path(..., description="FoodEntry ID (UUID 文字列)"),

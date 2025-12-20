@@ -14,6 +14,7 @@ from app.api.http.schemas.nutrition import (
     MealNutritionSummaryResponse,
     MealNutrientResponse,
 )
+from app.api.http.schemas.errors import ErrorResponse
 
 # === Application (DTO / UseCase) ============================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
@@ -90,6 +91,11 @@ def _to_daily_response(summary: DailyNutritionSummary) -> DailyNutritionSummaryR
 @router.get(
     "/nutrition/meal",
     response_model=MealAndDailyNutritionResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 def get_meal_and_daily_nutrition(
     date: DateType = Query(..., description="対象日 (YYYY-MM-DD)"),

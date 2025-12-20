@@ -12,11 +12,11 @@ from app.api.http.dependencies.auth import get_current_user_dto
 from app.api.http.mappers.auth import to_user_summary
 from app.api.http.schemas.auth import (
     AuthUserResponse,
-    ErrorResponse,
     LoginRequest,
     RefreshResponse,
     RegisterRequest,
 )
+from app.api.http.schemas.errors import ErrorResponse
 
 # === Auth (Application 層 DTO / UseCase) ====================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO

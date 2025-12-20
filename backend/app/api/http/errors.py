@@ -162,6 +162,13 @@ async def target_error_handler(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
+    if isinstance(exc, target_app_errors.TargetGenerationFailedError):
+        return error_response(
+            code="TARGET_GENERATION_FAILED",
+            message="栄養ターゲットの自動生成に失敗しました。",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
     logger.exception("Unhandled TargetError: %s", exc)
     return error_response(
         code="INTERNAL_ERROR",

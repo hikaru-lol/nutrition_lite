@@ -89,6 +89,18 @@ def _assert_error(resp, *, status_code: int, code: str) -> None:
     assert "message" in data["error"]
 
 
+def _make_profile_for_daily_log(meals_per_day: int) -> ProfileForDailyLog:
+    from app.domain.profile.value_objects import Sex, HeightCm, WeightKg
+
+    return ProfileForDailyLog(
+        sex=Sex.MALE,
+        birthdate=date(1990, 1, 1),
+        height_cm=HeightCm(175.0),
+        weight_kg=WeightKg(70.0),
+        meals_per_day=meals_per_day,
+    )
+
+
 # =========================================
 # Fake Repositories
 # =========================================
@@ -120,7 +132,7 @@ class FakeProfileQuery(ProfileQueryPort):
 
     def set_daily_log_profile(self, meals_per_day: int) -> None:
         """テスト用: プロフィール情報を設定"""
-        self._daily_log = ProfileForDailyLog(meals_per_day=meals_per_day)
+        self._daily_log = _make_profile_for_daily_log(meals_per_day)
 
     def get_profile_for_daily_log(self, user_id: UserId) -> ProfileForDailyLog | None:
         return self._daily_log
@@ -248,7 +260,6 @@ def app(
         nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
-        plan_checker=plan_checker,
     )
 
     get_report_uc = GetDailyNutritionReportUseCase(uow=nutrition_uow)

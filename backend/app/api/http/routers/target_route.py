@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 
 # === API (schemas / dependencies) ==========================================
 from app.api.http.dependencies.auth import get_current_user_dto
-from app.api.http.schemas.auth import ErrorResponse
+from app.api.http.schemas.errors import ErrorResponse
 from app.api.http.schemas.target import (
     CreateTargetRequest,
     TargetListResponse,
@@ -73,7 +73,7 @@ def create_target(
     10栄養素はサーバ側で TargetGenerator により決定される。
     """
     input_dto = CreateTargetInputDTO(
-        user_id=str(current_user.id),
+        user_id=current_user.id,
         title=request.title,
         goal_type=request.goal_type,           # Literal[str] -> str
         goal_description=request.goal_description,
