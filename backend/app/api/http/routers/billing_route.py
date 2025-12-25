@@ -1,33 +1,38 @@
 from __future__ import annotations
-
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
-
-from app.api.http.dependencies.auth import get_current_user_dto
-from app.api.http.schemas.billing import (
-    CheckoutSessionResponse,
-    BillingPortalUrlResponse,
-)
-from app.application.auth.dto.auth_user_dto import AuthUserDTO
-from app.application.billing.use_cases.create_checkout_session import (
-    CreateCheckoutSessionInput,
-    CreateCheckoutSessionUseCase,
-)
-from app.application.billing.use_cases.get_billing_portal_url import (
-    GetBillingPortalUrlInput,
-    GetBillingPortalUrlUseCase,
-)
-from app.application.billing.use_cases.handle_stripe_webhook import (
-    HandleStripeWebhookInput,
-    HandleStripeWebhookUseCase,
-)
+from app.domain.billing.errors import BillingAccountNotFoundError
+from stripe import error as stripe_error
+from app.settings import settings
+from app.domain.auth.value_objects import UserId
 from app.di.container import (
     get_create_checkout_session_use_case,
     get_billing_portal_url_use_case,
     get_handle_stripe_webhook_use_case,
 )
-from app.domain.auth.value_objects import UserId
-from app.settings import settings
-from app.domain.billing.errors import BillingAccountNotFoundError
+from app.application.billing.use_cases.handle_stripe_webhook import (
+    HandleStripeWebhookInput,
+    HandleStripeWebhookUseCase,
+)
+from app.application.billing.use_cases.get_billing_portal_url import (
+    GetBillingPortalUrlInput,
+    GetBillingPortalUrlUseCase,
+)
+from app.application.billing.use_cases.create_checkout_session import (
+    CreateCheckoutSessionInput,
+    CreateCheckoutSessionUseCase,
+)
+from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.api.http.schemas.billing import (
+    CheckoutSessionResponse,
+    BillingPortalUrlResponse,
+)
+from app.api.http.dependencies.auth import get_current_user_dto
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
+from uuid import uuid4
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
@@ -36,7 +41,9 @@ router = APIRouter(prefix="/billing", tags=["Billing"])
     "/checkout-session",
     response_model=CheckoutSessionResponse,
     responses={
+        400: {"description": "Billing inconsistent state"},
         401: {"description": "Unauthorized"},
+        404: {"description": "Billing account not found"},
         500: {"description": "Failed to create checkout session"},
     },
 )
@@ -44,12 +51,19 @@ def create_checkout_session(
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: CreateCheckoutSessionUseCase = Depends(
         get_create_checkout_session_use_case),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> CheckoutSessionResponse:
     """
     Stripe Checkout セッションを作成し、その URL を返す。
 
     - フロントからはこの URL にリダイレクトすればサブスク購入画面に飛ぶ。
     """
+    if not idempotency_key:
+        idempotency_key = str(uuid4())
+
+    customer_key = f"cus:{idempotency_key}"[:255]
+    session_key = f"cs:{idempotency_key}"[:255]
+
     user_id = UserId(current_user.id)
 
     # 成功時の戻り URL / キャンセル URL は settings から組み立てる前提
@@ -60,13 +74,14 @@ def create_checkout_session(
         user_id=user_id,
         success_url=success_url,
         cancel_url=cancel_url,
+        customer_key=customer_key,
+        session_key=session_key,
     )
 
     try:
         output = use_case.execute(input_dto)
     except Exception as e:
-        # stripe エラーやその他を 500 としてまとめる（詳細はログに出す想定）
-        # 実運用では、特定のエラー型ごとに分けてもよい
+        logger.exception("Failed to create checkout session")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create checkout session.",
@@ -120,6 +135,10 @@ def get_billing_portal_url(
 @router.post(
     "/stripe/webhook",
     status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Invalid Stripe webhook payload or signature"},
+        500: {"description": "Failed to handle Stripe webhook"},
+    },
 )
 async def stripe_webhook(
     request: Request,
@@ -141,14 +160,17 @@ async def stripe_webhook(
 
     try:
         use_case.execute(input_dto)
-    except Exception as e:
-        # Stripe の仕様上、署名検証失敗などは 400 を返す
-        # construct_event 内部で例外を投げる実装に合わせて、
-        # 必要であれば特定の例外型ごとに分けてもよい
+    except stripe_error.SignatureVerificationError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Stripe webhook payload or signature.",
-        ) from e
+        )
+    except Exception:
+        logger.exception("stripe_webhook failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to handle Stripe webhook.",
+        )
 
     # Stripe は 2xx を返せば OK（ボディは空 or {} でよい）
     return {}

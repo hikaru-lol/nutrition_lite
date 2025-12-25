@@ -33,6 +33,7 @@ class StripeClientPort(Protocol):
         price_id: str,
         success_url: str,
         cancel_url: str,
+        user_id: str,
     ) -> str:
         """
         サブスク用の Checkout セッションを作成し、その URL を返す。

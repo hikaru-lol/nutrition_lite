@@ -12,6 +12,7 @@ from app.domain.meal import errors as meal_domain_errors
 from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError, DailyLogProfileNotFoundError
 from app.domain.nutrition import errors as nutrition_domain_errors
 from app.domain.target import errors as target_domain_errors
+from app.domain.billing import errors as billing_errors
 
 logger = logging.getLogger(__name__)
 
@@ -369,4 +370,40 @@ async def meal_slot_error_handler(
         status_code=status.HTTP_400_BAD_REQUEST,
         code="INVALID_MEAL_SLOT",
         message=str(exc) or "Invalid meal slot",
+    )
+
+
+# === Billing ===================================================================
+
+
+async def billing_error_handler(request: Request, exc: billing_errors.BillingError) -> JSONResponse:
+    """
+    Billing アプリケーション層のエラーを HTTP レスポンスにマッピングするハンドラ。
+    """
+    logger.warning(
+        "BillingError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, billing_errors.BillingAccountNotFoundError):
+        return error_response(
+            code="BILLING_ACCOUNT_NOT_FOUND",
+            message="Billing account not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if isinstance(exc, billing_errors.BillingInconsistentStateError):
+        return error_response(
+            code="BILLING_INCONSISTENT_STATE",
+            message="Billing inconsistent state",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return error_response(
+        code="INTERNAL_ERROR",
+        message="予期しないエラーが発生しました。",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )

@@ -26,7 +26,7 @@ class StripeClient(StripeClientPort):
 
     # --- Checkout / Portal -------------------------------------------
 
-    def create_customer(self, email: str, user_id: str) -> str:
+    def create_customer(self, email: str, user_id: str, idempotency_key: str) -> str:
         """
         メールアドレスと user_id を metadata に入れて Customer を作る。
         すでに同じメールの Customer がいるかどうかを探すロジックは
@@ -35,6 +35,7 @@ class StripeClient(StripeClientPort):
         customer = stripe.Customer.create(
             email=email,
             metadata={"user_id": user_id},
+            idempotency_key=idempotency_key,
         )
         return customer.id
 
@@ -44,6 +45,8 @@ class StripeClient(StripeClientPort):
         price_id: str,
         success_url: str,
         cancel_url: str,
+        user_id: str,
+        idempotency_key: str,
     ) -> str:
         """
         サブスク用の Checkout セッションを作成し、その URL を返す。
@@ -54,6 +57,11 @@ class StripeClient(StripeClientPort):
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=success_url,
             cancel_url=cancel_url,
+            metadata={
+                "user_id": user_id,
+            },
+            client_reference_id=user_id,
+            idempotency_key=idempotency_key,
         )
         return session.url
 

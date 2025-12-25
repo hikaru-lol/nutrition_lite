@@ -20,6 +20,7 @@ from app.api.http.routers.target_route import router as target_router
 from app.api.http.routers.meal_route import router as meal_router
 from app.api.http.routers.nutrition_route import router as nutrition_router
 from app.api.http.routers.daily_report_route import router as daily_report_router
+from app.api.http.routers.billing_route import router as billing_router
 
 
 def configure_logging() -> None:
@@ -36,12 +37,21 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    @app.get("/health")
+    def health() -> dict:
+        return {"status": "ok"}
+
+    @app.get("/health/one-more")
+    def health_one_more() -> dict:
+        return {"status": "ok one more"}
+
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(profile_router, prefix="/api/v1")
     app.include_router(target_router, prefix="/api/v1")
     app.include_router(meal_router, prefix="/api/v1")
     app.include_router(nutrition_router, prefix="/api/v1")
     app.include_router(daily_report_router, prefix="/api/v1")
+    app.include_router(billing_router, prefix="/api/v1")
     app.add_exception_handler(auth_errors.AuthError, auth_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(
