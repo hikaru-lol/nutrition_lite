@@ -17,6 +17,8 @@ class CreateCheckoutSessionInput:
     user_id: UserId
     success_url: str
     cancel_url: str
+    customer_key: str
+    session_key: str
 
 
 @dataclass(slots=True)
@@ -80,7 +82,7 @@ class CreateCheckoutSessionUseCase:
             # Stripe Customer がなければ作成
             if billing_account.stripe_customer_id is None:
                 customer_id = self._stripe.create_customer(
-                    email=email, user_id=user_id.value)
+                    email=email, user_id=user_id.value, idempotency_key=input.customer_key)
                 billing_account.stripe_customer_id = customer_id
                 billing_account.updated_at = now
             else:
@@ -92,6 +94,8 @@ class CreateCheckoutSessionUseCase:
                 price_id=self._price_id,
                 success_url=input.success_url,
                 cancel_url=input.cancel_url,
+                user_id=user_id.value,
+                idempotency_key=input.session_key,
             )
 
             billing_repo.save(billing_account)

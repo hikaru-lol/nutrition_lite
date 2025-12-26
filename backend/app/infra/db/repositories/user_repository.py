@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.application.auth.ports.user_repository_port import UserRepositoryPort
 from app.domain.auth.entities import User
-from app.domain.auth.value_objects import EmailAddress, UserId
+from app.domain.auth.value_objects import EmailAddress, UserId, HashedPassword
 from app.domain.auth.errors import EmailAlreadyUsedError
 from app.domain.auth.value_objects import UserPlan, TrialInfo  # など
 from app.infra.db.models.user import UserModel
@@ -21,7 +21,8 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         return User(
             id=UserId(str(model.id)),
             email=EmailAddress(model.email),
-            hashed_password=model.hashed_password,  # HashedPassword(...) ならラップ
+            hashed_password=HashedPassword(
+                model.hashed_password),  # HashedPassword(...) ならラップ
             name=model.name,
             plan=UserPlan(model.plan),
             trial_info=TrialInfo(trial_ends_at=model.trial_ends_at),

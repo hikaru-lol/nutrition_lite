@@ -20,7 +20,7 @@ class NutritionEstimationFailedError(NutritionDomainError):
     pass
 
 
-class DailyLogNotCompletedError(Exception):
+class DailyLogNotCompletedError(NutritionDomainError):
     """
     その日が「記録完了」していないのに日次レポート生成を試みた場合のエラー。
 
@@ -30,7 +30,7 @@ class DailyLogNotCompletedError(Exception):
     pass
 
 
-class DailyNutritionReportAlreadyExistsError(Exception):
+class DailyNutritionReportAlreadyExistsError(NutritionDomainError):
     """
     同じ (user_id, date) の DailyNutritionReport が既に存在する場合のエラー。
 
@@ -40,7 +40,7 @@ class DailyNutritionReportAlreadyExistsError(Exception):
     pass
 
 
-class NotEnoughDailyReportsError(Exception):
+class NotEnoughDailyReportsError(NutritionDomainError):
     """
     提案生成に必要な日次レポート数が足りない場合のエラー。
 
@@ -50,7 +50,7 @@ class NotEnoughDailyReportsError(Exception):
     pass
 
 
-class MealRecommendationAlreadyExistsError(Exception):
+class MealRecommendationAlreadyExistsError(NutritionDomainError):
     """
     同じ (user_id, generated_for_date) の提案が既に存在する場合のエラー。
     """

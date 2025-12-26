@@ -11,6 +11,7 @@ from app.api.http.schemas.daily_report import (
     DailyNutritionReportResponse,
     GenerateDailyReportRequest,
 )
+from app.api.http.schemas.errors import ErrorResponse
 
 # === Application (DTO / UseCase) ============================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
@@ -47,6 +48,7 @@ def _report_to_response(report: DailyNutritionReport) -> DailyNutritionReportRes
         good_points=report.good_points,
         improvement_points=report.improvement_points,
         tomorrow_focus=report.tomorrow_focus,
+        created_at=report.created_at,
     )
 
 
@@ -57,9 +59,14 @@ def _report_to_response(report: DailyNutritionReport) -> DailyNutritionReportRes
     "/nutrition/daily/report",
     response_model=DailyNutritionReportResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        "400": {"model": ErrorResponse},
+        "401": {"model": ErrorResponse},
+        "409": {"model": ErrorResponse},
+    },
 )
 def generate_daily_nutrition_report(
-    body: GenerateDailyReportRequest,
+    request: GenerateDailyReportRequest,
     current_user: AuthUserDTO = Depends(get_current_user_dto),
     use_case: GenerateDailyNutritionReportUseCase = Depends(
         get_generate_daily_nutrition_report_use_case
@@ -78,7 +85,7 @@ def generate_daily_nutrition_report(
     """
 
     user_id = UserId(current_user.id)
-    target_date: DateType = body.date
+    target_date: DateType = request.date
 
     report = use_case.execute(user_id=user_id, date_=target_date)
     return _report_to_response(report)
@@ -87,6 +94,11 @@ def generate_daily_nutrition_report(
 @router.get(
     "/nutrition/daily/report",
     response_model=DailyNutritionReportResponse,
+    responses={
+        "400": {"model": ErrorResponse},
+        "401": {"model": ErrorResponse},
+        "404": {"model": ErrorResponse},
+    },
 )
 def get_daily_nutrition_report(
     date: DateType = Query(..., description="レポート対象日 (YYYY-MM-DD)"),

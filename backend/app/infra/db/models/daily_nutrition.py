@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import List
 import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as pg
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from app.infra.db.base import Base
 
@@ -40,7 +39,7 @@ class DailyNutritionSummaryModel(Base):
         onupdate=sa.func.now(),
     )
 
-    nutrients: List[DailyNutritionNutrientModel] = relationship(
+    nutrients: Mapped[list["DailyNutritionNutrientModel"]] = relationship(
         "DailyNutritionNutrientModel",
         back_populates="summary",
         cascade="all, delete-orphan",
@@ -79,7 +78,7 @@ class DailyNutritionNutrientModel(Base):
     # NutrientSource.value
     source = sa.Column(sa.String(length=50), nullable=False)
 
-    summary = relationship(
+    summary: Mapped["DailyNutritionSummaryModel"] = relationship(
         "DailyNutritionSummaryModel",
         back_populates="nutrients",
     )

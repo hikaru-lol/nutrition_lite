@@ -9,8 +9,7 @@ from alembic import context
 from app.infra.db.base import Base
 from app.settings import settings
 
-from app.infra.db.models import user
-from app.infra.db.models import profile
+import app.infra.db.models
 
 config = context.config
 

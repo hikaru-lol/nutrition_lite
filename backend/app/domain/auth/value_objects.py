@@ -54,14 +54,9 @@ class UserId:
 
 @dataclass(frozen=True)
 class TrialInfo:
-    """
-    トライアル期間に関する情報。
-    """
-
     trial_ends_at: datetime | None
 
-    @property
-    def is_trial_active(self) -> bool:
+    def is_trial_active(self, now: datetime) -> bool:
         if self.trial_ends_at is None:
             return False
-        return datetime.utcnow() < self.trial_ends_at
+        return now < self.trial_ends_at

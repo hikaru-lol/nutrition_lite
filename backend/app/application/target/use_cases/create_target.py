@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from uuid import uuid4
 
 # === Application (DTO / Ports) ==============================================
@@ -15,17 +14,17 @@ from app.application.target.dto.target_dto import (
     TargetDTO,
     TargetNutrientDTO,
 )
-from app.application.target.errors import TargetLimitExceededError
+from app.application.target.errors import TargetGenerationFailedError, TargetLimitExceededError, TargetProfileNotFoundError
 from app.application.target.ports.target_generator_port import (
     TargetGenerationContext,
     TargetGeneratorPort,
+    TargetGenerationResult,
 )
 from app.application.target.ports.uow_port import TargetUnitOfWorkPort
 
 # === Domain (Entities / ValueObjects / Errors) ==============================
 
 from app.domain.auth.value_objects import UserId
-from app.domain.profile.errors import ProfileNotFoundError
 from app.domain.target.entities import TargetDefinition
 from app.domain.target.value_objects import ActivityLevel, GoalType, TargetId, ALL_NUTRIENT_CODES
 
@@ -78,7 +77,7 @@ class CreateTargetUseCase:
                 user_id
             )
             if profile is None:
-                raise ProfileNotFoundError(
+                raise TargetProfileNotFoundError(
                     f"Profile not found for user {user_id}."
                 )
 
@@ -92,7 +91,7 @@ class CreateTargetUseCase:
                 goal_type=GoalType(input_dto.goal_type),
                 activity_level=ActivityLevel(input_dto.activity_level),
             )
-            gen_result = self._generator.generate(ctx)
+            gen_result: TargetGenerationResult = self._generator.generate(ctx)
 
             # ここで「10 栄養素そろっているか」を検査
             present = {n.code for n in gen_result.nutrients}
@@ -100,7 +99,7 @@ class CreateTargetUseCase:
                 code for code in ALL_NUTRIENT_CODES if code not in present]
             if missing:
                 codes_str = ", ".join(c.value for c in missing)
-                raise ValueError(
+                raise TargetGenerationFailedError(
                     f"TargetGenerator returned nutrients missing codes: {codes_str}"
                 )
 

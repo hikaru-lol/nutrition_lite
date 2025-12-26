@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from sqlalchemy import (
-    Column,
-    Date,
-    DateTime,
-    Float,
-    String,
-    ForeignKey,
-    SmallInteger,  # ← ここで一緒にimport
-)
-from sqlalchemy.dialects.postgresql import UUID
+import sqlalchemy as sa
+import sqlalchemy.dialects.postgresql as pg
+from sqlalchemy.orm import Mapped, relationship
 
 from app.infra.db.base import Base
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.infra.db.models.user import UserModel
 
 
 class ProfileModel(Base):
@@ -23,21 +20,26 @@ class ProfileModel(Base):
 
     __tablename__ = "profiles"
 
-    user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+    user_id = sa.Column(
+        pg.UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
 
-    sex = Column(String, nullable=False)
-    birthdate = Column(Date, nullable=False)
-    height_cm = Column(Float, nullable=False)
-    weight_kg = Column(Float, nullable=False)
+    sex = sa.Column(sa.String, nullable=False)
+    birthdate = sa.Column(sa.Date, nullable=False)
+    height_cm = sa.Column(sa.Float, nullable=False)
+    weight_kg = sa.Column(sa.Float, nullable=False)
 
-    image_id = Column(String, nullable=True)
+    image_id = sa.Column(sa.String, nullable=True)
 
-    # 💡 修正ポイント：display_width を削除
-    meals_per_day = Column(SmallInteger, nullable=True)
+    meals_per_day = sa.Column(sa.SmallInteger, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
+    updated_at = sa.Column(sa.DateTime(timezone=True), nullable=False)
+
+    # リレーションシップ
+    user: Mapped["UserModel"] = relationship(
+        "UserModel",
+        back_populates="profile",
+    )

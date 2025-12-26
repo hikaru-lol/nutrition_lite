@@ -13,6 +13,7 @@ from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError, 
 from app.domain.nutrition import errors as nutrition_domain_errors
 from app.domain.profile import errors as profile_domain_errors
 from app.domain.target import errors as target_domain_errors
+from app.domain.billing import errors as billing_errors
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,13 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError) -> JS
             status_code=status.HTTP_409_CONFLICT,
         )
 
+    if isinstance(exc, auth_errors.InvalidAccessTokenError):
+        return error_response(
+            code="INVALID_ACCESS_TOKEN",
+            message="アクセストークンが無効または期限切れです。",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
     if isinstance(exc, auth_errors.InvalidCredentialsError):
         return error_response(
             code="INVALID_CREDENTIALS",
@@ -85,8 +93,43 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError) -> JS
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    if isinstance(exc, auth_errors.PremiumFeatureRequiredError):
+        return error_response(
+            code="PREMIUM_FEATURE_REQUIRED",
+            message="この機能はトライアル中または有料プランで利用できます。",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
     # 想定外の AuthError（基本ないはずだが念のため）
     logger.exception("Unhandled AuthError: %s", exc)
+    return error_response(
+        code="INTERNAL_ERROR",
+        message="予期しないエラーが発生しました。",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+# === Profile (Domain エラー) ================================================
+async def profile_domain_error_handler(
+    request: Request,
+    exc: profile_domain_errors.ProfileError,
+) -> JSONResponse:
+    logger.warning(
+        "ProfileError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, profile_domain_errors.ProfileNotFoundError):
+        return error_response(
+            code="PROFILE_NOT_FOUND",
+            message="プロフィールが見つかりません。",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    logger.exception("Unhandled ProfileError: %s", exc)
     return error_response(
         code="INTERNAL_ERROR",
         message="予期しないエラーが発生しました。",
@@ -149,11 +192,18 @@ async def target_error_handler(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    if isinstance(exc, profile_domain_errors.ProfileNotFoundError):
+    if isinstance(exc, target_app_errors.TargetProfileNotFoundError):
         return error_response(
-            code="PROFILE_NOT_FOUND",
-            message="プロフィールが見つかりません。",
+            code="TARGET_PROFILE_NOT_FOUND",
+            message="ターゲットを生成するためのプロフィールが見つかりません。",
             status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if isinstance(exc, target_app_errors.TargetGenerationFailedError):
+        return error_response(
+            code="TARGET_GENERATION_FAILED",
+            message="栄養ターゲットの自動生成に失敗しました。",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
     logger.exception("Unhandled TargetError: %s", exc)
@@ -242,6 +292,13 @@ async def meal_domain_error_handler(
             status_code=status.HTTP_400_BAD_REQUEST,
             code="DAILY_LOG_PROFILE_NOT_FOUND",
             message="日次ログの判定にはプロフィールの設定が必要です。",
+        )
+
+    if isinstance(exc, meal_domain_errors.InvalidMealsPerDayError):
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="INVALID_MEALS_PER_DAY",
+            message="Invalid meals_per_day",
         )
 
     # 404 系
@@ -349,4 +406,40 @@ async def meal_slot_error_handler(
         status_code=status.HTTP_400_BAD_REQUEST,
         code="INVALID_MEAL_SLOT",
         message=str(exc) or "Invalid meal slot",
+    )
+
+
+# === Billing ===================================================================
+
+
+async def billing_error_handler(request: Request, exc: billing_errors.BillingError) -> JSONResponse:
+    """
+    Billing アプリケーション層のエラーを HTTP レスポンスにマッピングするハンドラ。
+    """
+    logger.warning(
+        "BillingError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, billing_errors.BillingAccountNotFoundError):
+        return error_response(
+            code="BILLING_ACCOUNT_NOT_FOUND",
+            message="Billing account not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    if isinstance(exc, billing_errors.BillingInconsistentStateError):
+        return error_response(
+            code="BILLING_INCONSISTENT_STATE",
+            message="Billing inconsistent state",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return error_response(
+        code="INTERNAL_ERROR",
+        message="予期しないエラーが発生しました。",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )

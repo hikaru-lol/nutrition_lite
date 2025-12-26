@@ -33,6 +33,7 @@ class SqlAlchemyProfileRepository(ProfileRepositoryPort):
             weight_kg=WeightKg(model.weight_kg),
             image_id=ProfileImageId(
                 model.image_id) if model.image_id else None,
+            meals_per_day=model.meals_per_day,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -50,6 +51,7 @@ class SqlAlchemyProfileRepository(ProfileRepositoryPort):
         model.height_cm = entity.height_cm.value
         model.weight_kg = entity.weight_kg.value
         model.image_id = entity.image_id.value if entity.image_id else None
+        model.meals_per_day = entity.meals_per_day
         model.created_at = entity.created_at
         model.updated_at = entity.updated_at
 
@@ -68,7 +70,9 @@ class SqlAlchemyProfileRepository(ProfileRepositoryPort):
         新規 or 更新を同じメソッドで扱う。
         commit は UoW 側で行う前提なので、ここでは flush までにとどめる。
         """
+
         model = self._from_entity(profile)
+
         self._session.add(model)
 
         # auth と同様、必要なら flush() して PK や制約エラーを早めに検出してもよい

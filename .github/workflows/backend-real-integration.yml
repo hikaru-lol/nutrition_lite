@@ -1,10 +1,11 @@
 name: Backend Real Integration Tests
 
 on:
+  # workflow_dispatch:
   push:
     paths:
-      # - 'backend/**'
-      # - '.github/workflows/backend-real-*'
+      - 'backend/**'
+      - '.github/workflows/backend-real-*'
   pull_request:
     branches:
       - main

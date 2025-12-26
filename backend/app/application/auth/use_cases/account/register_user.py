@@ -89,8 +89,6 @@ class RegisterUserUseCase:
             )
 
             saved = uow.user_repo.save(user)
-            # 必要であればここで uow.commit() を明示的に呼んでもよい
-            # uow.commit()
 
         # --- 3. トークン発行 ------------------------------------------
         payload = TokenPayload(user_id=saved.id.value, plan=saved.plan)

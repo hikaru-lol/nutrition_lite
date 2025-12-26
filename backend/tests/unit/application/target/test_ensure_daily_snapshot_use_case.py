@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.target.dto.target_dto import EnsureDailySnapshotInputDTO
 from app.application.target.use_cases.ensure_daily_snapshot import (
-    EnsureDailySnapshotUseCase,
-    EnsureDailySnapshotInputDTO,
+    EnsureDailyTargetSnapshotUseCase,
 )
 from app.application.target.errors import TargetNotFoundError
 from app.domain.auth.value_objects import UserId
@@ -37,7 +37,7 @@ def test_ensure_daily_snapshot_returns_existing_if_present():
     )
     snap_repo.add(existing_snapshot)
 
-    use_case = EnsureDailySnapshotUseCase(uow)
+    use_case = EnsureDailyTargetSnapshotUseCase(uow)
 
     input_dto = EnsureDailySnapshotInputDTO(
         user_id=user_id,
@@ -60,7 +60,7 @@ def test_ensure_daily_snapshot_creates_new_if_not_exists():
 
     snapshot_date = date(2024, 1, 2)
 
-    use_case = EnsureDailySnapshotUseCase(uow)
+    use_case = EnsureDailyTargetSnapshotUseCase(uow)
 
     input_dto = EnsureDailySnapshotInputDTO(
         user_id=user_id,
@@ -85,7 +85,7 @@ def test_ensure_daily_snapshot_raises_if_no_active_target():
     snap_repo = FakeTargetSnapshotRepository()
     uow = FakeTargetUnitOfWork(repo, snap_repo)
 
-    use_case = EnsureDailySnapshotUseCase(uow)
+    use_case = EnsureDailyTargetSnapshotUseCase(uow)
 
     input_dto = EnsureDailySnapshotInputDTO(
         user_id=user_id,

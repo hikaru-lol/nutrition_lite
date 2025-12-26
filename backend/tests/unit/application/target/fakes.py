@@ -13,6 +13,10 @@ from app.application.target.ports.target_generator_port import (
     TargetGenerationContext,
     TargetGenerationResult,
 )
+from app.application.profile.ports.profile_query_port import (
+    ProfileQueryPort,
+    ProfileForTarget,
+)
 
 from app.domain.auth.value_objects import UserId
 from app.domain.target.entities import (
@@ -190,6 +194,31 @@ class FakeTargetGenerator(TargetGeneratorPort):
             llm_rationale="fake rationale",
             disclaimer="fake disclaimer",
         )
+
+
+class FakeProfileQuery(ProfileQueryPort):
+    """
+    テスト用の ProfileQueryPort 実装。
+
+    - デフォルトで None を返す（プロフィールなし）。
+    - テストで必要に応じて値を設定可能。
+    """
+
+    def __init__(self) -> None:
+        self._profile_for_target: ProfileForTarget | None = None
+
+    def set_profile_for_target(self, profile: ProfileForTarget) -> None:
+        """テスト用: プロフィール情報を設定"""
+        self._profile_for_target = profile
+
+    def get_profile_for_target(self, user_id: UserId) -> ProfileForTarget | None:
+        return self._profile_for_target
+
+    def get_profile_for_daily_log(self, user_id: UserId) -> None:
+        return None
+
+    def get_profile_for_recommendation(self, user_id: UserId) -> None:
+        return None
 
 
 # =====================================================================

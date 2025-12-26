@@ -6,6 +6,7 @@ from app.application.profile.ports.profile_query_port import (
     ProfileForDailyLog,
     ProfileForRecommendation,
 )
+from app.application.profile.dto.profile_dto import ProfileDTO
 from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.domain.auth.value_objects import UserId
 from app.domain.profile.errors import ProfileNotFoundError as DomainProfileNotFoundError
@@ -20,7 +21,7 @@ class ProfileQueryService(ProfileQueryPort):
     def __init__(self, get_my_profile_uc: GetMyProfileUseCase) -> None:
         self._get_my_profile_uc = get_my_profile_uc
 
-    def _get_profile_output(self, user_id: UserId):
+    def _get_profile_output(self, user_id: UserId) -> ProfileDTO | None:
         """
         内部的に GetMyProfileUseCase を呼び出す共通ヘルパー。
         """
@@ -47,12 +48,16 @@ class ProfileQueryService(ProfileQueryPort):
     # --- DailyLog 用 ---------------------------------------------------
 
     def get_profile_for_daily_log(self, user_id: UserId) -> ProfileForDailyLog | None:
-        output = self._get_profile_output(user_id)
+        output: ProfileDTO | None = self._get_profile_output(user_id)
         if output is None:
             return None
 
         return ProfileForDailyLog(
-            meals_per_day=getattr(output, "meals_per_day", None),
+            sex=output.sex,
+            birthdate=output.birthdate,
+            height_cm=output.height_cm,
+            weight_kg=output.weight_kg,
+            meals_per_day=output.meals_per_day,
         )
 
 # --- Recommendation 用 --------------------------------------------

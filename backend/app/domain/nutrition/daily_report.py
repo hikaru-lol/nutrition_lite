@@ -10,10 +10,6 @@ from app.domain.auth.value_objects import UserId
 
 @dataclass(frozen=True)
 class DailyNutritionReportId:
-    """
-    DailyNutritionReport 用の ID 値オブジェクト。
-    """
-
     value: UUID
 
     @classmethod
@@ -23,27 +19,18 @@ class DailyNutritionReportId:
 
 @dataclass
 class DailyNutritionReport:
-    """
-    1 日分の栄養レポート。
-
-    - user_id + date ごとに 0 or 1 件を想定。
-    """
-
     id: DailyNutritionReportId
     user_id: UserId
     date: date
 
-    # --- レポート内容（LLM から生成される部分） ----------------------
-
-    summary: str  # その日の総評（短めの本文）
+    summary: str
 
     good_points: List[str] = field(default_factory=list)
     improvement_points: List[str] = field(default_factory=list)
     tomorrow_focus: List[str] = field(default_factory=list)
 
-    # --- メタ情報 -----------------------------------------------------
-
-    created_at: datetime
+    # ✅ keyword-only にして「default引数の後ろに必須引数」が来てもOKにする
+    created_at: datetime = field(kw_only=True)
 
     @classmethod
     def create(
@@ -56,11 +43,6 @@ class DailyNutritionReport:
         tomorrow_focus: List[str],
         created_at: datetime,
     ) -> DailyNutritionReport:
-        """
-        新規レポート作成用のファクトリ。
-
-        - id はここで自動採番。
-        """
         return cls(
             id=DailyNutritionReportId.new(),
             user_id=user_id,

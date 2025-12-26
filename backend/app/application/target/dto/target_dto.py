@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List
 
 
@@ -171,3 +171,19 @@ class ActivateTargetInputDTO:
 
     user_id: str
     target_id: str
+
+
+# --- EnsureDailySnapshot ---------------------------------------------
+
+
+@dataclass(slots=True)
+class EnsureDailySnapshotInputDTO:
+    """
+    指定した日付の DailyTargetSnapshot を確保するための入力 DTO。
+
+    - 既に存在する場合はそれを返す
+    - 存在しない場合は、アクティブな TargetDefinition から生成して返す
+    """
+
+    user_id: str
+    target_date: date
