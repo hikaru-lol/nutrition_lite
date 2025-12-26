@@ -138,7 +138,7 @@ def list_meal_items_by_date(
     main / snack を区別せず、その日の全ての FoodEntry を返す。
     """
 
-    dtos = use_case.execute(current_user.id, date)
+    dtos = use_case.execute(UserId(current_user.id), date)
     items = [_dto_to_response(dto) for dto in dtos]
     return MealItemListResponse(items=items)
 
@@ -179,7 +179,7 @@ def update_meal_item(
     )
 
     # UpdateFoodEntryUseCase は UpdateFoodEntryResultDTO を返す想定
-    result = use_case.execute(current_user.id, input_dto)
+    result = use_case.execute(UserId(current_user.id), input_dto)
     dto = result.entry
 
     # 影響する日付 = {更新前の日, 更新後の日}
@@ -216,7 +216,7 @@ def delete_meal_item(
     """
 
     # DeleteFoodEntryUseCase は DeleteFoodEntryResultDTO を返す想定
-    result = use_case.execute(current_user.id, entry_id)
+    result = use_case.execute(UserId(current_user.id), entry_id)
 
     if result is not None:
         _recompute_daily_summaries(

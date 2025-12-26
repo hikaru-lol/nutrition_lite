@@ -92,6 +92,13 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError) -> JS
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    if isinstance(exc, auth_errors.PremiumFeatureRequiredError):
+        return error_response(
+            code="PREMIUM_FEATURE_REQUIRED",
+            message="この機能はトライアル中または有料プランで利用できます。",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
     # 想定外の AuthError（基本ないはずだが念のため）
     logger.exception("Unhandled AuthError: %s", exc)
     return error_response(
