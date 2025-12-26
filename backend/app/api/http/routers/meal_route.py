@@ -15,6 +15,9 @@ from app.api.http.schemas.meal import (
     MealItemResponse,
 )
 
+# === Domain ================================================================
+from app.domain.auth.value_objects import UserId
+
 # === Application (DTO / UseCase) ===========================================
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.meal.dto.food_entry_dto import (
@@ -112,7 +115,7 @@ def create_meal_item(
         note=request.note,
     )
 
-    dto = use_case.execute(current_user.id, input_dto)
+    dto = use_case.execute(UserId(current_user.id), input_dto)
     return _dto_to_response(dto)
 
 
