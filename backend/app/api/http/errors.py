@@ -11,6 +11,7 @@ from app.domain.auth import errors as auth_errors
 from app.domain.meal import errors as meal_domain_errors
 from app.domain.meal.errors import InvalidMealIndexError, InvalidMealTypeError, DailyLogProfileNotFoundError
 from app.domain.nutrition import errors as nutrition_domain_errors
+from app.domain.profile import errors as profile_domain_errors
 from app.domain.target import errors as target_domain_errors
 from app.domain.billing import errors as billing_errors
 
@@ -101,6 +102,34 @@ async def auth_error_handler(request: Request, exc: auth_errors.AuthError) -> JS
 
     # 想定外の AuthError（基本ないはずだが念のため）
     logger.exception("Unhandled AuthError: %s", exc)
+    return error_response(
+        code="INTERNAL_ERROR",
+        message="予期しないエラーが発生しました。",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+# === Profile (Domain エラー) ================================================
+async def profile_domain_error_handler(
+    request: Request,
+    exc: profile_domain_errors.ProfileError,
+) -> JSONResponse:
+    logger.warning(
+        "ProfileError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, profile_domain_errors.ProfileNotFoundError):
+        return error_response(
+            code="PROFILE_NOT_FOUND",
+            message="プロフィールが見つかりません。",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    logger.exception("Unhandled ProfileError: %s", exc)
     return error_response(
         code="INTERNAL_ERROR",
         message="予期しないエラーが発生しました。",

@@ -7,9 +7,11 @@ from fastapi.exceptions import RequestValidationError
 from app.domain.auth import errors as auth_errors
 from app.domain.meal import errors as meal_domain_errors
 from app.domain.nutrition import errors as nutrition_domain_errors
+from app.domain.profile import errors as profile_domain_errors
 from app.application.target import errors as target_app_errors
 from app.domain.target import errors as target_domain_errors
 from app.api.http.errors import auth_error_handler, validation_error_handler
+from app.api.http.errors import profile_domain_error_handler
 from app.api.http.errors import target_error_handler, target_domain_error_handler
 from app.api.http.errors import meal_domain_error_handler
 from app.api.http.errors import nutrition_domain_error_handler
@@ -64,6 +66,8 @@ def create_app() -> FastAPI:
         nutrition_domain_errors.NutritionDomainError, nutrition_domain_error_handler)
     app.add_exception_handler(
         meal_domain_errors.InvalidMealTypeError, meal_slot_error_handler)
+    app.add_exception_handler(
+        profile_domain_errors.ProfileError, profile_domain_error_handler)
     return app
 
 

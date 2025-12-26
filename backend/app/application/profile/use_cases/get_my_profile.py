@@ -5,7 +5,7 @@ from app.application.profile.dto.profile_dto import ProfileDTO
 from app.application.profile.ports.uow_port import ProfileUnitOfWorkPort
 
 from app.domain.auth.value_objects import UserId
-from app.domain.auth.errors import UserNotFoundError
+from app.domain.profile.errors import ProfileNotFoundError
 
 
 class GetMyProfileUseCase:
@@ -25,7 +25,7 @@ class GetMyProfileUseCase:
         with self._uow as uow:
             profile = uow.profile_repo.get_by_user_id(user_id)
             if profile is None:
-                raise UserNotFoundError("Profile not found.")
+                raise ProfileNotFoundError("Profile not found.")
 
         return ProfileDTO(
             user_id=profile.user_id.value,
