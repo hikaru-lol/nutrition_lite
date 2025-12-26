@@ -2,9 +2,11 @@ from __future__ import annotations
 
 # === Standard library =======================================================
 import os
+from typing import Callable, TypeVar, cast
 
 # === Third-party ============================================================
 from fastapi import Depends
+from fastapi.params import Depends as DependsParam
 from sqlalchemy.orm import Session
 
 # === Core settings / infra ==================================================
@@ -105,7 +107,6 @@ from app.infra.meal.meal_entry_query_service import MealEntryQueryService
 # Ports
 from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
 from app.application.nutrition.ports.meal_entry_query_port import MealEntryQueryPort
-
 from app.application.nutrition.ports.daily_report_generator_port import (
     DailyNutritionReportGeneratorPort,
 )
@@ -113,7 +114,6 @@ from app.application.nutrition.ports.nutrition_estimator_port import NutritionEs
 from app.application.nutrition.ports.recommendation_generator_port import (
     MealRecommendationGeneratorPort,
 )
-from app.application.nutrition.ports.nutrition_estimator_port import NutritionEstimatorPort
 
 # Use cases
 from app.application.nutrition.use_cases.compute_daily_nutrition import (
@@ -128,23 +128,27 @@ from app.application.nutrition.use_cases.generate_daily_nutrition_report import 
 from app.application.nutrition.use_cases.get_daily_nutrition_report import (
     GetDailyNutritionReportUseCase,
 )
+
+# infra (estimators / llm)
 from app.infra.nutrition.estimator_stub import StubNutritionEstimator
 from app.infra.llm.estimator_openai import (
     OpenAINutritionEstimator,
     OpenAINutritionEstimatorConfig,
 )
 
-# === Nutrition: MealRecommendation ==========================================
-# Ports
-from app.application.nutrition.ports.recommendation_generator_port import (
-    MealRecommendationGeneratorPort,
+from app.infra.llm.daily_report_generator_openai import (
+    OpenAIDailyNutritionReportGenerator,
+    OpenAIDailyReportGeneratorConfig,
 )
-# Use cases
+from app.infra.llm.stub_daily_report_generator import (
+    StubDailyNutritionReportGenerator,
+)
+
+# === Nutrition: MealRecommendation ==========================================
 from app.application.nutrition.use_cases.generate_meal_recommendation import (
     GenerateMealRecommendationUseCase,
     GenerateMealRecommendationInput,  # JOB から使うなら import
 )
-# infra
 from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
 from app.infra.llm.meal_recommendation_generator_openai import (
     OpenAIMealRecommendationGenerator,
@@ -153,19 +157,6 @@ from app.infra.llm.meal_recommendation_generator_openai import (
 
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
-
-
-from app.infra.llm.daily_report_generator_openai import (
-    OpenAIDailyNutritionReportGenerator,
-    OpenAIDailyReportGeneratorConfig,
-)
-
-# LLM / estimators
-from app.infra.llm.stub_daily_report_generator import (
-    StubDailyNutritionReportGenerator,
-)
-from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
-from app.infra.nutrition.estimator_stub import StubNutritionEstimator
 
 # === Billing ================================================================
 # Ports
@@ -188,111 +179,150 @@ from app.infra.db.uow.billing import SqlAlchemyBillingUnitOfWork
 from app.infra.billing.stripe_client import StripeClient
 
 
-# === Common / DB / UoW =====================================================
-# アプリ全体で共通して使うインフラ（DBセッション / Clock など）の提供
+# =============================================================================
+# Helpers
+# =============================================================================
+T = TypeVar("T")
 
-# DBセッションを1つ生成して返す（各 Repository で利用する）
+
+def _resolve_dep(value: object, fallback_factory: Callable[[], T]) -> T:
+    """
+    FastAPI 経由: value は依存解決済みの実体
+    直呼び: value は Depends(...) のマーカー(DependsParam)になっている
+    → 直呼び時のみ fallback_factory() で実体化して返す
+    """
+    if isinstance(value, DependsParam):
+        return fallback_factory()
+    return cast(T, value)
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.lower() in ("1", "true", "yes", "on")
+
+
+# =============================================================================
+# Common / DB / Clock
+# =============================================================================
 def get_db_session() -> Session:
+    # 既存の設計のまま（必要なら他所で利用）
     return create_session()
 
 
-# 現在時刻を提供する ClockPort の実装を返す
 def get_clock() -> ClockPort:
     return SystemClock()
 
 
-# === Auth ===================================================================
-# 認証・認可（ユーザー登録 / ログイン / トークン）関連の DI 定義
-
-# 認証コンテキスト用の UnitOfWork 実装を返す
+# =============================================================================
+# Auth
+# =============================================================================
 def get_auth_uow() -> AuthUnitOfWorkPort:
+    # UoW は既存のまま（with で session を作って閉じる）
     return SqlAlchemyAuthUnitOfWork()
 
 
-# パスワードのハッシュ化ロジック（Bcrypt）の実装を返す
 def get_password_hasher() -> PasswordHasherPort:
     return BcryptPasswordHasher()
 
 
-# アクセストークン / リフレッシュトークンを扱うサービスの実装を返す
 def get_token_service() -> TokenServicePort:
     return JwtTokenService()
 
 
-# ユーザー登録 UseCase 用の依存を組み立てて返す
-def get_register_user_use_case() -> RegisterUserUseCase:
+def get_register_user_use_case(
+    uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    password_hasher: PasswordHasherPort = Depends(get_password_hasher),
+    token_service: TokenServicePort = Depends(get_token_service),
+    clock: ClockPort = Depends(get_clock),
+) -> RegisterUserUseCase:
+    uow = _resolve_dep(uow, get_auth_uow)
+    password_hasher = _resolve_dep(password_hasher, get_password_hasher)
+    token_service = _resolve_dep(token_service, get_token_service)
+    clock = _resolve_dep(clock, get_clock)
+
     return RegisterUserUseCase(
-        uow=get_auth_uow(),
-        password_hasher=get_password_hasher(),
-        token_service=get_token_service(),
-        clock=get_clock(),
+        uow=uow,
+        password_hasher=password_hasher,
+        token_service=token_service,
+        clock=clock,
     )
 
 
-# ログイン UseCase 用の依存を組み立てて返す
-def get_login_user_use_case() -> LoginUserUseCase:
+def get_login_user_use_case(
+    uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    password_hasher: PasswordHasherPort = Depends(get_password_hasher),
+    token_service: TokenServicePort = Depends(get_token_service),
+) -> LoginUserUseCase:
+    uow = _resolve_dep(uow, get_auth_uow)
+    password_hasher = _resolve_dep(password_hasher, get_password_hasher)
+    token_service = _resolve_dep(token_service, get_token_service)
+
     return LoginUserUseCase(
-        uow=get_auth_uow(),
-        password_hasher=get_password_hasher(),
-        token_service=get_token_service(),
+        uow=uow,
+        password_hasher=password_hasher,
+        token_service=token_service,
     )
 
 
-# ログアウト UseCase（今は stateless）を返す
 def get_logout_user_use_case() -> LogoutUserUseCase:
     return LogoutUserUseCase()
 
 
-# アカウント削除 UseCase 用の依存を組み立てて返す
-def get_delete_account_use_case() -> DeleteAccountUseCase:
+def get_delete_account_use_case(
+    uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    clock: ClockPort = Depends(get_clock),
+) -> DeleteAccountUseCase:
+    uow = _resolve_dep(uow, get_auth_uow)
+    clock = _resolve_dep(clock, get_clock)
+
     return DeleteAccountUseCase(
-        uow=get_auth_uow(),
-        clock=get_clock(),
+        uow=uow,
+        clock=clock,
     )
 
 
-# リフレッシュトークン発行 UseCase 用の依存を組み立てて返す
-def get_refresh_token_use_case() -> RefreshTokenUseCase:
+def get_refresh_token_use_case(
+    uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    token_service: TokenServicePort = Depends(get_token_service),
+) -> RefreshTokenUseCase:
+    uow = _resolve_dep(uow, get_auth_uow)
+    token_service = _resolve_dep(token_service, get_token_service)
+
     return RefreshTokenUseCase(
-        uow=get_auth_uow(),
-        token_service=get_token_service(),
+        uow=uow,
+        token_service=token_service,
     )
 
 
-# 現在ログイン中のユーザーを取得する UseCase の DI
-def get_current_user_use_case() -> GetCurrentUserUseCase:
-    return GetCurrentUserUseCase(
-        uow=get_auth_uow(),
+def get_current_user_use_case(
+    uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+) -> GetCurrentUserUseCase:
+    uow = _resolve_dep(uow, get_auth_uow)
+    return GetCurrentUserUseCase(uow=uow)
+
+
+# ✅ UoW を抱える singleton は廃止（毎回生成）
+def get_plan_checker(
+    auth_uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    clock: ClockPort = Depends(get_clock),
+) -> PlanCheckerPort:
+    auth_uow = _resolve_dep(auth_uow, get_auth_uow)
+    clock = _resolve_dep(clock, get_clock)
+
+    return PlanCheckerService(
+        auth_uow=auth_uow,
+        clock=clock,
     )
 
 
-# プレミアム機能のプランチェックを行うサービスのシングルトンインスタンス
-_plan_checker_singleton: PlanCheckerPort | None = None
-
-# プレミアム機能のプランチェックを行うサービスの実装を返す
-
-
-def get_plan_checker() -> PlanCheckerPort:
-    """
-    プレミアム機能のプランチェックを行うサービスの DI。
-    """
-    global _plan_checker_singleton
-    if _plan_checker_singleton is None:
-        _plan_checker_singleton = PlanCheckerService(
-            auth_uow=get_auth_uow(),
-            clock=get_clock(),
-        )
-    return _plan_checker_singleton
-
-
-# === Profile ================================================================
-# プロフィール情報とプロフィール画像ストレージまわりの DI 定義
-
-# プロフィール画像ストレージ（MinIO / InMemory）のシングルトンインスタンス
+# =============================================================================
+# Profile
+# =============================================================================
 _profile_image_storage_singleton: ProfileImageStoragePort | None = None
 
 
-# プロフィール画像の保存先（MinIO or InMemory）の実装を返す
 def get_profile_image_storage() -> ProfileImageStoragePort:
     global _profile_image_storage_singleton
 
@@ -304,49 +334,57 @@ def get_profile_image_storage() -> ProfileImageStoragePort:
     return _profile_image_storage_singleton
 
 
-# プロフィール更新用の UnitOfWork 実装を返す
 def get_profile_uow() -> ProfileUnitOfWorkPort:
     return SqlAlchemyProfileUnitOfWork()
 
 
-# プロフィールを新規作成・更新する UseCase の DI
-def get_upsert_profile_use_case() -> UpsertProfileUseCase:
+def get_upsert_profile_use_case(
+    uow: ProfileUnitOfWorkPort = Depends(get_profile_uow),
+    image_storage: ProfileImageStoragePort = Depends(
+        get_profile_image_storage),
+) -> UpsertProfileUseCase:
+    uow = _resolve_dep(uow, get_profile_uow)
+    image_storage = _resolve_dep(image_storage, get_profile_image_storage)
+
     return UpsertProfileUseCase(
-        uow=get_profile_uow(),
-        image_storage=get_profile_image_storage(),
+        uow=uow,
+        image_storage=image_storage,
     )
 
 
-# 自分自身のプロフィールを取得する UseCase の DI
-def get_my_profile_use_case() -> GetMyProfileUseCase:
-    return GetMyProfileUseCase(
-        uow=get_profile_uow(),
-    )
+def get_my_profile_use_case(
+    uow: ProfileUnitOfWorkPort = Depends(get_profile_uow),
+) -> GetMyProfileUseCase:
+    uow = _resolve_dep(uow, get_profile_uow)
+    return GetMyProfileUseCase(uow=uow)
 
 
-# === Target ================================================================
-# 目標（Target）と DailyTargetSnapshot まわりの DI 定義
+def get_profile_query_service(
+    get_my_profile_uc: GetMyProfileUseCase = Depends(get_my_profile_use_case),
+) -> ProfileQueryPort:
+    get_my_profile_uc = _resolve_dep(
+        get_my_profile_uc, get_my_profile_use_case)
+    return ProfileQueryService(get_my_profile_uc=get_my_profile_uc)
 
-# 目標情報を扱う UnitOfWork 実装を返す
+
+# =============================================================================
+# Target
+# =============================================================================
 def get_target_uow() -> TargetUnitOfWorkPort:
     return SqlAlchemyTargetUnitOfWork()
 
 
-# 目標自動生成ロジック（Stub / OpenAI）のシングルトンインスタンス
 _target_generator_singleton: TargetGeneratorPort | None = None
 
-# OpenAI の TargetGenerator を使うかどうかのフラグ
-_USE_OPENAI_TARGET_GENERATOR = os.getenv(
-    "USE_OPENAI_TARGET_GENERATOR", "false"
-).lower() in ("1", "true", "yes", "on")
 
-
-# 目標を自動生成する TargetGeneratorPort の実装を返す
 def get_target_generator() -> TargetGeneratorPort:
+    """
+    ✅ env フラグは「初回呼び出し時」に読む（import時確定をやめる）
+    """
     global _target_generator_singleton
-
     if _target_generator_singleton is None:
-        if _USE_OPENAI_TARGET_GENERATOR:
+        use_openai = _env_bool("USE_OPENAI_TARGET_GENERATOR", default=False)
+        if use_openai:
             _target_generator_singleton = OpenAITargetGenerator(
                 config=OpenAITargetGeneratorConfig(
                     model=os.getenv("OPENAI_TARGET_MODEL", "gpt-4o-mini"),
@@ -359,175 +397,148 @@ def get_target_generator() -> TargetGeneratorPort:
     return _target_generator_singleton
 
 
-# プロフィール情報取得用の QueryService を返す
-def get_profile_query_service() -> ProfileQueryPort:
-    return ProfileQueryService(
-        get_my_profile_uc=get_my_profile_use_case(),
-    )
+def get_create_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+    generator: TargetGeneratorPort = Depends(get_target_generator),
+    profile_query: ProfileQueryPort = Depends(get_profile_query_service),
+    clock: ClockPort = Depends(get_clock),
+) -> CreateTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    generator = _resolve_dep(generator, get_target_generator)
+    profile_query = _resolve_dep(profile_query, get_profile_query_service)
+    clock = _resolve_dep(clock, get_clock)
 
-
-# 新しい Target を作成する UseCase の DI
-def get_create_target_use_case() -> CreateTargetUseCase:
-    """
-    /target/create のための UseCase を DI する。
-    """
     return CreateTargetUseCase(
-        uow=get_target_uow(),
-        generator=get_target_generator(),
-        profile_query=get_profile_query_service(),
-        clock=get_clock(),
+        uow=uow,
+        generator=generator,
+        profile_query=profile_query,
+        clock=clock,
     )
 
 
-# アクティブな Target を取得する UseCase の DI
-def get_get_active_target_use_case() -> GetActiveTargetUseCase:
-    """
-    /target/active（現在のターゲット取得）のための UseCase。
-    """
-    return GetActiveTargetUseCase(
-        uow=get_target_uow(),
-    )
+def get_get_active_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> GetActiveTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return GetActiveTargetUseCase(uow=uow)
 
 
-# Target 一覧を取得する UseCase の DI
-def get_list_targets_use_case() -> ListTargetsUseCase:
-    """
-    /target/list のための UseCase。
-    """
-    return ListTargetsUseCase(
-        uow=get_target_uow(),
-    )
+def get_list_targets_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> ListTargetsUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return ListTargetsUseCase(uow=uow)
 
 
-# Target を有効化（activate）する UseCase の DI
-def get_activate_target_use_case() -> ActivateTargetUseCase:
-    """
-    /target/activate のための UseCase。
-    """
-    return ActivateTargetUseCase(
-        uow=get_target_uow(),
-        clock=get_clock(),
-    )
+def get_activate_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+    clock: ClockPort = Depends(get_clock),
+) -> ActivateTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    clock = _resolve_dep(clock, get_clock)
+    return ActivateTargetUseCase(uow=uow, clock=clock)
 
 
-# 既存の Target を更新する UseCase の DI
-def get_update_target_use_case() -> UpdateTargetUseCase:
-    """
-    /target/update のための UseCase。
-    """
-    return UpdateTargetUseCase(
-        uow=get_target_uow(),
-        clock=get_clock(),
-    )
+def get_update_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+    clock: ClockPort = Depends(get_clock),
+) -> UpdateTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    clock = _resolve_dep(clock, get_clock)
+    return UpdateTargetUseCase(uow=uow, clock=clock)
 
 
-# 特定の Target を取得する UseCase の DI
-def get_get_target_use_case() -> GetTargetUseCase:
-    """
-    /target/get のための UseCase。
-    """
-    return GetTargetUseCase(
-        uow=get_target_uow(),
-    )
+def get_get_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> GetTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return GetTargetUseCase(uow=uow)
 
 
-# === Meal ===================================================================
-# 食事記録（FoodEntry）まわりの DI 定義
-
-# 食事エントリを扱う Repository を返す
+# =============================================================================
+# Meal
+# =============================================================================
 def get_meal_uow() -> MealUnitOfWorkPort:
     return SqlAlchemyMealUnitOfWork()
 
 
-# 食事エントリの作成 UseCase の DI
-def get_create_food_entry_use_case() -> CreateFoodEntryUseCase:
-    return CreateFoodEntryUseCase(
-        meal_uow=get_meal_uow(),
-    )
+def get_create_food_entry_use_case(
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> CreateFoodEntryUseCase:
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+    return CreateFoodEntryUseCase(meal_uow=meal_uow)
 
 
-# 食事エントリの更新 UseCase の DI
-def get_update_food_entry_use_case() -> UpdateFoodEntryUseCase:
-    return UpdateFoodEntryUseCase(
-        meal_uow=get_meal_uow(),
-    )
+def get_update_food_entry_use_case(
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> UpdateFoodEntryUseCase:
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+    return UpdateFoodEntryUseCase(meal_uow=meal_uow)
 
 
-# 食事エントリの削除 UseCase の DI
-def get_delete_food_entry_use_case() -> DeleteFoodEntryUseCase:
-    return DeleteFoodEntryUseCase(
-        meal_uow=get_meal_uow(),
-    )
+def get_delete_food_entry_use_case(
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> DeleteFoodEntryUseCase:
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+    return DeleteFoodEntryUseCase(meal_uow=meal_uow)
 
 
-# 指定日の食事エントリ一覧を取得する UseCase の DI
-def get_list_food_entries_by_date_use_case() -> ListFoodEntriesByDateUseCase:
-    return ListFoodEntriesByDateUseCase(
-        meal_uow=get_meal_uow(),
-    )
+def get_list_food_entries_by_date_use_case(
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> ListFoodEntriesByDateUseCase:
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+    return ListFoodEntriesByDateUseCase(meal_uow=meal_uow)
 
 
-# === Nutrition: estimator & repositories ====================================
-# 栄養推定ロジックと栄養サマリ系 Repository の DI 定義
+def get_meal_entry_query_service(
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> MealEntryQueryPort:
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+    return MealEntryQueryService(meal_uow=meal_uow)
 
-# NutritionUnitOfWork を返す
+
+# =============================================================================
+# Nutrition
+# =============================================================================
 def get_nutrition_uow() -> NutritionUnitOfWorkPort:
-    """
-    栄養ドメイン用 UnitOfWork 実装を返す。
-    """
     return SqlAlchemyNutritionUnitOfWork()
 
-
-_USE_OPENAI_NUTRITION_ESTIMATOR = os.getenv(
-    "USE_OPENAI_NUTRITION_ESTIMATOR", "false"
-).lower() in ("1", "true", "yes", "on")
 
 _nutrition_estimator_singleton: NutritionEstimatorPort | None = None
 
 
 def get_nutrition_estimator() -> NutritionEstimatorPort:
     """
-    栄養推定ロジックの DI。
-
-    - デフォルトは StubNutritionEstimator（開発 / テスト用）
-    - USE_OPENAI_NUTRITION_ESTIMATOR=true のとき OpenAI ベースの実装に切り替える
+    ✅ env フラグは「初回呼び出し時」に読む
     """
     global _nutrition_estimator_singleton
-
     if _nutrition_estimator_singleton is None:
-        if _USE_OPENAI_NUTRITION_ESTIMATOR:
+        use_openai = _env_bool("USE_OPENAI_NUTRITION_ESTIMATOR", default=False)
+        if use_openai:
             _nutrition_estimator_singleton = OpenAINutritionEstimator(
                 config=OpenAINutritionEstimatorConfig(
                     model=os.getenv("OPENAI_NUTRITION_MODEL", "gpt-4o-mini"),
                     temperature=float(
-                        os.getenv("OPENAI_NUTRITION_TEMPERATURE", "0.1")
-                    ),
+                        os.getenv("OPENAI_NUTRITION_TEMPERATURE", "0.1")),
                 )
             )
         else:
             _nutrition_estimator_singleton = StubNutritionEstimator()
-
     return _nutrition_estimator_singleton
 
 
-def get_meal_entry_query_service() -> MealEntryQueryPort:
-    return MealEntryQueryService(
-        meal_uow=get_meal_uow(),
-    )
-
-
-# === Nutrition: core use cases ==============================================
-# Meal単位 / 日単位の栄養計算 UseCase の DI 定義
-
-# 1 Meal 分の栄養を推定し、MealNutritionSummary を更新する UseCase の DI
-def get_compute_meal_nutrition_use_case() -> ComputeMealNutritionUseCase:
-    """
-    1 Meal 分の栄養を推定して MealNutritionSummary を更新する UseCase。
-    """
-    meal_entry_query_service = get_meal_entry_query_service()
-    nutrition_uow = get_nutrition_uow()
-    estimator = get_nutrition_estimator()
-    plan_checker = get_plan_checker()
+def get_compute_meal_nutrition_use_case(
+    meal_entry_query_service: MealEntryQueryPort = Depends(
+        get_meal_entry_query_service),
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    estimator: NutritionEstimatorPort = Depends(get_nutrition_estimator),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
+) -> ComputeMealNutritionUseCase:
+    meal_entry_query_service = _resolve_dep(
+        meal_entry_query_service, get_meal_entry_query_service)
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    estimator = _resolve_dep(estimator, get_nutrition_estimator)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
 
     return ComputeMealNutritionUseCase(
         meal_entry_query_service=meal_entry_query_service,
@@ -537,43 +548,31 @@ def get_compute_meal_nutrition_use_case() -> ComputeMealNutritionUseCase:
     )
 
 
-# 1 日分の栄養サマリ（DailyNutritionSummary）を計算・保存する UseCase の DI
 def get_compute_daily_nutrition_summary_use_case(
+    uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
 ) -> ComputeDailyNutritionSummaryUseCase:
-    """
-    1日分の栄養サマリ (DailyNutritionSummary) を計算・保存する UC。
+    uow = _resolve_dep(uow, get_nutrition_uow)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
 
-    - MealNutritionSummary を集約して計算する。
-    """
     return ComputeDailyNutritionSummaryUseCase(
-        uow=get_nutrition_uow(),
-        plan_checker=get_plan_checker(),
+        uow=uow,
+        plan_checker=plan_checker,
     )
 
 
-# === DailyNutritionReport ====================================================
-# 日次栄養レポート生成まわりの DI 定義
-
-_USE_OPENAI_DAILY_REPORT_GENERATOR = os.getenv(
-    "USE_OPENAI_DAILY_REPORT_GENERATOR", "false"
-).lower() in ("1", "true", "yes", "on")
-
 _daily_report_generator_singleton: DailyNutritionReportGeneratorPort | None = None
-
-# 日次レポート生成用 LLM ポートのシングルトンインスタンス
 
 
 def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
     """
-    日次レポート生成用 LLM ポートの DI。
-
-    - デフォルトは StubDailyNutritionReportGenerator（開発 / テスト用）
-    - USE_OPENAI_DAILY_REPORT_GENERATOR=true のとき OpenAI ベースの実装に切り替える
+    ✅ env フラグは「初回呼び出し時」に読む
     """
     global _daily_report_generator_singleton
-
     if _daily_report_generator_singleton is None:
-        if _USE_OPENAI_DAILY_REPORT_GENERATOR:
+        use_openai = _env_bool(
+            "USE_OPENAI_DAILY_REPORT_GENERATOR", default=False)
+        if use_openai:
             model = os.getenv("OPENAI_DAILY_REPORT_MODEL", "gpt-4o-mini")
             temperature = float(
                 os.getenv("OPENAI_DAILY_REPORT_TEMPERATURE", "0.4"))
@@ -585,80 +584,91 @@ def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
             )
         else:
             _daily_report_generator_singleton = StubDailyNutritionReportGenerator()
-
     return _daily_report_generator_singleton
 
 
-# 1 日分の食事ログが「記録完了」かどうか判定する UseCase の DI
-def get_check_daily_log_completion_use_case() -> CheckDailyLogCompletionUseCase:
-    """
-    1 日分の食事ログが「記録完了」しているかを判定する UseCase の DI。
-    """
+def get_check_daily_log_completion_use_case(
+    profile_query: ProfileQueryPort = Depends(get_profile_query_service),
+    meal_uow: MealUnitOfWorkPort = Depends(get_meal_uow),
+) -> CheckDailyLogCompletionUseCase:
+    profile_query = _resolve_dep(profile_query, get_profile_query_service)
+    meal_uow = _resolve_dep(meal_uow, get_meal_uow)
+
     return CheckDailyLogCompletionUseCase(
-        profile_query=get_profile_query_service(),
-        meal_uow=get_meal_uow(),
+        profile_query=profile_query,
+        meal_uow=meal_uow,
     )
 
 
-# DailyTargetSnapshot を確保する UseCase の DI
-def get_ensure_daily_target_snapshot_use_case() -> EnsureDailyTargetSnapshotUseCase:
-    """
-    DailyTargetSnapshot 用 UseCase の DI。
-    """
-    return EnsureDailyTargetSnapshotUseCase(
-        uow=get_target_uow(),
-    )
+def get_ensure_daily_target_snapshot_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> EnsureDailyTargetSnapshotUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return EnsureDailyTargetSnapshotUseCase(uow=uow)
 
 
-# 日次栄養レポート（DailyNutritionReport）を生成する UseCase の DI
 def get_generate_daily_nutrition_report_use_case(
+    daily_log_uc: CheckDailyLogCompletionUseCase = Depends(
+        get_check_daily_log_completion_use_case),
+    profile_query: ProfileQueryPort = Depends(get_profile_query_service),
+    ensure_target_snapshot_uc: EnsureDailyTargetSnapshotUseCase = Depends(
+        get_ensure_daily_target_snapshot_use_case),
+    daily_nutrition_uc: ComputeDailyNutritionSummaryUseCase = Depends(
+        get_compute_daily_nutrition_summary_use_case),
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    report_generator: DailyNutritionReportGeneratorPort = Depends(
+        get_daily_nutrition_report_generator),
+    clock: ClockPort = Depends(get_clock),
 ) -> GenerateDailyNutritionReportUseCase:
-    daily_log_uc = get_check_daily_log_completion_use_case()
-    ensure_target_snapshot_uc = get_ensure_daily_target_snapshot_use_case()
-    daily_nutrition_uc = get_compute_daily_nutrition_summary_use_case()
-    report_generator = get_daily_nutrition_report_generator()
-    clock = get_clock()
+    daily_log_uc = _resolve_dep(
+        daily_log_uc, get_check_daily_log_completion_use_case)
+    profile_query = _resolve_dep(profile_query, get_profile_query_service)
+    ensure_target_snapshot_uc = _resolve_dep(
+        ensure_target_snapshot_uc, get_ensure_daily_target_snapshot_use_case)
+    daily_nutrition_uc = _resolve_dep(
+        daily_nutrition_uc, get_compute_daily_nutrition_summary_use_case)
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    report_generator = _resolve_dep(
+        report_generator, get_daily_nutrition_report_generator)
+    clock = _resolve_dep(clock, get_clock)
 
     return GenerateDailyNutritionReportUseCase(
         daily_log_uc=daily_log_uc,
-        profile_query=get_profile_query_service(),
+        profile_query=profile_query,
         ensure_target_snapshot_uc=ensure_target_snapshot_uc,
         daily_nutrition_uc=daily_nutrition_uc,
-        nutrition_uow=get_nutrition_uow(),
+        nutrition_uow=nutrition_uow,
         report_generator=report_generator,
         clock=clock,
     )
 
 
-# 指定した (user_id, date) の DailyNutritionReport を取得する UseCase の DI
-def get_get_daily_nutrition_report_use_case() -> GetDailyNutritionReportUseCase:
-    return GetDailyNutritionReportUseCase(
-        uow=get_nutrition_uow(),
-    )
+def get_get_daily_nutrition_report_use_case(
+    uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+) -> GetDailyNutritionReportUseCase:
+    uow = _resolve_dep(uow, get_nutrition_uow)
+    return GetDailyNutritionReportUseCase(uow=uow)
 
 
-# === MealRecommendation ====================================
-# 食事レコメンド（将来の機能）の DI 定義
-_USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR = os.getenv(
-    "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false"
-).lower() in ("1", "true", "yes", "on")
-
-# 食事レコメンドを生成する Generator のシングルトンインスタンス
+# =============================================================================
+# MealRecommendation
+# =============================================================================
 _recommendation_generator_singleton: MealRecommendationGeneratorPort | None = None
 
 
 def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     """
-    MealRecommendation 生成ロジック（LLM / Stub）の DI。
+    ✅ env フラグは「初回呼び出し時」に読む
     """
     global _recommendation_generator_singleton
     if _recommendation_generator_singleton is None:
-        if _USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR:
+        use_openai = _env_bool(
+            "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", default=False)
+        if use_openai:
             model = os.getenv(
                 "OPENAI_MEAL_RECOMMENDATION_MODEL", "gpt-4o-mini")
             temperature = float(
-                os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4")
-            )
+                os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4"))
             _recommendation_generator_singleton = OpenAIMealRecommendationGenerator(
                 config=OpenAIMealRecommendationGeneratorConfig(
                     model=model,
@@ -670,35 +680,38 @@ def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     return _recommendation_generator_singleton
 
 
-def get_generate_meal_recommendation_use_case() -> GenerateMealRecommendationUseCase:
-    """
-    MealRecommendation 生成 UseCase の DI。
+def get_generate_meal_recommendation_use_case(
+    profile_query: ProfileQueryPort = Depends(get_profile_query_service),
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    generator: MealRecommendationGeneratorPort = Depends(
+        get_meal_recommendation_generator),
+    clock: ClockPort = Depends(get_clock),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
+) -> GenerateMealRecommendationUseCase:
+    profile_query = _resolve_dep(profile_query, get_profile_query_service)
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    generator = _resolve_dep(generator, get_meal_recommendation_generator)
+    clock = _resolve_dep(clock, get_clock)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
 
-    - Profile は QueryService 経由
-    - DailyReport / Recommendation は NutritionUnitOfWorkPort 経由
-    """
     return GenerateMealRecommendationUseCase(
-        profile_query=get_profile_query_service(),
-        nutrition_uow=get_nutrition_uow(),
-        generator=get_meal_recommendation_generator(),
-        clock=get_clock(),
+        profile_query=profile_query,
+        nutrition_uow=nutrition_uow,
+        generator=generator,
+        clock=clock,
         required_days=5,
-        plan_checker=get_plan_checker(),
+        plan_checker=plan_checker,
     )
 
 
-# === Billing ================================================================
-# Stripe クライアントと Billing UoW の DI 定義
-
+# =============================================================================
+# Billing
+# =============================================================================
 _stripe_client_singleton: StripeClientPort | None = None
 
 
 def get_stripe_client() -> StripeClientPort:
-    """
-    StripeClientPort 実装を返す。
-
-    - STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET は StripeClient 内で env から読む前提。
-    """
+    # StripeClient は DB/UoW を抱えないので singleton 維持でOK
     global _stripe_client_singleton
     if _stripe_client_singleton is None:
         _stripe_client_singleton = StripeClient()
@@ -706,46 +719,56 @@ def get_stripe_client() -> StripeClientPort:
 
 
 def get_billing_uow() -> BillingUnitOfWorkPort:
-    """
-    Billing ドメイン用の UnitOfWork 実装を返す。
-    """
     return SqlAlchemyBillingUnitOfWork()
 
-# Checkout セッション作成 UC
 
+def get_create_checkout_session_use_case(
+    billing_uow: BillingUnitOfWorkPort = Depends(get_billing_uow),
+    auth_uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    stripe_client: StripeClientPort = Depends(get_stripe_client),
+    clock: ClockPort = Depends(get_clock),
+) -> CreateCheckoutSessionUseCase:
+    billing_uow = _resolve_dep(billing_uow, get_billing_uow)
+    auth_uow = _resolve_dep(auth_uow, get_auth_uow)
+    stripe_client = _resolve_dep(stripe_client, get_stripe_client)
+    clock = _resolve_dep(clock, get_clock)
 
-def get_create_checkout_session_use_case() -> CreateCheckoutSessionUseCase:
-    """
-    Stripe Checkout セッション作成 UseCase の DI。
-    """
     return CreateCheckoutSessionUseCase(
-        billing_uow=get_billing_uow(),
-        auth_uow=get_auth_uow(),
-        stripe_client=get_stripe_client(),
-        clock=get_clock(),
-        price_id=settings.STRIPE_PRICE_ID,  # env or settings に定義しておく
+        billing_uow=billing_uow,
+        auth_uow=auth_uow,
+        stripe_client=stripe_client,
+        clock=clock,
+        price_id=settings.STRIPE_PRICE_ID,
     )
 
 
-# Billing Portal URL UC
-def get_billing_portal_url_use_case() -> GetBillingPortalUrlUseCase:
-    """
-    Stripe Billing Portal URL 取得 UseCase の DI。
-    """
+def get_billing_portal_url_use_case(
+    billing_uow: BillingUnitOfWorkPort = Depends(get_billing_uow),
+    stripe_client: StripeClientPort = Depends(get_stripe_client),
+) -> GetBillingPortalUrlUseCase:
+    billing_uow = _resolve_dep(billing_uow, get_billing_uow)
+    stripe_client = _resolve_dep(stripe_client, get_stripe_client)
+
     return GetBillingPortalUrlUseCase(
-        billing_uow=get_billing_uow(),
-        stripe_client=get_stripe_client(),
+        billing_uow=billing_uow,
+        stripe_client=stripe_client,
     )
 
 
-# Webhook ハンドラ UC
-def get_handle_stripe_webhook_use_case() -> HandleStripeWebhookUseCase:
-    """
-    Stripe Webhook イベント処理 UseCase の DI。
-    """
+def get_handle_stripe_webhook_use_case(
+    billing_uow: BillingUnitOfWorkPort = Depends(get_billing_uow),
+    auth_uow: AuthUnitOfWorkPort = Depends(get_auth_uow),
+    stripe_client: StripeClientPort = Depends(get_stripe_client),
+    clock: ClockPort = Depends(get_clock),
+) -> HandleStripeWebhookUseCase:
+    billing_uow = _resolve_dep(billing_uow, get_billing_uow)
+    auth_uow = _resolve_dep(auth_uow, get_auth_uow)
+    stripe_client = _resolve_dep(stripe_client, get_stripe_client)
+    clock = _resolve_dep(clock, get_clock)
+
     return HandleStripeWebhookUseCase(
-        billing_uow=get_billing_uow(),
-        auth_uow=get_auth_uow(),
-        stripe_client=get_stripe_client(),
-        clock=get_clock(),
+        billing_uow=billing_uow,
+        auth_uow=auth_uow,
+        stripe_client=stripe_client,
+        clock=clock,
     )

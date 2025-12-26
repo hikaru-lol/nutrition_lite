@@ -131,7 +131,7 @@ def get_meal_and_daily_nutrition(
       3. Meal + Daily をまとめて返す
     """
 
-    user_id: UserId = current_user.id
+    user_id: UserId = UserId(current_user.id)
 
     # ① 1食分の栄養サマリを再計算 & 保存
     meal_summary = meal_uc.execute(
