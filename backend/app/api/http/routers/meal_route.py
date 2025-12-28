@@ -70,7 +70,7 @@ def _dto_to_response(dto: FoodEntryDTO) -> MealItemResponse:
 def _recompute_daily_summaries(
     *,
     compute_daily_uc: ComputeDailyNutritionSummaryUseCase,
-    user_id: str,
+    user_id: UserId,
     dates: set[DateType],
 ) -> None:
     """
@@ -186,7 +186,7 @@ def update_meal_item(
     impacted_dates = {result.old_date, dto.date}
     _recompute_daily_summaries(
         compute_daily_uc=compute_daily_uc,
-        user_id=current_user.id,
+        user_id=UserId(current_user.id),
         dates=impacted_dates,
     )
 
@@ -221,7 +221,7 @@ def delete_meal_item(
     if result is not None:
         _recompute_daily_summaries(
             compute_daily_uc=compute_daily_uc,
-            user_id=current_user.id,
+            user_id=UserId(current_user.id),
             dates={result.date},
         )
 
