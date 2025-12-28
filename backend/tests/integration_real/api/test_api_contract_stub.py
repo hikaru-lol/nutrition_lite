@@ -239,7 +239,7 @@ def test_profile_contract() -> None:
 
     # profile GET before PUT -> 401 USER_NOT_FOUND（現挙動）
     g0 = _request(client, "PROFILE GET before", "GET", "/api/v1/profile/me")
-    _assert_error(g0, 401, "USER_NOT_FOUND", "PROFILE GET before")
+    _assert_error(g0, 404, "PROFILE_NOT_FOUND", "PROFILE GET before")
 
     # PUT -> GET
     put = _put_profile(client, meals_per_day=3)
@@ -268,7 +268,8 @@ def test_target_contract_methods_and_errors() -> None:
         json={"title": "x", "goal_type": "weight_loss",
               "goal_description": None, "activity_level": "normal"},
     )
-    _assert_error(t0, 401, "USER_NOT_FOUND", "TARGET create without profile")
+    _assert_error(t0, 404, "TARGET_PROFILE_NOT_FOUND",
+                  "TARGET create without profile")
 
     _put_profile(client, meals_per_day=3)
 

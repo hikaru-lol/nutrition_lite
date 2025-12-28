@@ -432,20 +432,16 @@ def get_list_targets_use_case(
 
 def get_activate_target_use_case(
     uow: TargetUnitOfWorkPort = Depends(get_target_uow),
-    clock: ClockPort = Depends(get_clock),
 ) -> ActivateTargetUseCase:
     uow = _resolve_dep(uow, get_target_uow)
-    clock = _resolve_dep(clock, get_clock)
-    return ActivateTargetUseCase(uow=uow, clock=clock)
+    return ActivateTargetUseCase(uow=uow)
 
 
 def get_update_target_use_case(
     uow: TargetUnitOfWorkPort = Depends(get_target_uow),
-    clock: ClockPort = Depends(get_clock),
 ) -> UpdateTargetUseCase:
     uow = _resolve_dep(uow, get_target_uow)
-    clock = _resolve_dep(clock, get_clock)
-    return UpdateTargetUseCase(uow=uow, clock=clock)
+    return UpdateTargetUseCase(uow=uow)
 
 
 def get_get_target_use_case(
