@@ -1,7 +1,6 @@
 name: Backend Real Integration Tests
 
 on:
-  # workflow_dispatch:
   push:
     paths:
       - 'backend/**'
@@ -60,6 +59,12 @@ jobs:
       USE_FAKE_INFRA: 'false'
 
       ENV: 'ci'
+
+      STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout repository
