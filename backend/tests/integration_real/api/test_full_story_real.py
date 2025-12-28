@@ -1,3 +1,5 @@
+# 　テスト実行時に環境変数の読み込みが必要になるので、.envファイルを読み込む
+
 from __future__ import annotations
 
 import os

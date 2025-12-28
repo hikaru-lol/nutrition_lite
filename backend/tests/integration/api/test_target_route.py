@@ -324,8 +324,8 @@ class TestCreateTarget:
             },
         )
 
-        # ProfileNotFoundErrorはUserNotFoundErrorとして扱われ、401が返る
-        assert response.status_code == 401
+        # ProfileNotFoundErrorはProfileNotFoundErrorとして扱われ、404が返る
+        assert response.status_code == 404
         data = response.json()
         assert "error" in data
 
