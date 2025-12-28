@@ -9,6 +9,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-integration-tests.yml'
+  workflow_dispatch:
 
 jobs:
   tests:

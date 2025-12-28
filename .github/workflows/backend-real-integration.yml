@@ -11,6 +11,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-real-*'
+  workflow_dispatch:
 
 jobs:
   real-integration-tests:
