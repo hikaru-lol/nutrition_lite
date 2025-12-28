@@ -9,6 +9,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-unit-tests.yml'
+  workflow_dispatch:
 
 jobs:
   tests:
@@ -38,4 +39,4 @@ jobs:
         run: uv sync --frozen --extra dev
 
       - name: Run unit tests
-        run: uv run pytest -m "not real_integration" tests/unit/application/profile
+        run: uv run pytest -m "not real_integration" tests/unit/
