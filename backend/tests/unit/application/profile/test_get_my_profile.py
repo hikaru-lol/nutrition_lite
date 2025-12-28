@@ -8,7 +8,7 @@ from app.application.profile.use_cases.get_my_profile import GetMyProfileUseCase
 from app.domain.auth.value_objects import UserId
 from app.domain.profile.entities import Profile
 from app.domain.profile.value_objects import Sex, HeightCm, WeightKg
-from app.domain.auth.errors import UserNotFoundError
+from app.domain.profile.errors import ProfileNotFoundError
 from tests.fakes.profile_repositories import InMemoryProfileRepository
 from tests.fakes.profile_uow import FakeProfileUnitOfWork
 
@@ -53,5 +53,5 @@ def test_get_my_profile_raises_when_not_found() -> None:
     repo = InMemoryProfileRepository()
     use_case = _make_use_case(repo)
 
-    with pytest.raises(UserNotFoundError):
+    with pytest.raises(ProfileNotFoundError):
         use_case.execute("55555555-5555-5555-5555-555555555555")

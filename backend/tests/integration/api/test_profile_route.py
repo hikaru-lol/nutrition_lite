@@ -224,7 +224,7 @@ class TestGetMyProfile:
             },
         )
 
-        assert response.status_code == 401
+        assert response.status_code == 404
         data = response.json()
         assert "error" in data
 

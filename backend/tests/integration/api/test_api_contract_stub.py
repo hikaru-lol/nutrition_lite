@@ -1,17 +1,22 @@
 from __future__ import annotations
+from app.infra.db.session import create_session
+from app.main import create_app
+from sqlalchemy import text
+from fastapi.testclient import TestClient
+import pytest
+from typing import Any
+from pprint import pformat
+from datetime import date, datetime, timedelta, timezone
+import uuid
 
 import os
-import uuid
-from datetime import date, datetime, timedelta, timezone
-from pprint import pformat
-from typing import Any
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import text
+# --- OpenAI を絶対に叩かない（env-file を使わなくても Stub になるよう保険） ---
+os.environ.setdefault("USE_OPENAI_TARGET_GENERATOR", "false")
+os.environ.setdefault("USE_OPENAI_NUTRITION_ESTIMATOR", "false")
+os.environ.setdefault("USE_OPENAI_DAILY_REPORT_GENERATOR", "false")
+os.environ.setdefault("USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", "false")
 
-from app.main import create_app
-from app.infra.db.session import create_session
 
 pytestmark = pytest.mark.real_integration
 
@@ -153,8 +158,13 @@ def _create_meal_item(
         "serving_count": serving_count,
         "note": note,
     }
-    r = _request(client, f"MEAL CREATE {meal_type}#{meal_index}",
-                 "POST", "/api/v1/meal-items", json=payload)
+    r = _request(
+        client,
+        f"MEAL CREATE {meal_type}#{meal_index}",
+        "POST",
+        "/api/v1/meal-items",
+        json=payload,
+    )
     _assert_status(r, 201, f"MEAL CREATE {meal_type}#{meal_index}")
     return r.json()
 
@@ -211,7 +221,8 @@ def test_auth_contract_happy_and_errors() -> None:
     _assert_status(lo, 204, "LOGOUT")
 
     me2 = _request(client, "ME after logout", "GET", "/api/v1/auth/me")
-    _assert_error(me2, 401, "INVALID_CREDENTIALS", "ME after logout")
+    # 実装: access token missing -> INVALID_ACCESS_TOKEN
+    _assert_error(me2, 401, "INVALID_ACCESS_TOKEN", "ME after logout")
 
     # refresh without cookie -> 401 UNAUTHORIZED
     ref2 = _request(client, "REFRESH no cookie",
@@ -222,16 +233,31 @@ def test_auth_contract_happy_and_errors() -> None:
     c2 = _make_client()
     email = f"dup_{uuid.uuid4().hex}@example.com"
     pw = "DupPass123!"
-    r1 = _request(c2, "REGISTER #1", "POST", "/api/v1/auth/register",
-                  json={"email": email, "password": pw, "name": "dup"})
+    r1 = _request(
+        c2,
+        "REGISTER #1",
+        "POST",
+        "/api/v1/auth/register",
+        json={"email": email, "password": pw, "name": "dup"},
+    )
     _assert_status(r1, 201, "REGISTER #1")
-    r2 = _request(c2, "REGISTER #2", "POST", "/api/v1/auth/register",
-                  json={"email": email, "password": pw, "name": "dup"})
+    r2 = _request(
+        c2,
+        "REGISTER #2",
+        "POST",
+        "/api/v1/auth/register",
+        json={"email": email, "password": pw, "name": "dup"},
+    )
     _assert_error(r2, 409, "EMAIL_ALREADY_IN_USE", "REGISTER #2")
 
     # login invalid credentials -> 401
-    li = _request(c2, "LOGIN wrong pw", "POST", "/api/v1/auth/login",
-                  json={"email": email, "password": "wrong"})
+    li = _request(
+        c2,
+        "LOGIN wrong pw",
+        "POST",
+        "/api/v1/auth/login",
+        json={"email": email, "password": "wrong"},
+    )
     _assert_error(li, 401, "INVALID_CREDENTIALS", "LOGIN wrong pw")
 
 
@@ -239,9 +265,9 @@ def test_profile_contract() -> None:
     client = _make_client()
     _register_and_login(client)
 
-    # profile GET before PUT -> 401 USER_NOT_FOUND（あなたの実装仕様）
+    # profile GET before PUT -> 404 PROFILE_NOT_FOUND（実装仕様）
     g0 = _request(client, "PROFILE GET before", "GET", "/api/v1/profile/me")
-    _assert_error(g0, 401, "USER_NOT_FOUND", "PROFILE GET before")
+    _assert_error(g0, 404, "PROFILE_NOT_FOUND", "PROFILE GET before")
 
     # PUT -> GET
     put = _put_profile(client, meals_per_day=3)
@@ -252,8 +278,13 @@ def test_profile_contract() -> None:
     assert g1.json()["meals_per_day"] == 3
 
     # validation error
-    bad = _request(client, "PROFILE PUT bad", "PUT",
-                   "/api/v1/profile/me", json={"birthdate": "1990-01-02"})
+    bad = _request(
+        client,
+        "PROFILE PUT bad",
+        "PUT",
+        "/api/v1/profile/me",
+        json={"birthdate": "1990-01-02"},
+    )
     _assert_error(bad, 400, "VALIDATION_ERROR", "PROFILE PUT bad")
 
 
@@ -261,16 +292,20 @@ def test_target_contract_methods_and_errors() -> None:
     client = _make_client()
     _register_and_login(client)
 
-    # profile無しで target create -> 404 PROFILE_NOT_FOUND
+    # profile無しで target create -> 404 TARGET_PROFILE_NOT_FOUND
     t0 = _request(
         client,
         "TARGET create without profile",
         "POST",
         "/api/v1/targets",
-        json={"title": "x", "goal_type": "weight_loss",
-              "goal_description": None, "activity_level": "normal"},
+        json={
+            "title": "x",
+            "goal_type": "weight_loss",
+            "goal_description": None,
+            "activity_level": "normal",
+        },
     )
-    _assert_error(t0, 404, "PROFILE_NOT_FOUND",
+    _assert_error(t0, 404, "TARGET_PROFILE_NOT_FOUND",
                   "TARGET create without profile")
 
     _put_profile(client, meals_per_day=3)
@@ -282,8 +317,10 @@ def test_target_contract_methods_and_errors() -> None:
 
     # list
     lst = _request(client, "TARGET list", "GET", "/api/v1/targets")
+    data = lst.json()
+    items = data["items"]
     _assert_status(lst, 200, "TARGET list")
-    assert any(x["id"] == target_id_1 for x in lst.json()), lst.json()
+    assert any(x["id"] == target_id_1 for x in items), data
 
     # active
     act = _request(client, "TARGET active", "GET", "/api/v1/targets/active")
@@ -297,8 +334,13 @@ def test_target_contract_methods_and_errors() -> None:
     assert g1.json()["id"] == target_id_1
 
     # patch title
-    p1 = _request(client, "TARGET patch", "PATCH",
-                  f"/api/v1/targets/{target_id_1}", json={"title": "Target 1 updated"})
+    p1 = _request(
+        client,
+        "TARGET patch",
+        "PATCH",
+        f"/api/v1/targets/{target_id_1}",
+        json={"title": "Target 1 updated"},
+    )
     _assert_status(p1, 200, "TARGET patch")
     assert p1.json()["title"] == "Target 1 updated"
 
@@ -323,8 +365,12 @@ def test_target_contract_methods_and_errors() -> None:
         "TARGET limit exceeded",
         "POST",
         "/api/v1/targets",
-        json={"title": "Target 6", "goal_type": "weight_loss",
-              "goal_description": None, "activity_level": "normal"},
+        json={
+            "title": "Target 6",
+            "goal_type": "weight_loss",
+            "goal_description": None,
+            "activity_level": "normal",
+        },
     )
     _assert_error(too_many, 409, "TARGET_LIMIT_EXCEEDED",
                   "TARGET limit exceeded")
@@ -341,26 +387,43 @@ def test_meal_contract_methods_and_errors() -> None:
     created = _create_meal_item(client, d, "main", 1, "Meal 1")
     meal_id = created["id"]
 
-    # list
+    # list: {"items": [...]}
     lst = _request(client, "MEAL list", "GET",
                    "/api/v1/meal-items", params={"date": d})
     _assert_status(lst, 200, "MEAL list")
-    assert any(x["id"] == meal_id for x in lst.json()), lst.json()
+    items = lst.json()["items"]
+    assert any(x["id"] == meal_id for x in items), items
 
-    # patch
+    # patch: 現状フル更新前提（MealItemRequest）
+    patch_payload = {
+        "date": d,
+        "meal_type": "main",
+        "meal_index": 1,
+        "name": "Meal 1 updated",
+        "amount_value": 200.0,
+        "amount_unit": "g",
+        "serving_count": None,
+        "note": None,
+    }
     upd = _request(client, "MEAL patch", "PATCH",
-                   f"/api/v1/meal-items/{meal_id}", json={"name": "Meal 1 updated"})
+                   f"/api/v1/meal-items/{meal_id}", json=patch_payload)
     _assert_status(upd, 200, "MEAL patch")
-    assert upd.json()["entry"]["name"] == "Meal 1 updated"
+    assert upd.json()["name"] == "Meal 1 updated"
 
     # delete
     dele = _request(client, "MEAL delete", "DELETE",
                     f"/api/v1/meal-items/{meal_id}")
     _assert_status(dele, 204, "MEAL delete")
 
-    # not found (patch)
-    nf = _request(client, "MEAL patch notfound", "PATCH",
-                  "/api/v1/meal-items/00000000-0000-0000-0000-000000000000", json={"name": "x"})
+    # not found (patch) -> 404 FOOD_ENTRY_NOT_FOUND（バリデーションを通すためフルボディで送る）
+    nf_payload = {**patch_payload, "name": "x"}
+    nf = _request(
+        client,
+        "MEAL patch notfound",
+        "PATCH",
+        "/api/v1/meal-items/00000000-0000-0000-0000-000000000000",
+        json=nf_payload,
+    )
     _assert_error(nf, 404, "FOOD_ENTRY_NOT_FOUND", "MEAL patch notfound")
 
     # invalid meal_index for main (None)
@@ -439,7 +502,7 @@ def test_nutrition_meal_contract_and_plan_gate() -> None:
     _assert_error(bad, 400, "INVALID_MEAL_INDEX",
                   "NUTRITION invalid snack index")
 
-    # unauth -> 401 INVALID_CREDENTIALS
+    # unauth -> 401 INVALID_ACCESS_TOKEN（実装）
     anon = _make_client()
     unauth = _request(
         anon,
@@ -448,11 +511,13 @@ def test_nutrition_meal_contract_and_plan_gate() -> None:
         "/api/v1/nutrition/meal",
         params={"date": d, "meal_type": "main", "meal_index": 1},
     )
-    _assert_error(unauth, 401, "INVALID_CREDENTIALS", "NUTRITION unauth")
+    _assert_error(unauth, 401, "INVALID_ACCESS_TOKEN", "NUTRITION unauth")
 
     # --- plan gate (force FREE + expired trial) ---
     gated = _make_client()
     u2 = _register_and_login(gated)
+    # profile無しだと別エラーに寄る可能性があるので先に作っておく
+    _put_profile(gated, meals_per_day=1)
     _force_user_free_plan_and_expired_trial(u2["user_id"])
 
     # plan check should block first
@@ -524,25 +589,44 @@ def test_daily_report_contract_happy_and_errors() -> None:
                   "DAILY REPORT already exists")
 
     # get ok
-    getr = _request(client, "DAILY REPORT get", "GET",
-                    "/api/v1/nutrition/daily/report", params={"date": d})
+    getr = _request(
+        client,
+        "DAILY REPORT get",
+        "GET",
+        "/api/v1/nutrition/daily/report",
+        params={"date": d},
+    )
     _assert_status(getr, 200, "DAILY REPORT get")
     fetched = getr.json()
     assert fetched["date"] == d
     assert fetched["summary"] == created["summary"]
 
-    # get missing -> 404 (ここは HTTPException の detail 仕様のままなら detail を確認)
-    miss = _request(client, "DAILY REPORT get missing", "GET",
-                    "/api/v1/nutrition/daily/report", params={"date": "2025-01-03"})
+    # get missing -> 404 detail
+    miss = _request(
+        client,
+        "DAILY REPORT get missing",
+        "GET",
+        "/api/v1/nutrition/daily/report",
+        params={"date": "2025-01-03"},
+    )
     assert miss.status_code == 404
     body = miss.json()
     assert "detail" in body, body
 
-    # premium gate
+    # premium gate（前提条件を満たしてからプランを落とす）
     gated = _make_client()
     u2 = _register_and_login(gated)
+    _put_profile(gated, meals_per_day=1)
+    _create_target(gated, title="Target gated")
+    _create_meal_item(gated, d, "main", 1, "Meal 1")  # meals_per_day=1 で完了状態に
     _force_user_free_plan_and_expired_trial(u2["user_id"])
-    pg = _request(gated, "DAILY REPORT premium required", "POST",
-                  "/api/v1/nutrition/daily/report", json={"date": d})
+
+    pg = _request(
+        gated,
+        "DAILY REPORT premium required",
+        "POST",
+        "/api/v1/nutrition/daily/report",
+        json={"date": d},
+    )
     _assert_error(pg, 403, "PREMIUM_FEATURE_REQUIRED",
                   "DAILY REPORT premium required")
