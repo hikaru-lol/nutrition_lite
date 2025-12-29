@@ -1,42 +1,113 @@
-# Backend Directory Structure
+# Backend Structure Report
 
-最終更新: 2025-11-28（自動生成）
+This document summarizes the backend project's structure, responsibilities, and
+major flows. It focuses on how the code is organized and how the main features
+are implemented.
 
-## ルート直下
+## High-Level Architecture
 
-- `README.md` – プロジェクト概要とセットアップ手順。
-- `pyproject.toml` / `uv.lock` – Poetry/uv ベースのビルド・依存管理設定。
-- `alembic/` + `alembic.ini` – DB マイグレーション設定とスクリプト (`versions/` に履歴)。
-- `nutrition_backend.egg-info/` – `pip install -e .` 実行時に生成されるメタデータ。
-- `docs/` – 設計資料、要件、OpenAPI 仕様など。
-- `tests/` – ユニット/統合テスト、Fake 実装、pytest 設定。
-- `app/` – FastAPI アプリケーション本体。
-- `.\*.venv`, `.pytest_cache/` – ローカル実行用の一時ディレクトリ（バージョン管理から除外推奨）。
+- API layer (FastAPI): request/response schemas, routing, auth dependencies.
+- Application layer: use cases and DTOs (orchestrates domain behavior).
+- Domain layer: entities, value objects, and domain validation rules.
+- Infra layer: external services (OpenAI LLM), stub implementations.
+- DI container: wiring of use cases, repositories, and LLM adapters.
 
-## `app/` 配下
+## Directory Overview
 
-- `app/main.py` – FastAPI アプリ作成・ルータ登録・例外ハンドラ設定。
-- `app/settings.py` – アプリケーション設定／環境変数の読み込み。
-- `app/api/http/` – HTTP レイヤ (routers, schemas, cookies,エラーハンドラ等)。
-- `app/application/` – UseCase や DTO を含むアプリケーション層。`auth/`, `meal/`, `profile/` などドメイン単位で整理。
-- `app/domain/` – エンティティ・値オブジェクト・ドメインエラー。`auth/`, `nutrition/` 等で分割。
-- `app/infra/` – DB リポジトリ、セキュリティ、LLM 連携などインフラ層の実装。
-- `app/di/` – `container.py` による依存性解決（FastAPI 依存注入用ファクトリ）。
-- `app/jobs/` – バッチ／バックグラウンドジョブ（例: `generate_meal_recommendations.py`）。
+- `app/api/http/routers/`
+  - HTTP routes for Auth, Profile, Target, Meal, Nutrition, DailyReport, Billing.
+  - Uses Pydantic schemas and auth dependencies.
+- `app/api/http/schemas/`
+  - Request/response models used by routers.
+- `app/api/http/dependencies/`
+  - Auth-related dependencies for current user extraction.
+- `app/application/`
+  - Use cases and DTOs for each domain.
+- `app/domain/`
+  - Entities and value objects for auth, profile, target, meal, nutrition, billing.
+  - Validation rules live in `__post_init__` or dedicated methods.
+- `app/infra/llm/`
+  - OpenAI-based implementations (target, estimator, daily report).
+  - Stub implementations for non-LLM environments.
+- `app/di/container.py`
+  - Dependency injection wiring and feature toggles (OpenAI vs stub).
+- `docs/openapi/openapi.yaml`
+  - OpenAPI specification for the REST API.
+- `tests/`
+  - Unit tests and real integration tests.
 
-## `tests/` 配下
+## Core Domains and Responsibilities
 
-- `tests/conftest.py` – FastAPI TestClient と Fake UoW/Ports の共通フィクスチャ。
-- `tests/fakes/` – テスト専用の `InMemoryUserRepository`, `FakeTokenService` 等。
-- `tests/unit/` – ユースケース/ドメイン単位のユニットテスト。更に `application/`, `domain/`, `infra/` で整理。
-- `tests/integration/api/` – FastAPI エンドポイントを TestClient で叩く統合テスト。
-- `tests/integration_real/` – 実 DB/インフラを用いた統合テスト想定のフォルダ。
-- `tests/application/` – アプリ層テストのサンプル（今後拡張予定）。
+### Auth
+- Registration, login, refresh, logout.
+- Cookie-based auth: ACCESS_TOKEN and REFRESH_TOKEN.
+- Auth dependencies resolve current user for protected endpoints.
 
-## その他
+### Profile
+- Create/update and fetch current user's profile.
+- Stores sex, birthdate, height, weight, meals_per_day.
 
-- `docs/openapi/openapi.yaml` – API 仕様書。
-- `docs/plan/`, `docs/refactor/`, `docs/要件&仕様/` – 計画書や要件定義。
-- `.pytest_cache/`, `.venv/` – 実行時に生成される一時キャッシュ/仮想環境 (gitignore 対象)。
+### Target (Daily Nutrient Targets)
+- Create/list/get/update/activate targets.
+- Target generation uses LLM (OpenAI) or stub based on environment flags.
+- Target data includes nutrients, rationale, and disclaimer.
 
-上記構造を基に、ドメイン毎に `app/domain`→`application`→`api` の流れで依存が一方向となるよう整理されています。Tests では Fake 実装を共有して高速なユニット/統合テストを実現しています。
+### Meal (Food Entries)
+- CRUD for individual food entries (`/meal-items`).
+- Supports main meals (meal_index) and snacks (meal_index is null).
+- Updates recompute daily nutrition summaries for impacted dates.
+
+### Nutrition
+- `/nutrition/meal` recomputes meal and daily nutrition summaries.
+- Daily nutrition summaries aggregate nutrient intake across meals.
+
+### Daily Report
+- `/nutrition/daily/report` generates or fetches daily report text.
+- LLM output is validated and mapped into DTOs.
+
+### Billing (Stripe)
+- Checkout session creation.
+- Billing portal URL generation.
+- Stripe webhook handling for subscription updates.
+
+## API Endpoints (Summary)
+
+- Auth: `/auth/register`, `/auth/login`, `/auth/logout`, `/auth/refresh`, `/auth/me`
+- Profile: `/profile/me` (GET/PUT)
+- Target: `/targets`, `/targets/active`, `/targets/{target_id}`,
+  `/targets/{target_id}/activate`
+- Meal: `/meal-items` (POST/GET), `/meal-items/{entry_id}` (PATCH/DELETE)
+- Nutrition: `/nutrition/meal`, `/nutrition/daily/report` (POST/GET)
+- Billing: `/billing/checkout-session`, `/billing/portal-url`,
+  `/billing/stripe/webhook`
+
+## LLM (OpenAI) Integration
+
+- Implementations in `app/infra/llm/`.
+- OpenAI usage is configured via environment variables and DI container.
+- Key implementations:
+  - Target generation (daily nutrient targets).
+  - Meal-level nutrition estimator.
+  - Daily report generator.
+
+## Dependency Injection and Feature Toggles
+
+- `app/di/container.py` provides singleton instances.
+- Feature toggles select OpenAI or stub implementations:
+  - `USE_OPENAI_TARGET_GENERATOR`
+  - `USE_OPENAI_NUTRITION_ESTIMATOR`
+  - `USE_OPENAI_DAILY_REPORT_GENERATOR`
+  - Model selection via `OPENAI_*_MODEL`.
+
+## Testing
+
+- Unit tests for core logic and OpenAI adapters in `tests/unit/`.
+- Real integration tests in `tests/integration_real/` (requires auth and
+  `OPENAI_API_KEY` when LLM is invoked).
+
+## Notes on Data Flow
+
+- Authenticated requests use cookie-based session tokens.
+- Target creation depends on profile data; LLM generates recommended nutrients.
+- Nutrition summaries are recomputed after meal updates.
+- Daily reports depend on profile, targets, and daily nutrition summaries.
