@@ -4,6 +4,8 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware  # 追加: CORSミドルウェア
+
 from app.domain.auth import errors as auth_errors
 from app.domain.meal import errors as meal_domain_errors
 from app.domain.nutrition import errors as nutrition_domain_errors
@@ -39,7 +41,23 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    @app.get("/health")
+    # --- CORS設定 追加ここから ---
+    # フロントエンドのURLを許可リストに追加
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,       # 許可するオリジン
+        allow_credentials=True,      # Cookie等の信用情報を含むリクエストを許可
+        allow_methods=["*"],         # 全てのHTTPメソッド(GET, POST, PUT...)を許可
+        allow_headers=["*"],         # 全てのヘッダーを許可
+    )
+    # --- CORS設定 追加ここまで ---
+
+    @app.get("/api/v1/health")
     def health() -> dict:
         return {"status": "ok"}
 

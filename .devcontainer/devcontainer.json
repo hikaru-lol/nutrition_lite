@@ -44,9 +44,10 @@
 
   "mounts": [
     "source=code-config-${devcontainerId},target=/home/node/.claude,type=volume",
-    "source=${localEnv:HOME}/.aws,target=/home/node/.aws,type=bind,consistency=cached",
     "source=code-codex-${devcontainerId},target=/home/node/.codex,type=volume",
-    "source=${localEnv:HOME}/.ssh,target=/host-ssh,type=bind,consistency=cached"
+    "source=gemini-config-${devcontainerId},target=/home/node/.gemini,type=volume",
+    "source=${localEnv:HOME}/.ssh,target=/host-ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.aws,target=/home/node/.aws,type=bind,consistency=cached"
   ],
 
   "containerEnv": {

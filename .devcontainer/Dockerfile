@@ -41,8 +41,8 @@
   
   # ---------- ワークスペース ------------------------------------------
   # /home/node/.claude /home/node/.codex は volume / bind mount の受け皿
-  RUN mkdir -p /workspace /home/node/.claude /home/node/.codex \
-      && chown -R node:node /workspace /home/node/.claude /home/node/.codex
+  RUN mkdir -p /workspace /home/node/.claude /home/node/.codex /home/node/.gemini \
+      && chown -R node:node /workspace /home/node/.claude /home/node/.codex /home/node/.gemini
   
   WORKDIR /workspace
   
@@ -92,5 +92,6 @@
   
   RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
   RUN npm install -g @openai/codex
+  RUN npm install -g @google/gemini-cli
   RUN npm install -g typescript ts-node eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin aws-cdk@2
   
