@@ -28,21 +28,28 @@
 //   );
 // }
 
-import { ReactNode } from 'react';
-import { Header } from '@/modules/layout/ui/Header';
+// src/app/(onboarding)/layout.tsx
+import { redirect } from 'next/navigation';
+import { fetchCurrentUserServer } from '@/modules/auth';
+import { isApiError } from '@/shared/lib/errors';
 
-export default function OnboardingLayout({
+export default async function OnboardingLayout({
   children,
 }: {
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
-  return (
-    // Rule A: Layoutが「空間（背景・配置）」を定義する
-    <div className="flex min-h-screen w-full flex-col bg-gray-50">
-      <Header />
-      <div className="container mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-4 py-12">
-        {children}
-      </div>
-    </div>
-  );
+  try {
+    await fetchCurrentUserServer();
+  } catch (e) {
+    // 認証系だけ login へ。それ以外はエラーとして上に投げる（500等）
+    if (
+      isApiError(e) &&
+      (e.kind === 'unauthorized' || e.kind === 'forbidden')
+    ) {
+      redirect('/auth/login');
+    }
+    throw e;
+  }
+
+  return <>{children}</>;
 }

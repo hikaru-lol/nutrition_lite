@@ -31,16 +31,15 @@
 //   return renderContent('appShell');
 // }
 
-import { ReactNode } from 'react';
-import { Header } from '@/modules/layout/ui/Header'; // 移動したHeaderを使用
+// src/app/(app)/layout.tsx
+import { redirect } from 'next/navigation';
+import { fetchCurrentUserServer } from '@/modules/auth';
 
-export default function AppLayout({ children }: { children: ReactNode }) {
-  return (
-    // Rule A: アプリ全体の背景色と基本構造
-    <div className="min-h-screen w-full bg-gray-50">
-      <Header />
-      {/* メインコンテンツエリア */}
-      <main>{children}</main>
-    </div>
-  );
+export default async function AppLayout(props: { children: React.ReactNode }) {
+  const { user } = await fetchCurrentUserServer();
+
+  if (!user.has_profile) redirect('/onboarding/profile');
+  if (!user.has_target) redirect('/onboarding/target');
+
+  return <>{props.children}</>;
 }

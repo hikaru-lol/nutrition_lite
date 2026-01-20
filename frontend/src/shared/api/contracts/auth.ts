@@ -1,4 +1,4 @@
-// src/modules/auth/api/types.ts
+// src/shared/api/contracts/auth.ts
 export type UserPlan = 'trial' | 'free' | 'paid';
 
 export type UserSummary = {
@@ -6,24 +6,16 @@ export type UserSummary = {
   email: string;
   name: string | null;
   plan: UserPlan;
-  trial_ends_at: string | null;
+
+  // Phase3のガード判定に使う（バックエンドに無ければ後で差し替え）
   has_profile: boolean;
+  has_target: boolean;
+
   created_at: string;
 };
 
-export type AuthUserResponse = {
+export type CurrentUserResponse = {
   user: UserSummary;
-};
-
-export type RegisterRequest = {
-  email: string;
-  password: string;
-  name?: string | null;
-};
-
-export type LoginRequest = {
-  email: string;
-  password: string;
 };
 
 export type RefreshResponse = {

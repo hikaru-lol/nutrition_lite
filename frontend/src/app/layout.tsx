@@ -38,17 +38,14 @@
 // }
 
 // src/app/layout.tsx
-import { QueryProvider } from '@/shared/providers/QueryProvider';
+import './globals.css';
+import { Providers } from './providers';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="ja">
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <Providers>{props.children}</Providers>
       </body>
     </html>
   );
