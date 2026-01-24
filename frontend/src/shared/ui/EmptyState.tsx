@@ -1,5 +1,7 @@
 // src/shared/ui/EmptyState.tsx
-import React from 'react';
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function EmptyState(props: {
   title: string;
@@ -8,13 +10,17 @@ export function EmptyState(props: {
 }) {
   return (
     <div className="p-6">
-      <div className="max-w-xl rounded-xl border p-6 space-y-3">
-        <h2 className="text-lg font-semibold">{props.title}</h2>
-        {props.description ? (
-          <p className="text-sm text-muted-foreground">{props.description}</p>
-        ) : null}
-        {props.action ? <div className="pt-2">{props.action}</div> : null}
-      </div>
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="text-lg">{props.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {props.description ? (
+            <p className="text-sm text-muted-foreground">{props.description}</p>
+          ) : null}
+          {props.action ? <div>{props.action}</div> : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,25 +1,21 @@
-// src/modules/auth/api/authClient.ts
-import { apiFetch, registerRefresh } from '@/shared/api/client';
-import type {
-  CurrentUserResponse,
-  RefreshResponse,
-} from '@/shared/api/contracts';
+import { clientApiFetch } from '@/shared/api/client';
+
+export type LoginRequest = { email: string; password: string };
+export type RegisterRequest = { email: string; password: string };
+
+export async function login(req: LoginRequest) {
+  return clientApiFetch<void>('/auth/login', { method: 'POST', body: req });
+}
+
+export async function register(req: RegisterRequest) {
+  // /api/auth/register → BFF → `${BACKEND_AUTH_PREFIX}/register`
+  return clientApiFetch<void>('/auth/register', { method: 'POST', body: req });
+}
+
+export async function logout() {
+  return clientApiFetch<void>('/auth/logout', { method: 'POST' });
+}
 
 export async function fetchCurrentUser() {
-  return apiFetch<CurrentUserResponse>('/api/v1/auth/me', { method: 'GET' });
+  return clientApiFetch<{ user: unknown }>('/auth/me', { method: 'GET' });
 }
-
-export async function refreshSession(): Promise<boolean> {
-  try {
-    const res = await apiFetch<RefreshResponse>('/api/v1/auth/refresh', {
-      method: 'POST',
-      retryOnUnauthorized: false,
-    });
-    return !!res.ok;
-  } catch {
-    return false;
-  }
-}
-
-// apiFetch が401時に呼ぶ refresh を登録
-registerRefresh(refreshSession);

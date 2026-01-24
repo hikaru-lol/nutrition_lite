@@ -1,10 +1,12 @@
-// src/modules/auth/api/authServer.ts
-import { serverApiFetch } from '@/shared/api/server';
-import type { CurrentUserResponse } from '@/shared/api/contracts';
+import 'server-only';
+import { bffServerFetch } from '@/shared/api/bffServer';
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+};
 
 export async function fetchCurrentUserServer() {
-  return serverApiFetch<CurrentUserResponse>('/api/v1/auth/me', {
-    method: 'GET',
-    cache: 'no-store',
-  });
+  // ✅ backend直叩きではなく BFF経由
+  return bffServerFetch<CurrentUser>('/api/auth/me', { method: 'GET' });
 }

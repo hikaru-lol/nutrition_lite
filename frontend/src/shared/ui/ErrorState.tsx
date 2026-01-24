@@ -1,5 +1,7 @@
 // src/shared/ui/ErrorState.tsx
-import React from 'react';
+'use client';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function ErrorState(props: {
   title?: string;
@@ -8,14 +10,14 @@ export function ErrorState(props: {
 }) {
   return (
     <div className="p-6">
-      <div className="max-w-xl rounded-xl border p-6 space-y-3">
-        <h2 className="text-lg font-semibold">
-          {props.title ?? 'エラーが発生しました'}
-        </h2>
-        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-          {props.message}
-        </p>
-        {props.action ? <div className="pt-2">{props.action}</div> : null}
+      <div className="max-w-xl space-y-3">
+        <Alert>
+          <AlertTitle>{props.title ?? 'エラーが発生しました'}</AlertTitle>
+          <AlertDescription className="whitespace-pre-wrap">
+            {props.message}
+          </AlertDescription>
+        </Alert>
+        {props.action ? <div>{props.action}</div> : null}
       </div>
     </div>
   );

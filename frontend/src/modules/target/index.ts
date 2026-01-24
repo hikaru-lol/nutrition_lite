@@ -1,5 +1,6 @@
 // src/modules/target/index.ts
-// Phase7で TargetGeneratorPage を export するように拡張する
-export * from './api/targetApi';
-export * from './ui/TargetGeneratorPage';
-export * from './model/targetGeneratorPageModel';
+export { TargetGeneratorPage } from './ui/TargetGeneratorPage';
+export { useTargetGeneratorPageModel } from './model/useTargetGeneratorPageModel';
+
+export * from './api/targetClient';
+export * from './contract/targetContract';
