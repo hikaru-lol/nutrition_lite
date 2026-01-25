@@ -13,11 +13,15 @@
 ├── .devcontainer/          # 開発環境設定（Docker）
 ├── .github/                # GitHub Actions CI/CD設定
 │   └── workflows/
-├── backend/                 # バックエンド（FastAPI + Python）
+├── backend/                # バックエンド（FastAPI + Python）
 ├── frontend/               # フロントエンド（Next.js + TypeScript）
 ├── docs/                   # プロジェクトドキュメント
+│   ├── structure/          # 構成ドキュメント
+│   ├── workflow/           # 運用ドキュメント
+│   ├── openapi/            # OpenAPI仕様
+│   └── 要件&仕様/          # 機能要件・仕様書
 ├── scripts/                # 補助スクリプト
-└── README.md              # プロジェクトルートREADME
+└── README.md               # プロジェクトルートREADME
 ```
 
 ---
@@ -28,100 +32,178 @@
 
 クリーンアーキテクチャの原則に基づき、以下のレイヤーで構成されています：
 
-- **API 層** (`app/api/`): HTTP エンドポイント、リクエスト/レスポンスのスキーマ定義
-- **Application 層** (`app/application/`): ユースケース、ビジネスロジック
-- **Domain 層** (`app/domain/`): エンティティ、値オブジェクト、ドメインルール
-- **Infrastructure 層** (`app/infra/`): データベース、外部サービス、実装詳細
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      API Layer (FastAPI)                        │
+│  routers/ → schemas/ → dependencies/                            │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Application Layer                            │
+│  use_cases/ → dto/ → ports/                                     │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Domain Layer                             │
+│  entities/ → value_objects/ → errors/                           │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Infrastructure Layer                         │
+│  db/ → llm/ → security/ → storage/ → billing/                   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### 主要ディレクトリ
+### ディレクトリ構造
 
-#### `app/api/http/`
+```
+backend/
+├── app/
+│   ├── api/
+│   │   └── http/
+│   │       ├── routers/           # FastAPI ルーター（7ルーター）
+│   │       │   ├── auth_route.py
+│   │       │   ├── profile_route.py
+│   │       │   ├── target_route.py
+│   │       │   ├── meal_route.py
+│   │       │   ├── nutrition_route.py
+│   │       │   ├── daily_report_route.py
+│   │       │   └── billing_route.py
+│   │       ├── schemas/           # Pydantic スキーマ
+│   │       ├── dependencies/      # 依存性注入（認証等）
+│   │       ├── mappers/           # DTOマッパー
+│   │       ├── cookies.py         # Cookie処理
+│   │       └── errors.py          # エラーハンドリング
+│   │
+│   ├── application/               # ユースケース層
+│   │   ├── auth/
+│   │   │   ├── use_cases/
+│   │   │   │   ├── account/       # register_user, delete_account
+│   │   │   │   ├── session/       # login, logout, refresh
+│   │   │   │   └── current_user/  # get_current_user
+│   │   │   ├── ports/             # インターフェース定義
+│   │   │   └── dto/               # データ転送オブジェクト
+│   │   ├── profile/
+│   │   │   ├── use_cases/         # get_my_profile, upsert_profile
+│   │   │   ├── ports/
+│   │   │   └── dto/
+│   │   ├── target/
+│   │   │   ├── use_cases/         # CRUD, activate, generate
+│   │   │   ├── ports/
+│   │   │   └── dto/
+│   │   ├── meal/
+│   │   │   ├── use_cases/         # CRUD, check_daily_completion
+│   │   │   ├── ports/
+│   │   │   └── dto/
+│   │   ├── nutrition/
+│   │   │   ├── use_cases/         # compute, generate_report, recommend
+│   │   │   ├── ports/
+│   │   │   └── dto/
+│   │   ├── billing/
+│   │   │   ├── use_cases/         # checkout, portal, webhook
+│   │   │   └── ports/
+│   │   └── common/
+│   │       └── ports/             # 共通インターフェース
+│   │
+│   ├── domain/                    # ドメイン層
+│   │   ├── auth/
+│   │   │   ├── entities.py        # User
+│   │   │   ├── value_objects.py   # TokenPair, Credentials
+│   │   │   └── errors.py
+│   │   ├── profile/
+│   │   │   ├── entities.py        # Profile
+│   │   │   ├── value_objects.py
+│   │   │   └── errors.py
+│   │   ├── target/
+│   │   │   ├── entities.py        # Target, TargetNutrient
+│   │   │   ├── value_objects.py
+│   │   │   └── errors.py
+│   │   ├── meal/
+│   │   │   ├── entities.py        # FoodEntry
+│   │   │   ├── value_objects.py   # MealType, Amount
+│   │   │   └── errors.py
+│   │   ├── nutrition/
+│   │   │   ├── daily_nutrition.py
+│   │   │   ├── meal_nutrition.py
+│   │   │   ├── daily_report.py
+│   │   │   ├── meal_recommendation.py
+│   │   │   └── errors.py
+│   │   └── billing/
+│   │       ├── entities.py        # BillingAccount
+│   │       └── errors.py
+│   │
+│   ├── infra/                     # インフラ層
+│   │   ├── db/
+│   │   │   ├── models/            # SQLAlchemy モデル（14テーブル）
+│   │   │   ├── repositories/      # リポジトリ実装（10リポジトリ）
+│   │   │   ├── uow/               # Unit of Work 実装
+│   │   │   ├── session.py         # DBセッション管理
+│   │   │   └── base.py            # SQLAlchemy Base
+│   │   ├── security/
+│   │   │   ├── jwt_token_service.py
+│   │   │   └── password_hasher.py
+│   │   ├── llm/
+│   │   │   ├── estimator_openai.py           # 栄養推定
+│   │   │   ├── daily_report_generator_openai.py
+│   │   │   ├── meal_recommendation_generator_openai.py
+│   │   │   ├── target_generator_openai.py
+│   │   │   └── stub_*.py                     # スタブ実装
+│   │   ├── storage/
+│   │   │   └── minio_profile_image_storage.py
+│   │   ├── billing/
+│   │   │   └── stripe_client.py
+│   │   ├── auth/
+│   │   │   └── plan_checker_service.py
+│   │   ├── meal/
+│   │   │   └── meal_entry_query_service.py
+│   │   ├── profile/
+│   │   │   └── profile_query_service.py
+│   │   ├── nutrition/
+│   │   │   └── estimator_stub.py
+│   │   └── time/
+│   │       └── system_clock.py
+│   │
+│   ├── di/
+│   │   └── container.py           # 依存性注入コンテナ
+│   │
+│   ├── jobs/
+│   │   └── generate_meal_recommendations.py
+│   │
+│   ├── main.py                    # FastAPI エントリーポイント
+│   └── settings.py                # 環境変数・設定
+│
+├── alembic/                       # DBマイグレーション
+├── tests/
+│   ├── unit/                      # ユニットテスト（53ファイル）
+│   │   ├── application/
+│   │   └── infra/
+│   ├── integration/               # 統合テスト
+│   ├── integration_real/          # 実インフラ統合テスト
+│   └── fakes/                     # テスト用フェイク実装
+└── pyproject.toml                 # 依存関係定義
+```
 
-- **routers/**: FastAPI ルーター定義
-  - `auth_route.py`: 認証関連エンドポイント
-  - `profile_route.py`: プロフィール管理
-  - `target_route.py`: ターゲット（目標）管理
-  - `meal_route.py`: 食事記録
-  - `daily_report_route.py`: 日次レポート
-  - `nutrition_route.py`: 栄養計算
-  - `billing_route.py`: 課金処理
-- **schemas/**: Pydantic スキーマ（リクエスト/レスポンス）
-- **dependencies/**: FastAPI 依存性注入（認証ミドルウェアなど）
-- **errors.py**: エラーハンドリング
+### データベーステーブル一覧（14テーブル）
 
-#### `app/application/`
-
-各機能ドメインごとにユースケースを定義：
-
-- **auth/**: 認証・セッション管理
-
-  - `use_cases/account/`: ユーザー登録・削除
-  - `use_cases/session/`: ログイン・ログアウト・トークンリフレッシュ
-  - `use_cases/current_user/`: 現在のユーザー情報取得
-  - `ports/`: インターフェース定義（リポジトリ、サービス）
-  - `dto/`: データ転送オブジェクト
-
-- **profile/**: プロフィール管理
-- **target/**: 栄養目標（ターゲット）管理
-- **meal/**: 食事記録
-- **nutrition/**: 栄養計算・レポート生成
-  - `use_cases/`: 栄養推定、レポート生成、推奨生成
-  - `ports/`: 栄養計算、レポート生成、推奨生成のインターフェース
-- **billing/**: 課金処理（Stripe 連携）
-
-#### `app/domain/`
-
-ドメインエンティティとビジネスルール：
-
-- **auth/**: ユーザーエンティティ、認証関連の値オブジェクト
-- **profile/**: プロフィールエンティティ
-- **target/**: ターゲットエンティティ
-- **meal/**: 食事エンティティ
-- **nutrition/**: 栄養情報、レポート、推奨のエンティティ
-- **billing/**: 課金関連エンティティ
-
-#### `app/infra/`
-
-外部サービス・データベースの実装：
-
-- **db/**: SQLAlchemy モデルとリポジトリ実装
-  - `models/`: データベースモデル
-  - `repositories/`: リポジトリ実装
-  - `uow/`: ユニットオブワーク実装
-- **security/**: JWT、パスワードハッシュ
-- **llm/**: OpenAI 連携（栄養推定、レポート生成、推奨生成、ターゲット生成）
-- **storage/**: MinIO 連携（プロフィール画像保存）
-- **billing/**: Stripe クライアント実装
-- **time/**: 時刻サービス
-
-#### `app/di/`
-
-- `container.py`: 依存性注入コンテナ
-
-#### `app/jobs/`
-
-- `generate_meal_recommendations.py`: バッチジョブ（食事推奨生成）
-
-#### `app/main.py`
-
-FastAPI アプリケーションのエントリーポイント
-
-#### `app/settings.py`
-
-環境変数とアプリケーション設定
-
-### データベース
-
-- **Alembic**: マイグレーション管理
-- **SQLAlchemy**: ORM
-- 対応 DB: SQLite（開発）、PostgreSQL（本番）
-
-### テスト構成 (`/backend/tests`)
-
-- **unit/**: ユニットテスト（ユースケース、ドメインロジック）
-- **integration/**: 統合テスト（API エンドポイント、データベース）
-- **integration_real/**: 実インフラを使用する統合テスト
-- **fakes/**: テスト用のフェイク実装
+| テーブル名 | 説明 |
+|-----------|------|
+| `users` | ユーザー基本情報（plan, trial_ends_at等） |
+| `profiles` | プロフィール（1:1 with users） |
+| `billing_accounts` | Stripe連携情報（1:1 with users） |
+| `targets` | 栄養目標 |
+| `target_nutrients` | 目標栄養素（1:N with targets） |
+| `daily_target_snapshots` | 日次目標スナップショット |
+| `daily_target_snapshot_nutrients` | スナップショット栄養素 |
+| `food_entries` | 食事ログ（ソフトデリート対応） |
+| `meal_nutrition_summaries` | 食事栄養サマリ |
+| `meal_nutrition_nutrients` | 食事栄養素 |
+| `meal_recommendations` | 食事推奨（AI生成） |
+| `daily_nutrition_summaries` | 日次栄養サマリ |
+| `daily_nutrition_nutrients` | 日次栄養素 |
+| `daily_nutrition_reports` | 日次レポート（AI生成） |
 
 ---
 
@@ -129,87 +211,182 @@ FastAPI アプリケーションのエントリーポイント
 
 ### 技術スタック
 
-- **Next.js 16**: React フレームワーク（App Router）
-- **TypeScript**: 型安全性
-- **Tailwind CSS**: スタイリング
-- **Recharts**: グラフ・チャート表示
-- **MSW (Mock Service Worker)**: API モック（開発用）
+| カテゴリ | 技術 | バージョン |
+|---------|-----|-----------|
+| フレームワーク | Next.js | 16.0.7 |
+| UIライブラリ | React | 19.2.0 |
+| 言語 | TypeScript | 5.x |
+| 状態管理 | TanStack Query | 5.90.16 |
+| スタイリング | Tailwind CSS | 4.x |
+| UIコンポーネント | Radix UI | - |
+| チャート | Recharts | 3.5.1 |
+| フォーム | React Hook Form + Zod | - |
+| パッケージ管理 | pnpm | - |
 
-### 主要ディレクトリ
+### ディレクトリ構造
 
-#### `app/`
+```
+frontend/
+├── src/
+│   ├── app/                           # Next.js App Router
+│   │   ├── (app)/                     # 認証済みルート
+│   │   │   ├── layout.tsx             # 認証済みレイアウト
+│   │   │   ├── billing/
+│   │   │   │   └── plan/page.tsx
+│   │   │   └── meals/                 # 食事記録（予定）
+│   │   │
+│   │   ├── (onboarding)/              # オンボーディング
+│   │   │   ├── layout.tsx
+│   │   │   └── target/page.tsx        # ターゲット設定
+│   │   │
+│   │   ├── (public)/                  # 公開ルート
+│   │   │   └── auth/
+│   │   │       ├── layout.tsx
+│   │   │       ├── login/page.tsx
+│   │   │       └── register/page.tsx
+│   │   │
+│   │   ├── api/                       # API Routes (BFF)
+│   │   │   ├── auth/[...path]/route.ts
+│   │   │   └── target/route.ts
+│   │   │
+│   │   ├── layout.tsx                 # ルートレイアウト
+│   │   ├── providers.tsx              # React Providers
+│   │   └── globals.css                # グローバルスタイル
+│   │
+│   ├── modules/                       # 機能モジュール（Feature Sliced Design）
+│   │   ├── auth/
+│   │   │   ├── api/
+│   │   │   │   ├── authClient.ts      # クライアント側API
+│   │   │   │   └── authServer.ts      # サーバー側API
+│   │   │   ├── model/
+│   │   │   │   ├── schema.ts          # Zod スキーマ
+│   │   │   │   ├── useLoginPageModel.ts
+│   │   │   │   └── useRegisterPageModel.ts
+│   │   │   ├── ui/
+│   │   │   │   ├── LoginForm.tsx
+│   │   │   │   └── RegisterForm.tsx
+│   │   │   ├── server.ts              # Server Actions
+│   │   │   └── index.ts               # Public API
+│   │   │
+│   │   ├── target/
+│   │   │   ├── api/
+│   │   │   │   └── targetClient.ts
+│   │   │   ├── contract/
+│   │   │   │   └── targetContract.ts  # API契約定義
+│   │   │   ├── model/
+│   │   │   │   └── useTargetGeneratorPageModel.ts
+│   │   │   ├── ui/
+│   │   │   │   └── TargetGeneratorPage.tsx
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── today/
+│   │   │   ├── hooks/
+│   │   │   │   └── useToday.ts
+│   │   │   ├── infra/
+│   │   │   │   └── api.ts
+│   │   │   └── ui/
+│   │   │       └── NutritionSummary.tsx
+│   │   │
+│   │   ├── meals/                     # 食事モジュール
+│   │   │   ├── api/
+│   │   │   ├── model/
+│   │   │   └── ui/
+│   │   │
+│   │   ├── profile/                   # プロフィールモジュール
+│   │   │   ├── api/
+│   │   │   ├── model/
+│   │   │   └── ui/
+│   │   │
+│   │   ├── nutrition/                 # 栄養モジュール
+│   │   │   ├── api/
+│   │   │   └── model/
+│   │   │
+│   │   └── report/                    # レポートモジュール
+│   │       ├── api/
+│   │       └── model/
+│   │
+│   ├── shared/                        # 共有リソース
+│   │   ├── api/
+│   │   │   ├── client.ts              # HTTPクライアント
+│   │   │   ├── bffServer.ts           # BFFサーバー通信
+│   │   │   ├── proxy.ts               # APIプロキシ
+│   │   │   ├── errors.ts              # エラー定義
+│   │   │   └── contracts/             # API契約
+│   │   │       ├── auth.ts
+│   │   │       ├── target.ts
+│   │   │       └── index.ts
+│   │   │
+│   │   ├── config/
+│   │   │   └── env.ts                 # 環境変数
+│   │   │
+│   │   ├── lib/
+│   │   │   ├── errors.ts              # エラーユーティリティ
+│   │   │   └── query/
+│   │   │       ├── queryClient.ts     # TanStack Query設定
+│   │   │       ├── keys.ts            # Query Keys
+│   │   │       └── invalidate.ts      # キャッシュ無効化
+│   │   │
+│   │   └── ui/                        # 共有UIコンポーネント
+│   │       ├── EmptyState.tsx
+│   │       ├── ErrorState.tsx
+│   │       ├── PageSkeleton.tsx
+│   │       └── Toast.ts
+│   │
+│   ├── components/                    # 汎用UIコンポーネント
+│   │   └── ui/                        # shadcn/ui ベース
+│   │       ├── alert.tsx
+│   │       ├── button.tsx
+│   │       ├── card.tsx
+│   │       ├── input.tsx
+│   │       ├── label.tsx
+│   │       ├── select.tsx
+│   │       ├── separator.tsx
+│   │       ├── skeleton.tsx
+│   │       └── textarea.tsx
+│   │
+│   └── lib/
+│       └── utils.ts                   # ユーティリティ（cn関数等）
+│
+├── public/                            # 静的アセット
+├── package.json
+├── tsconfig.json
+├── next.config.ts
+├── tailwind.config.cjs
+├── postcss.config.mjs
+└── components.json                    # shadcn/ui 設定
+```
 
-Next.js App Router のページ定義：
+### アーキテクチャパターン
 
-- **(app)/**: 認証済みユーザー向けページ
-  - `page.tsx`: ホーム（今日の概要）
-  - `meals/page.tsx`: 食事記録ページ
-  - `profile/page.tsx`: プロフィール設定
-  - `targets/page.tsx`: ターゲット管理
-  - `recommendations/today/page.tsx`: 今日の推奨
-  - `reports/daily/[date]/page.tsx`: 日次レポート
-  - `billing/plan/page.tsx`: プラン一覧
-  - `billing/upgrade/page.tsx`: プランアップグレード
-- **(onboarding)/**: オンボーディングフロー
-  - `onboarding/profile/page.tsx`: プロフィール設定
-  - `onboarding/target/page.tsx`: ターゲット設定
-- **(public)/**: 公開ページ
-  - `auth/login/page.tsx`: ログイン
-  - `auth/register/page.tsx`: ユーザー登録
+#### Feature Sliced Design (FSD)
 
-#### `components/`
+モジュールは以下の構造で整理されています：
 
-React コンポーネント：
+```
+modules/{feature}/
+├── api/           # APIクライアント（Server/Client分離）
+├── model/         # ビジネスロジック、カスタムフック
+├── ui/            # Reactコンポーネント
+├── contract/      # API契約定義（オプション）
+└── index.ts       # Public API（再エクスポート）
+```
 
-- **auth/**: 認証関連コンポーネント
-- **layout/**: レイアウトコンポーネント（ヘッダー、サイドバー、シェル）
-- **meals/**: 食事記録関連
-  - `MealsPage.tsx`: メインページ
-  - `MealItemDialog.tsx`: 食事アイテム追加/編集ダイアログ
-  - `MealNutritionChart.tsx`: 栄養チャート
-  - `MealSlotCard.tsx`: 食事スロット（朝食、昼食など）カード
-- **profile/**: プロフィール設定
-- **targets/**: ターゲット管理
-- **recommendations/**: 推奨表示
-- **reports/**: レポート表示
-- **today/**: 今日の概要
-- **billing/**: 課金関連
-- **ui/**: 汎用 UI コンポーネント（Button, Card, Input など）
+#### BFF (Backend for Frontend) パターン
 
-#### `lib/`
+- `src/app/api/` にNext.js API Routesを配置
+- サーバーサイドでバックエンドAPIを呼び出し、クライアントに適切な形式で返却
+- Cookie認証のプロキシ処理を担当
 
-ユーティリティと API クライアント：
+### ルーティング構造
 
-- **api/**: API クライアント関数
-  - `client.ts`: ベース HTTP クライアント
-  - `auth.ts`: 認証 API
-  - `meals.ts`: 食事記録 API
-  - `nutrition.ts`: 栄養計算 API
-  - `profile.ts`: プロフィール API
-  - `targets.ts`: ターゲット API
-  - `dailyReport.ts`: レポート API
-  - `recommendation.ts`: 推奨 API
-  - `today.ts`: 今日の概要 API
-  - `billing.ts`: 課金 API
-- **hooks/**: カスタム React フック
-  - `useCurrentUser.ts`: 現在のユーザー情報
-  - `useMealsByDate.ts`: 日付別食事取得
-  - `useDailyReport.ts`: 日次レポート取得
-  - `useTodayOverview.ts`: 今日の概要取得
-  - `useTodayRecommendation.ts`: 今日の推奨取得
-- **mocks/**: MSW ハンドラー（開発用 API モック）
-- **utils.ts**: 汎用ユーティリティ関数
-
-#### `types/`
-
-TypeScript 型定義：
-
-- `auth.ts`: 認証関連型
-- `meal.ts`: 食事関連型
-- `nutrition.ts`: 栄養関連型
-- `profile.ts`: プロフィール型
-- `target.ts`: ターゲット型
-- `report.ts`: レポート型
+| パス | ルートグループ | 説明 |
+|------|---------------|------|
+| `/auth/login` | (public) | ログインページ |
+| `/auth/register` | (public) | ユーザー登録ページ |
+| `/` | (app) | ホーム（ダッシュボード） |
+| `/meals` | (app) | 食事記録ページ |
+| `/billing/plan` | (app) | プラン一覧 |
+| `/onboarding/target` | (onboarding) | ターゲット設定 |
 
 ---
 
@@ -267,23 +444,30 @@ TypeScript 型定義：
 
 ### バックエンド
 
-- **Python**: 3.11+
-- **パッケージ管理**: `uv` または `pip`
-- **依存関係**: `pyproject.toml`で管理
-- **起動**: `uvicorn app.main:app --reload`
-- **テスト**: `pytest`
+| 項目 | 内容 |
+|------|------|
+| Python | 3.11+ |
+| パッケージ管理 | `uv` または `pip` |
+| 依存関係 | `pyproject.toml` |
+| 起動 | `uvicorn app.main:app --reload` |
+| テスト | `pytest` |
+| Linter | `ruff` |
+| 型チェック | `mypy` |
 
 ### フロントエンド
 
-- **Node.js**: 20+
-- **パッケージ管理**: `pnpm`
-- **依存関係**: `package.json`で管理
-- **起動**: `pnpm dev`
-- **ビルド**: `pnpm build`
+| 項目 | 内容 |
+|------|------|
+| Node.js | 20+ |
+| パッケージ管理 | `pnpm` |
+| 依存関係 | `package.json` |
+| 起動 | `pnpm dev` |
+| ビルド | `pnpm build` |
+| Linter | `eslint` |
 
 ### 開発コンテナ
 
-`.devcontainer/`に Docker 設定があり、統一された開発環境を提供します。
+`.devcontainer/` に Docker 設定があり、統一された開発環境を提供します。
 
 ---
 
@@ -291,28 +475,13 @@ TypeScript 型定義：
 
 ### GitHub Actions
 
-`.github/workflows/`に以下が定義されています：
+`.github/workflows/` に以下が定義されています：
 
-- `ci.yml`: 全体の CI
-- `backend-ci.yml`: バックエンド専用 CI
-- `backend-real-integration.yml`: 実インフラを使用する統合テスト
-
----
-
-## ドキュメント
-
-`/docs`ディレクトリに以下が含まれます：
-
-- `GIT_WORKFLOW.md`: Git 運用ルール（GitHub Flow）
-- `frontend_business_requirements.md`: フロントエンド要件（空）
-- `frontend_components.md`: フロントエンドコンポーネント（空）
-- `frontend_screen_map.md`: 画面マップ（空）
-
-`/backend/docs`には以下が含まれます：
-
-- `backend_structure.md`: バックエンド構造説明
-- `openapi/openapi.yaml`: OpenAPI 仕様
-- `要件&仕様/`: 各機能の要件・仕様書
+| ワークフロー | 説明 |
+|-------------|------|
+| `backend-unit-tests.yml` | バックエンドユニットテスト |
+| `backend-integration-tests.yml` | バックエンド統合テスト |
+| `backend-real-integration.yml` | 実インフラ統合テスト |
 
 ---
 
@@ -333,7 +502,7 @@ TypeScript 型定義：
 
 ### MinIO
 
-- プロフィール画像の保存
+- プロフィール画像の保存（S3互換）
 
 ---
 
@@ -351,27 +520,23 @@ TypeScript 型定義：
 
 ### バックエンド
 
-- **ユニットテスト**: ユースケース、ドメインロジック
-- **統合テスト**: API エンドポイント、データベース連携
-- **実インフラ統合テスト**: 実際の DB、MinIO、OpenAI を使用
+| テスト種別 | 内容 |
+|-----------|------|
+| ユニットテスト | ユースケース、ドメインロジック（53ファイル） |
+| 統合テスト | API エンドポイント、データベース連携 |
+| 実インフラテスト | 実際の DB、MinIO、OpenAI を使用 |
 
 ### フロントエンド
 
-- MSW による API モック
-- 開発時のモックサーバー
-
----
-
-## 今後の拡張
-
-- 認証以外の機能追加時も、application 層に新ユースケース、infra 層にリポジトリ実装を追加するだけで API に組み込み可能
-- クリーンアーキテクチャにより、テスト容易性と保守性を確保
-- ドメイン層の独立性により、ビジネスロジックの変更が容易
+- TanStack Query によるサーバー状態管理
+- Zod によるランタイム型検証
+- （今後）E2Eテスト導入予定
 
 ---
 
 ## 参考情報
 
 - バックエンド詳細: `/backend/README.md`
-- Git 運用ルール: `/docs/GIT_WORKFLOW.md`
-- OpenAPI 仕様: `/backend/docs/openapi/openapi.yaml`
+- Git 運用ルール: `/docs/workflow/GIT_WORKFLOW.md`
+- OpenAPI 仕様: `/docs/openapi/openapi.yaml`
+- ER図: `/backend/ER_DIAGRAM.md`

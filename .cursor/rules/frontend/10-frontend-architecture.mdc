@@ -1,0 +1,117 @@
+---
+description: 'FRONTEND: strict boundaries (UI→Model→API→shared/api→BFF) + server-only safety'
+globs: ['frontend/**/*']
+alwaysApply: false
+---
+
+# FRONTEND ARCHITECTURE (STRICT)
+
+## Dependency direction (never break)
+
+```
+UI (modules/*/ui)
+  → PageModel (modules/*/model)
+    → API (modules/*/api)
+      → shared/api
+        → BFF (app/api)
+          → Backend (/api/v1)
+```
+
+## Directory structure
+
+### `app/` — Next.js App Router
+
+| Path                | Role                                     |
+| ------------------- | ---------------------------------------- |
+| `app/(public)/`     | Public pages (auth/login, auth/register) |
+| `app/(onboarding)/` | First-time setup flow                    |
+| `app/(app)/`        | Authenticated main app                   |
+| `app/api/`          | **BFF** — proxy to backend               |
+| `app/layout.tsx`    | Root layout                              |
+| `app/providers.tsx` | Client providers (React Query, etc.)     |
+
+- `(group)` does not appear in URL. Avoid URL collisions.
+
+### `modules/` — Feature modules
+
+Each feature has isolated subdirectories:
+
+| Subdir      | Role                                                      |
+| ----------- | --------------------------------------------------------- |
+| `ui/`       | React components (UI layer)                               |
+| `model/`    | PageModel hooks (`useXxxPageModel`) + Zod schema          |
+| `api/`      | BFF calls via `clientApiFetch`                            |
+| `contract/` | Type definitions / Zod schemas                            |
+| `index.ts`  | **Client-safe exports only**                              |
+| `server.ts` | **Server-only exports** (`import 'server-only'` required) |
+
+### `shared/` — Shared utilities
+
+| Path                      | Role                                     |
+| ------------------------- | ---------------------------------------- |
+| `shared/api/client.ts`    | Client fetch wrapper (to BFF `/api/*`)   |
+| `shared/api/bffServer.ts` | Server-side fetch                        |
+| `shared/api/proxy.ts`     | BFF proxy utility (server-only)          |
+| `shared/api/errors.ts`    | Error normalization                      |
+| `shared/api/contracts/`   | Shared Zod schemas                       |
+| `shared/lib/query/`       | TanStack Query config                    |
+| `shared/ui/`              | Common UI (EmptyState, ErrorState, etc.) |
+
+### `components/ui/` — shadcn/ui components
+
+Reusable base UI components (button, card, input, etc.)
+
+## Layer rules (must)
+
+### UI layer
+
+- Imports PageModel only. **Must not call API directly.**
+
+### PageModel layer
+
+- Contains `useXxxPageModel` hooks.
+- Orchestrates API calls + state.
+
+### API layer (`modules/*/api`)
+
+- All feature API calls live here.
+- Uses `clientApiFetch` from `shared/api/client.ts`.
+
+### shared/api layer
+
+- Fetch + error normalization only. **No feature logic.**
+
+### BFF layer (`app/api`)
+
+- Proxies requests to backend.
+- Forwards Cookie / Set-Cookie.
+- **No direct backend calls from frontend.** Always go through BFF `/api/*`.
+
+## server/client mixing prevention (must)
+
+- Server-only modules must start with `import 'server-only'`.
+- `modules/*/server.ts` is server-only only.
+- `modules/*/index.ts` exports client-safe only (do NOT export server-only).
+- Client components must not import `next/headers`, `server-only`, or server-only modules.
+
+## Data flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Browser                                                 │
+├─────────────────────────────────────────────────────────┤
+│  UI Component (modules/*/ui/)                           │
+│       ↓ uses                                            │
+│  PageModel Hook (modules/*/model/useXxxPageModel.ts)    │
+│       ↓ calls                                           │
+│  Feature API (modules/*/api/xxxClient.ts)               │
+│       ↓ uses                                            │
+│  clientApiFetch (shared/api/client.ts)                  │
+│       ↓ fetch("/api/...")                               │
+├─────────────────────────────────────────────────────────┤
+│  BFF Route Handler (app/api/.../route.ts)  ← Next.js    │
+│       ↓ proxy                                           │
+├─────────────────────────────────────────────────────────┤
+│  Backend API (/api/v1/...)                 ← FastAPI    │
+└─────────────────────────────────────────────────────────┘
+```

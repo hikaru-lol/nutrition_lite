@@ -12,17 +12,14 @@ function joinPath(a: string, b: string) {
 function buildProfileBackendUrl(req: NextRequest) {
   const origin = process.env.BACKEND_INTERNAL_ORIGIN ?? 'http://127.0.0.1:8000';
   const prefix = process.env.BACKEND_API_PREFIX ?? '/api/v1';
-  const profilePath = process.env.BACKEND_PROFILE_PATH ?? '/profile';
+  const path = process.env.BACKEND_PROFILE_PATH ?? '/profile';
 
-  // origin + prefix + path を安全に連結
-  const base = joinPath(joinPath(origin, prefix), profilePath);
-
-  // ✅ クエリ引き継ぎ（date等が将来増えても安全）
-  return `${base}${req.nextUrl.search}`;
+  const base = joinPath(joinPath(origin, prefix), path);
+  return `${base}${req.nextUrl.search}`; // ✅ query引き継ぎ
 }
 
 export async function GET(req: NextRequest, ctx: any) {
-  // ✅ Next.js 16 対策（統一ルール）
+  // ✅ ルール統一（paramsがPromiseのケース対策）
   if (ctx?.params) await ctx.params;
 
   return proxyToBackend(req, buildProfileBackendUrl(req));

@@ -1,0 +1,17 @@
+---
+description: 'FRONTEND Contracts: Zod schema as source of truth (no casts)'
+globs:
+  [
+    'frontend/src/modules/**/contract/**/*.{ts,tsx}',
+    'frontend/src/shared/contract/**/*.{ts,tsx}',
+  ]
+alwaysApply: false
+---
+
+# Contract RULES (Zod)
+
+- Request/response types are derived from Zod schema.
+- No `as` casting to force types.
+- Numeric inputs:
+  - Use RHF `valueAsNumber: true`
+  - Prefer `z.number()` in schema (refine if needed)

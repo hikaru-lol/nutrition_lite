@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
+import * as z from 'zod'; // ← v4 はこれが安全
 
 import { fetchProfile, upsertProfile } from '../api/profileClient';
 import { SexSchema } from '../contract/profileContract';
 
+// coerce を使うなら input/output を分けるのが正解
 export const ProfileFormSchema = z.object({
   sex: SexSchema,
   birthday: z.string().min(1),
@@ -11,11 +12,12 @@ export const ProfileFormSchema = z.object({
   weightKg: z.coerce.number().min(20).max(300),
 });
 
-export type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
+// ✅ フォームが扱うのは「入力型」
+export type ProfileFormValues = z.input<typeof ProfileFormSchema>;
+// ✅ 保存・APIへ渡すのは「出力型」
+type ProfileParsedValues = z.output<typeof ProfileFormSchema>;
 
-const qk = {
-  me: ['profile', 'me'] as const,
-};
+const qk = { me: ['profile', 'me'] as const };
 
 export function useProfilePageModel() {
   const qc = useQueryClient();
@@ -26,10 +28,8 @@ export function useProfilePageModel() {
   });
 
   const upsertMutation = useMutation({
-    mutationFn: (values: ProfileFormValues) => upsertProfile(values),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.me });
-    },
+    mutationFn: (values: ProfileParsedValues) => upsertProfile(values),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.me }),
   });
 
   const defaults: ProfileFormValues = profileQuery.data
@@ -47,7 +47,9 @@ export function useProfilePageModel() {
     upsertMutation,
     defaults,
     async save(values: ProfileFormValues) {
-      return upsertMutation.mutateAsync(values);
+      // ✅ ここで parse して「出力型」にしてから APIへ
+      const parsed = ProfileFormSchema.parse(values) as ProfileParsedValues;
+      return upsertMutation.mutateAsync(parsed);
     },
   };
 }

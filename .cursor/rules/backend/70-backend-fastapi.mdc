@@ -1,0 +1,23 @@
+---
+description: 'BACKEND: FastAPI conventions (routing, schemas, errors, auth boundary)'
+globs: ['backend/app/**/*', 'backend/tests/**/*']
+alwaysApply: false
+---
+
+# FastAPI CONVENTIONS
+
+## API boundary
+
+- Routers live under `backend/app/api/http/*` (or existing convention).
+- Schemas/DTOs: keep at the boundary (API/App) and avoid leaking infra models.
+
+## Error handling
+
+- Prefer explicit error mapping:
+  - Domain/Application errors → HTTP status + structured payload
+- Do not return raw exceptions or stack traces.
+
+## Auth boundary
+
+- Keep auth/session handling consistent with existing approach.
+- If changing auth endpoints, update OpenAPI + integration tests accordingly.

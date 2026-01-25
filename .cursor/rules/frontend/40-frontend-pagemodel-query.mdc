@@ -1,0 +1,23 @@
+---
+description: 'FRONTEND PageModel: TanStack Query usage + UI isolation'
+globs:
+  [
+    'frontend/src/modules/**/model/**/*.{ts,tsx}',
+    'frontend/src/modules/**/api/**/*.{ts,tsx}',
+  ]
+alwaysApply: false
+---
+
+# PageModel (TanStack Query) RULES
+
+## Responsibilities
+
+- PageModel owns `useQuery`/`useMutation`.
+- UI consumes PageModel outputs only (ViewState + handlers).
+- UI must not import `modules/*/api` or `shared/api` directly.
+
+## Types
+
+- Avoid `any`. Use explicit generics:
+  - `useMutation<TData, TError, TVariables>()`
+- Query keys / invalidation remain feature-local (do not scatter in shared).

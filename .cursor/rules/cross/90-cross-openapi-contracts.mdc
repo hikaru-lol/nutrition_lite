@@ -1,0 +1,23 @@
+---
+description: 'CROSS: OpenAPI / contracts sync, FE(BFF)↔BE changes checklist'
+globs: ['docs/openapi/**/*', 'backend/**/*', 'frontend/**/*']
+alwaysApply: false
+---
+
+# CROSS-CUTTING RULES (FE ↔ BE)
+
+## When backend API changes
+
+Do this checklist (in order):
+
+1. Update OpenAPI (`docs/openapi/openapi.yaml` if used as source)
+2. Update backend implementation + tests
+3. Update frontend BFF proxy (/api/\*) if needed
+4. Update frontend contracts (Zod) and clients
+5. Update UI/PageModel usage + E2E/manual verification
+
+## Breaking changes
+
+- Propose compatibility strategy:
+  - versioning OR migration plan OR fallback behavior
+- Clearly list impacted routes and clients.

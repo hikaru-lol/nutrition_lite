@@ -1,0 +1,25 @@
+---
+description: 'BACKEND: Clean Architecture boundaries + ports/adapters discipline'
+globs: ['backend/**/*']
+alwaysApply: false
+---
+
+# BACKEND RULES (Clean Architecture)
+
+## Layering (never break)
+
+API (FastAPI routers, DI)
+→ Application (usecases, DTOs, ports)
+→ Domain (entities, value objects, domain errors)
+→ Infrastructure (DB/LLM/storage/security adapters)
+
+## Rules
+
+- Domain must not depend on external I/O frameworks (FastAPI/DB clients/etc.).
+- Application depends on ports (interfaces), not concrete infra.
+- Infra implements ports. API wires dependencies via DI container.
+
+## Changes
+
+- Minimal diff. No unrelated refactors.
+- For any behavior change: specify impacted usecase(s) + add/update tests.

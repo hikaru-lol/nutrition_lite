@@ -16,8 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { LoadingState } from '@/shared/ui/states/LoadingState';
-import { ErrorState } from '@/shared/ui/states/ErrorState';
+import { LoadingState } from '@/shared/ui/Status/LoadingState';
+import { ErrorState } from '@/shared/ui/Status/ErrorState';
 
 import {
   useProfilePageModel,
@@ -50,6 +50,7 @@ export function ProfilePage() {
 
   if (m.profileQuery.isLoading)
     return <LoadingState label="プロフィールを読み込み中..." />;
+
   if (m.profileQuery.isError)
     return (
       <ErrorState

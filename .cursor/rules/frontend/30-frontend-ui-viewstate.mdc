@@ -1,0 +1,30 @@
+---
+description: 'FRONTEND UI: shadcn-first + ViewState-driven rendering + shared status UI'
+globs:
+  [
+    'frontend/src/app/**/*.{ts,tsx}',
+    'frontend/src/modules/**/ui/**/*.{ts,tsx}',
+    'frontend/src/shared/ui/**/*.{ts,tsx}',
+    'frontend/src/components/ui/**/*.{ts,tsx}',
+  ]
+alwaysApply: false
+---
+
+# UI RULES (shadcn + ViewState)
+
+## Components
+
+- Prefer shadcn/ui components (`frontend/src/components/ui/*`) over raw HTML controls.
+- Keep styling consistent with Tailwind + Radix + shadcn patterns.
+
+## ViewState
+
+- Pages render by switching ViewState (e.g., idle/loading/submitting/success/error).
+- UI should be “dumb”: render based on ViewState, no business logic.
+
+## Shared status UI
+
+- Put common states in shared UI:
+  - `PageSkeleton`, `EmptyState`, `ErrorState`
+- Error message must use a single normalization helper:
+  - `toErrorMessage(err: unknown)` (no `any`)
