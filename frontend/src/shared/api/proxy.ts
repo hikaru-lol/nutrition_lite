@@ -9,11 +9,12 @@ export async function proxyToBackend(req: NextRequest, backendUrl: string) {
 
   const res = await fetch(backendUrl, {
     method: req.method,
-    // Cookie を backend に転送（me/logout 等に必要）
+    // Cookie / Authorization を backend に転送
     headers: {
       'content-type': req.headers.get('content-type') ?? 'application/json',
       accept: req.headers.get('accept') ?? 'application/json',
       cookie: req.headers.get('cookie') ?? '',
+      authorization: req.headers.get('authorization') ?? '',
     },
     body,
     cache: 'no-store',

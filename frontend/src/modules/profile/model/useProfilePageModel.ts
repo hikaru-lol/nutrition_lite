@@ -1,21 +1,23 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod'; // ← v4 はこれが安全
 
 import { fetchProfile, upsertProfile } from '../api/profileClient';
-import { SexSchema } from '../contract/profileContract';
+import {
+  SexSchema,
+  type UpsertProfileInput,
+} from '../contract/profileContract';
 
-// coerce を使うなら input/output を分けるのが正解
+// フォーム用スキーマ（camelCase, coerce で文字列→数値変換）
 export const ProfileFormSchema = z.object({
   sex: SexSchema,
-  birthday: z.string().min(1),
-  heightCm: z.coerce.number().int().min(50).max(250),
-  weightKg: z.coerce.number().min(20).max(300),
+  birthdate: z.string().min(1),
+  height_cm: z.coerce.number().int().min(50).max(250),
+  weight_kg: z.coerce.number().min(20).max(300),
 });
 
 // ✅ フォームが扱うのは「入力型」
 export type ProfileFormValues = z.input<typeof ProfileFormSchema>;
-// ✅ 保存・APIへ渡すのは「出力型」
-type ProfileParsedValues = z.output<typeof ProfileFormSchema>;
 
 const qk = { me: ['profile', 'me'] as const };
 
@@ -28,18 +30,21 @@ export function useProfilePageModel() {
   });
 
   const upsertMutation = useMutation({
-    mutationFn: (values: ProfileParsedValues) => upsertProfile(values),
+    mutationFn: (values: UpsertProfileInput) => upsertProfile(values),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.me }),
   });
 
-  const defaults: ProfileFormValues = profileQuery.data
-    ? {
+  const defaults: ProfileFormValues = useMemo(() => {
+    if (profileQuery.data) {
+      return {
         sex: profileQuery.data.sex,
-        birthday: profileQuery.data.birthday,
-        heightCm: profileQuery.data.heightCm,
-        weightKg: profileQuery.data.weightKg,
-      }
-    : { sex: 'male', birthday: '', heightCm: 170, weightKg: 60 };
+        birthdate: profileQuery.data.birthdate,
+        height_cm: profileQuery.data.height_cm,
+        weight_kg: profileQuery.data.weight_kg,
+      };
+    }
+    return { sex: 'male', birthdate: '', height_cm: 170, weight_kg: 60 };
+  }, [profileQuery.data]);
 
   return {
     ProfileFormSchema,
@@ -47,8 +52,8 @@ export function useProfilePageModel() {
     upsertMutation,
     defaults,
     async save(values: ProfileFormValues) {
-      // ✅ ここで parse して「出力型」にしてから APIへ
-      const parsed = ProfileFormSchema.parse(values) as ProfileParsedValues;
+      // parse して API スキーマ型に変換
+      const parsed = ProfileFormSchema.parse(values);
       return upsertMutation.mutateAsync(parsed);
     },
   };

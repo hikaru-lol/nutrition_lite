@@ -1,26 +1,6 @@
 // src/app/(app)/layout.tsx
-import 'server-only';
-import { redirect } from 'next/navigation';
-import { fetchCurrentUserServer } from '@/modules/auth/server';
-import { fetchProfileServer } from '@/modules/profile/server';
-import { fetchActiveTargetServer } from '@/modules/targets/server';
+// TODO: 認証・プロファイル・ターゲットのガードを実装する
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  try {
-    await fetchCurrentUserServer();
-  } catch {
-    redirect('/auth/login');
-  }
-
-  const profile = await fetchProfileServer().catch(() => null);
-  if (!profile) redirect('/profile');
-
-  const activeTarget = await fetchActiveTargetServer().catch(() => null);
-  if (!activeTarget) redirect('/target');
-
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

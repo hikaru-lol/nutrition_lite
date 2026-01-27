@@ -1,12 +1,14 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -15,173 +17,136 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { useTargetGeneratorPageModel } from '../model/useTargetGeneratorPageModel';
 import {
-  generateTargetRequestSchema,
-  type GenerateTargetRequest,
-} from '../contract/targetContract';
+  useTargetGeneratorPageModel,
+  type TargetFormValues,
+} from '../model/useTargetGeneratorPageModel';
 
 export function TargetGeneratorPage() {
+  const router = useRouter();
   const m = useTargetGeneratorPageModel();
 
-  const form = useForm<GenerateTargetRequest>({
-    resolver: zodResolver(generateTargetRequestSchema),
-    defaultValues: {
-      sex: 'male',
-      age: 30,
-      heightCm: 170,
-      weightKg: 65,
-      activityLevel: 'moderate',
-      goal: 'maintain',
-    },
+  const form = useForm<TargetFormValues>({
+    resolver: zodResolver(m.TargetFormSchema),
+    defaultValues: m.defaultFormValues,
   });
 
-  const onSubmit: SubmitHandler<GenerateTargetRequest> = async (v) => {
-    await m.submit(v); // ✅ cast不要
+  // 成功したら /today へ遷移
+  useEffect(() => {
+    if (m.state.type === 'success') {
+      router.replace('/today');
+    }
+  }, [m.state.type, router]);
+
+  const onSubmit: SubmitHandler<TargetFormValues> = async (v) => {
+    await m.submit(v);
   };
 
-  const disabled = m.state.type === 'submitting';
+  const isSubmitting = m.state.type === 'submitting';
 
   return (
-    <div className="mx-auto w-full max-w-2xl p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>ターゲット生成</CardTitle>
-        </CardHeader>
+    <div className="space-y-4">
+      <div>
+        <div className="text-lg font-semibold">ターゲット生成</div>
+        <div className="text-sm text-muted-foreground">
+          目標に合わせた栄養ターゲットを自動生成します
+        </div>
+      </div>
 
-        <CardContent className="space-y-6">
-          <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>性別</Label>
-                <Select
-                  value={form.watch('sex')}
-                  onValueChange={(v) =>
-                    form.setValue('sex', v as GenerateTargetRequest['sex'], {
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">男性</SelectItem>
-                    <SelectItem value="female">女性</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="age">年齢</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  inputMode="numeric"
-                  {...form.register('age', { valueAsNumber: true })}
-                />
-                {form.formState.errors.age ? (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.age.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="heightCm">身長 (cm)</Label>
-                <Input
-                  id="heightCm"
-                  type="number"
-                  inputMode="numeric"
-                  {...form.register('heightCm', { valueAsNumber: true })}
-                />
-                {form.formState.errors.heightCm ? (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.heightCm.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="weightKg">体重 (kg)</Label>
-                <Input
-                  id="weightKg"
-                  type="number"
-                  inputMode="decimal"
-                  {...form.register('weightKg', { valueAsNumber: true })}
-                />
-                {form.formState.errors.weightKg ? (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.weightKg.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label>活動レベル</Label>
-                <Select
-                  value={form.watch('activityLevel')}
-                  onValueChange={(v) =>
-                    form.setValue(
-                      'activityLevel',
-                      v as GenerateTargetRequest['activityLevel'],
-                      { shouldValidate: true }
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sedentary">
-                      低い（ほぼ運動しない）
-                    </SelectItem>
-                    <SelectItem value="light">やや低い（週1〜2）</SelectItem>
-                    <SelectItem value="moderate">普通（週3〜4）</SelectItem>
-                    <SelectItem value="active">高い（週5〜6）</SelectItem>
-                    <SelectItem value="very_active">
-                      非常に高い（毎日）
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>目的</Label>
-                <Select
-                  value={form.watch('goal')}
-                  onValueChange={(v) =>
-                    form.setValue('goal', v as GenerateTargetRequest['goal'], {
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lose">減量</SelectItem>
-                    <SelectItem value="maintain">維持</SelectItem>
-                    <SelectItem value="gain">増量</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {m.state.type === 'error' ? (
-              <p className="text-sm text-destructive whitespace-pre-wrap">
-                {m.state.message}
+      <Card className="p-4">
+        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          {/* タイトル */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">タイトル</div>
+            <Input
+              placeholder="例: ダイエット2026"
+              {...form.register('title')}
+            />
+            {form.formState.errors.title ? (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.title.message}
               </p>
             ) : null}
+          </div>
 
-            <Button className="w-full" type="submit" disabled={disabled}>
-              {disabled ? '生成中…' : 'ターゲットを生成'}
+          {/* 目標タイプ */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">目標タイプ</div>
+            <Select
+              value={form.watch('goal_type')}
+              onValueChange={(v) =>
+                form.setValue('goal_type', v as TargetFormValues['goal_type'])
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {(
+                  Object.keys(m.goalTypeLabels) as Array<
+                    TargetFormValues['goal_type']
+                  >
+                ).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {m.goalTypeLabels[key]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 活動レベル */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">活動レベル</div>
+            <Select
+              value={form.watch('activity_level')}
+              onValueChange={(v) =>
+                form.setValue(
+                  'activity_level',
+                  v as TargetFormValues['activity_level']
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {(
+                  Object.keys(m.activityLevelLabels) as Array<
+                    TargetFormValues['activity_level']
+                  >
+                ).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {m.activityLevelLabels[key]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 目標の詳細（任意） */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">目標の詳細（任意）</div>
+            <Textarea
+              placeholder="例: 3ヶ月で5kg減量したい"
+              rows={3}
+              {...form.register('goal_description')}
+            />
+          </div>
+
+          {/* 送信ボタン */}
+          <div className="flex items-center justify-end">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? '生成中...' : 'ターゲットを生成'}
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
 
-      {/* 結果表示はそのままでOK */}
+          {/* エラー表示 */}
+          {m.state.type === 'error' ? (
+            <div className="text-sm text-destructive">{m.state.message}</div>
+          ) : null}
+        </form>
+      </Card>
     </div>
   );
 }

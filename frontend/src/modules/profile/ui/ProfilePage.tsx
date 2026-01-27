@@ -28,6 +28,7 @@ const sexLabel: Record<ProfileFormValues['sex'], string> = {
   male: '男性',
   female: '女性',
   other: 'その他',
+  undisclosed: '回答しない',
 };
 
 export function ProfilePage() {
@@ -74,7 +75,9 @@ export function ProfilePage() {
             <div className="text-sm font-medium">性別</div>
             <Select
               value={form.watch('sex')}
-              onValueChange={(v) => form.setValue('sex', v as any)}
+              onValueChange={(v) =>
+                form.setValue('sex', v as ProfileFormValues['sex'])
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="選択" />
@@ -93,7 +96,7 @@ export function ProfilePage() {
 
           <div className="space-y-2">
             <div className="text-sm font-medium">生年月日</div>
-            <Input type="date" {...form.register('birthday')} />
+            <Input type="date" {...form.register('birthdate')} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -102,7 +105,7 @@ export function ProfilePage() {
               <Input
                 type="number"
                 inputMode="numeric"
-                {...form.register('heightCm')}
+                {...form.register('height_cm')}
               />
             </div>
             <div className="space-y-2">
@@ -110,7 +113,7 @@ export function ProfilePage() {
               <Input
                 type="number"
                 inputMode="decimal"
-                {...form.register('weightKg')}
+                {...form.register('weight_kg')}
               />
             </div>
           </div>
