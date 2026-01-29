@@ -1,8 +1,5 @@
 import { z } from 'zod';
 
-// ============================================================
-// OpenAPI: GoalType, ActivityLevel
-// ============================================================
 export const GoalTypeSchema = z.enum([
   'weight_loss',
   'maintain',
@@ -32,19 +29,6 @@ export const NutrientSourceSchema = z.enum([
   'aggregated',
 ]);
 
-// ============================================================
-// OpenAPI: CreateTargetRequest
-// ============================================================
-export const CreateTargetRequestSchema = z.object({
-  title: z.string().min(1),
-  goal_type: GoalTypeSchema,
-  goal_description: z.string().nullable().optional(),
-  activity_level: ActivityLevelSchema,
-});
-
-// ============================================================
-// OpenAPI: TargetNutrient
-// ============================================================
 export const TargetNutrientSchema = z.object({
   code: NutrientCodeSchema,
   amount: z.number(),
@@ -52,10 +36,7 @@ export const TargetNutrientSchema = z.object({
   source: NutrientSourceSchema,
 });
 
-// ============================================================
-// OpenAPI: TargetResponse
-// ============================================================
-export const TargetResponseSchema = z.object({
+export const TargetSchema = z.object({
   id: z.string(),
   user_id: z.string(),
   title: z.string(),
@@ -70,20 +51,18 @@ export const TargetResponseSchema = z.object({
   updated_at: z.string(),
 });
 
-// ============================================================
-// OpenAPI: TargetListResponse
-// ============================================================
 export const TargetListResponseSchema = z.object({
-  items: z.array(TargetResponseSchema),
+  items: z.array(TargetSchema),
 });
 
-// ============================================================
-// Types
-// ============================================================
-export type GoalType = z.infer<typeof GoalTypeSchema>;
-export type ActivityLevel = z.infer<typeof ActivityLevelSchema>;
+export const CreateTargetRequestSchema = z.object({
+  title: z.string(),
+  goal_type: GoalTypeSchema,
+  goal_description: z.string().nullable().optional(),
+  activity_level: ActivityLevelSchema,
+});
+
 export type NutrientCode = z.infer<typeof NutrientCodeSchema>;
-export type TargetNutrient = z.infer<typeof TargetNutrientSchema>;
-export type CreateTargetRequest = z.infer<typeof CreateTargetRequestSchema>;
-export type TargetResponse = z.infer<typeof TargetResponseSchema>;
+export type Target = z.infer<typeof TargetSchema>;
 export type TargetListResponse = z.infer<typeof TargetListResponseSchema>;
+export type CreateTargetRequest = z.infer<typeof CreateTargetRequestSchema>;

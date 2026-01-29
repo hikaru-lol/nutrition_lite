@@ -1,59 +1,61 @@
 import { clientApiFetch } from '@/shared/api/client';
 import {
-  TargetResponseSchema,
+  TargetSchema,
   TargetListResponseSchema,
-  type CreateTargetRequest,
-  type TargetResponse,
+  CreateTargetRequestSchema,
+  type Target,
   type TargetListResponse,
+  type CreateTargetRequest,
 } from '../contract/targetContract';
 
-/**
- * POST /targets - 新しい Target を作成
- */
-export async function createTarget(
-  body: CreateTargetRequest
-): Promise<TargetResponse> {
-  const raw = await clientApiFetch<unknown>('/targets', {
-    method: 'POST',
-    body,
-  });
-  return TargetResponseSchema.parse(raw);
-}
-
-/**
- * GET /targets - Target 一覧を取得
- */
-export async function fetchTargets(): Promise<TargetListResponse> {
-  const raw = await clientApiFetch<unknown>('/targets', { method: 'GET' });
-  return TargetListResponseSchema.parse(raw);
-}
-
-/**
- * GET /targets/active - アクティブな Target を取得
- * 404 の場合は null を返す
- */
-export async function fetchActiveTarget(): Promise<TargetResponse | null> {
+export async function fetchActiveTarget(): Promise<Target | null> {
   try {
-    const raw = await clientApiFetch<unknown>('/targets/active', {
+    const raw = await clientApiFetch<unknown>(`/targets/active`, {
       method: 'GET',
     });
-    return TargetResponseSchema.parse(raw);
+    return TargetSchema.parse(raw);
   } catch (err) {
-    if (err instanceof Error && err.message.includes('TARGET_NOT_FOUND')) {
+    // 404 = active target が無い（初回等） → null で扱うのが Today 的に便利
+    if (err instanceof Error && err.message.includes('404')) {
       return null;
     }
     throw err;
   }
 }
 
-/**
- * POST /targets/:id/activate - 指定した Target をアクティブにする
- */
-export async function activateTarget(
-  targetId: string
-): Promise<TargetResponse> {
+export async function listTargets(params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<TargetListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.limit != null) qs.set('limit', String(params.limit));
+  if (params?.offset != null) qs.set('offset', String(params.offset));
+
+  const raw = await clientApiFetch<unknown>(
+    `/targets${qs.toString() ? `?${qs.toString()}` : ''}`,
+    { method: 'GET' }
+  );
+  return TargetListResponseSchema.parse(raw);
+}
+
+export async function createTarget(req: CreateTargetRequest): Promise<Target> {
+  const safe = CreateTargetRequestSchema.parse(req);
+  const raw = await clientApiFetch<unknown>(`/targets`, {
+    method: 'POST',
+    body: safe,
+  });
+  return TargetSchema.parse(raw);
+}
+
+export async function activateTarget(targetId: string): Promise<Target> {
   const raw = await clientApiFetch<unknown>(`/targets/${targetId}/activate`, {
     method: 'POST',
   });
-  return TargetResponseSchema.parse(raw);
+  return TargetSchema.parse(raw);
+}
+
+export async function deleteTarget(targetId: string): Promise<void> {
+  await clientApiFetch<unknown>(`/targets/${targetId}`, {
+    method: 'DELETE',
+  });
 }

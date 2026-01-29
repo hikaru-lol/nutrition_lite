@@ -623,6 +623,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+    delete:
+      tags: [Target]
+      summary: Delete a target
+      description: >
+        Delete the specified nutrition target.
+        This is a hard delete and cannot be undone.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: target_id
+          required: true
+          description: Target ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Target deleted successfully
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found or does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /targets/{target_id}/activate:
     post:
       tags: [Target]

@@ -173,6 +173,19 @@ class ActivateTargetInputDTO:
     target_id: str
 
 
+# --- DeleteTarget -----------------------------------------------------
+
+
+@dataclass(slots=True)
+class DeleteTargetInputDTO:
+    """
+    指定した TargetDefinition を削除するための入力 DTO。
+    """
+
+    user_id: str
+    target_id: str
+
+
 # --- EnsureDailySnapshot ---------------------------------------------
 
 

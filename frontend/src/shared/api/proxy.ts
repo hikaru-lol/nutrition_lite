@@ -1,5 +1,5 @@
 import 'server-only';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function proxyToBackend(req: NextRequest, backendUrl: string) {
   const body =
@@ -28,5 +28,10 @@ export async function proxyToBackend(req: NextRequest, backendUrl: string) {
   const ct = res.headers.get('content-type');
   if (ct) headers.set('content-type', ct);
 
-  return new Response(await res.text(), { status: res.status, headers });
+  // 204 No Content の場合、ボディなしで返す（Next.js は 200 に変換）
+  if (res.status === 204) {
+    return new NextResponse(null, { status: 200, headers });
+  }
+
+  return new NextResponse(await res.text(), { status: res.status, headers });
 }

@@ -78,3 +78,14 @@ class TargetRepositoryPort(Protocol):
         - パフォーマンスのために、UseCase から一括 UPDATE を許可している
         """
         ...
+
+    # --- Delete ---------------------------------------------------------
+
+    def delete(self, user_id: UserId, target_id: TargetId) -> bool:
+        """
+        指定したターゲットを削除する。
+
+        - user_id に属さない場合、または存在しない場合は False を返す
+        - 削除成功時は True を返す
+        """
+        ...

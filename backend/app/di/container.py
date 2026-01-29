@@ -75,6 +75,7 @@ from app.application.target.use_cases.get_active_target import GetActiveTargetUs
 from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
+from app.application.target.use_cases.delete_target import DeleteTargetUseCase
 
 # Infra (repo / uow / llm)
 from app.infra.db.uow.target import SqlAlchemyTargetUnitOfWork
@@ -449,6 +450,13 @@ def get_get_target_use_case(
 ) -> GetTargetUseCase:
     uow = _resolve_dep(uow, get_target_uow)
     return GetTargetUseCase(uow=uow)
+
+
+def get_delete_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> DeleteTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return DeleteTargetUseCase(uow=uow)
 
 
 # =============================================================================

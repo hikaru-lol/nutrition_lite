@@ -26,5 +26,10 @@ export async function clientApiFetch<T>(
   }
 
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+
+  // 空のレスポンスの場合（204 → 200 変換対応）
+  const text = await res.text();
+  if (!text) return undefined as T;
+
+  return JSON.parse(text) as T;
 }

@@ -209,3 +209,20 @@ class SqlAlchemyTargetRepository(TargetRepositoryPort):
             .values(is_active=False)
         )
         self._session.execute(stmt)
+
+    def delete(self, user_id: UserId, target_id: TargetId) -> bool:
+        """
+        指定したターゲットを削除する。
+
+        - user_id に属さない場合、または存在しない場合は False を返す
+        - 削除成功時は True を返す
+        """
+        stmt = select(TargetModel).where(
+            TargetModel.id == UUID(target_id.value),
+            TargetModel.user_id == UUID(user_id.value),
+        )
+        model = self._session.execute(stmt).scalar_one_or_none()
+        if model is None:
+            return False
+        self._session.delete(model)
+        return True

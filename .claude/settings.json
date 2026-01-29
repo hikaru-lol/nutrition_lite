@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": ["Bash(pnpm *)", "Bash(uv run *)", "Bash(git *)", "Read(**/*)"],
-    "deny": [
-      "Read(./.env)", // .envは読ませない
-      "Bash(rm -rf /)" // 危険なコマンドを禁止
-    ]
-  }
-}

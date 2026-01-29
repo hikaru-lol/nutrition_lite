@@ -10,9 +10,12 @@ function backendUrl(path: string, search: string) {
 }
 
 export async function GET(req: NextRequest) {
-  return proxyToBackend(req, backendUrl('/meal-items', req.nextUrl.search));
+  return proxyToBackend(
+    req,
+    backendUrl('/nutrition/daily/report', req.nextUrl.search)
+  );
 }
 
 export async function POST(req: NextRequest) {
-  return proxyToBackend(req, backendUrl('/meal-items', ''));
+  return proxyToBackend(req, backendUrl('/nutrition/daily/report', ''));
 }
