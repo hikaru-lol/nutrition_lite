@@ -1,0 +1,1609 @@
+openapi: 3.1.0
+info:
+  title: Nutrition Backend - Auth, Profile, Target, Nutrition & Meal API
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+    description: User registration, login, session management
+  - name: Profile
+    description: User basic profile (sex, birthdate, height, weight, optional image)
+  - name: Target
+    description: Nutrition target (daily recommended intake for key nutrients)
+  - name: Nutrition
+    description: Nutrition summaries and daily reports
+  - name: Meal
+    description: Food entries (per-item meal logs for each day)
+  - name: DailyReport
+    description: Daily nutrition report generation and retrieval
+  - name: Billing
+    description: Billing and Stripe checkout/portal/webhook endpoints
+
+paths:
+  # ==========
+  # Auth
+  # ==========
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: >
+        Create a new user account and start a 7-day trial plan.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      description: >
+        Authenticate a user with email and password.
+        On success, ACCESS_TOKEN and REFRESH_TOKEN cookies are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current user
+      description: >
+        Clear ACCESS_TOKEN and REFRESH_TOKEN cookies.
+        Server side is stateless; tokens are not stored or revoked.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Logged out successfully. Cookies are cleared.
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: >
+        Issue a new ACCESS_TOKEN and REFRESH_TOKEN pair using the REFRESH_TOKEN cookie.
+      security:
+        - RefreshTokenCookieAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          headers:
+            Set-Cookie:
+              description: New ACCESS_TOKEN and REFRESH_TOKEN HttpOnly cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: Invalid or expired refresh token, or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: >
+        Return the currently authenticated user based on ACCESS_TOKEN cookie.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserResponse'
+        '401':
+          description: Unauthorized (missing or invalid token, or user not found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Auth]
+      summary: Delete current user (logical delete)
+      description: >
+        Mark the current user as deleted (soft delete) and clear auth cookies.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '204':
+          description: Account deleted successfully
+          headers:
+            Set-Cookie:
+              description: Expired ACCESS_TOKEN and REFRESH_TOKEN cookies
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Profile
+  # ==========
+  /profile/me:
+    get:
+      tags: [Profile]
+      summary: Get current user's profile
+      description: >
+        Return the basic profile of the currently authenticated user.
+        Includes sex, birthdate, height, weight, and optional profile image ID.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Current user's profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token, or profile not found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Profile]
+      summary: Create or update current user's profile
+      description: >
+        Create or update the basic profile of the currently authenticated user.
+        This endpoint only handles basic fields (sex, birthdate, height, weight).
+        Additional target-related preferences (e.g., goal, activity level) are provided when creating targets.
+        Profile image upload will be handled by a separate endpoint or extended later.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileRequest'
+      responses:
+        '200':
+          description: Profile upserted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Daily Nutrition Report
+  # ==========
+  /nutrition/daily/report:
+    post:
+      tags: [DailyReport]
+      summary: Generate daily nutrition report
+      description: >
+        Generate the daily nutrition report for a given date.
+        Requires the day's meal log to be marked as completed.
+        If a report already exists for that date, 409 is returned.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateDailyReportRequest'
+      responses:
+        '201':
+          description: Daily nutrition report generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyNutritionReportResponse'
+        '400':
+          description: Daily log not completed or profile missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Report already exists for the specified date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [DailyReport]
+      summary: Get daily nutrition report
+      description: >
+        Fetch the generated daily nutrition report for the specified date.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Target date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Daily nutrition report for the specified date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyNutritionReportResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Report not found for the specified date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Daily Meal Nutrition
+  # ==========
+  /nutrition/meal:
+    get:
+      tags: [Nutrition]
+      summary: Recompute meal and daily nutrition summaries
+      description: >
+        Recalculate the nutrient summary for a specific meal (main or snack) and
+        return both the meal-level and day-level summaries.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Target date (YYYY-MM-DD)
+        - in: query
+          name: meal_type
+          required: true
+          schema:
+            type: string
+            enum: [main, snack]
+          description: Meal type to recompute
+        - in: query
+          name: meal_index
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            nullable: true
+          description: >
+            Required for main meals (1..N). Must be omitted for snack meals.
+      responses:
+        '200':
+          description: Meal and daily nutrition summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealAndDailyNutritionResponse'
+        '400':
+          description: Invalid meal parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature not available for the current plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to estimate nutrition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Target
+  # ==========
+  /targets:
+    get:
+      tags: [Target]
+      summary: List current user's targets
+      description: >
+        List all nutrition targets of the currently authenticated user
+        (optionally paginated with limit/offset). The newest targets
+        (by created_at) are returned first. Each target represents a
+        daily set of key nutrient goals.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          required: false
+          description: Maximum number of targets to return (default is implementation-defined)
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          required: false
+          description: Number of items to skip before starting to collect the result set
+      responses:
+        '200':
+          description: List of user's targets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetListResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Target]
+      summary: Create a new nutrition target
+      description: >
+        Create a new daily nutrition target definition for the current user.
+
+        The server uses the user's Profile (sex, birthdate, height, weight) plus
+        the provided goal information (goal_type, activity_level, etc.) to generate
+        a set of recommended daily intakes for key nutrients using a model
+        (e.g., LLM or rules). If this is the first target for the user,
+        it becomes the active target.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTargetRequest'
+      responses:
+        '201':
+          description: Target created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '400':
+          description: Invalid input (e.g., missing required fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Profile not found for current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Maximum number of targets reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/active:
+    get:
+      tags: [Target]
+      summary: Get active target
+      description: >
+        Return the active nutrition target for the currently authenticated user.
+        If no target is active or if no targets exist, an error is returned.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Active target of the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No active target or no targets exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/{target_id}:
+    get:
+      tags: [Target]
+      summary: Get target by ID
+      description: >
+        Get a specific nutrition target of the current user by its ID.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: target_id
+          required: true
+          description: Target ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Target detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found or does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Target]
+      summary: Partially update a target
+      description: >
+        Partially update fields of an existing nutrition target.
+        Only fields present in the request body are updated.
+        When nutrient values are updated, their source is changed to "manual".
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: target_id
+          required: true
+          description: Target ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTargetRequest'
+      responses:
+        '200':
+          description: Updated target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '400':
+          description: Invalid nutrient code or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found or does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Target]
+      summary: Delete a target
+      description: >
+        Delete the specified nutrition target.
+        This is a hard delete and cannot be undone.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: target_id
+          required: true
+          description: Target ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Target deleted successfully
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found or does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /targets/{target_id}/activate:
+    post:
+      tags: [Target]
+      summary: Activate a target
+      description: >
+        Activate the specified target for the current user.
+        Any other targets of the same user will be set to inactive.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: target_id
+          required: true
+          description: Target ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Activated target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target not found or does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Meal
+  # ==========
+  /meal-items:
+    post:
+      tags: [Meal]
+      summary: Create a new food entry
+      description: >
+        1品分の食事ログ（FoodEntry）を新規作成する。
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealItemRequest'
+      responses:
+        '201':
+          description: Food entry created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemResponse'
+        '400':
+          description: Invalid meal input (type/index/amount)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Meal]
+      summary: List food entries for a given date
+      description: >
+        指定した1日分の FoodEntry 一覧を取得する（main / snack 含む）。
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Target date (YYYY-MM-DD)
+      responses:
+        '200':
+          description: List of food entries for the given date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meal-items/{entry_id}:
+    patch:
+      tags: [Meal]
+      summary: Update a food entry
+      description: >
+        既存の FoodEntry を更新する。（現時点ではフル更新）
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Food entry ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealItemRequest'
+      responses:
+        '200':
+          description: Updated food entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealItemResponse'
+        '400':
+          description: Invalid meal input (type/index/amount)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Food entry not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========
+  # Billing
+  # ==========
+  /billing/checkout-session:
+    post:
+      tags: [Billing]
+      summary: Create Stripe checkout session
+      description: >
+        Create a Stripe Checkout session and return a redirect URL.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+          description: Optional idempotency key for checkout session creation
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutSessionResponse'
+        '400':
+          description: Billing inconsistent state
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Billing account not found
+        '500':
+          description: Failed to create checkout session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /billing/portal-url:
+    get:
+      tags: [Billing]
+      summary: Get Stripe billing portal URL
+      description: >
+        Create a Stripe billing portal session and return the portal URL.
+      security:
+        - AccessTokenCookieAuth: []
+      responses:
+        '200':
+          description: Billing portal URL created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPortalUrlResponse'
+        '400':
+          description: Billing account not found
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to create billing portal session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /billing/stripe/webhook:
+    post:
+      tags: [Billing]
+      summary: Stripe webhook endpoint
+      description: >
+        Receive Stripe webhook events and update billing state.
+      parameters:
+        - in: header
+          name: Stripe-Signature
+          required: true
+          schema:
+            type: string
+          description: Stripe webhook signature header
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw Stripe webhook event payload
+      responses:
+        '200':
+          description: Webhook handled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid Stripe webhook payload or signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to handle Stripe webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Meal]
+      summary: Delete a food entry
+      description: >
+        FoodEntry を削除する（ソフトデリート想定）。  
+        既に削除済みでも 204 を返し、冪等性を保つ。
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: entry_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Food entry ID
+      responses:
+        '204':
+          description: Deleted successfully (or already deleted)
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Food entry not found (belongs to another user, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AccessTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: ACCESS_TOKEN
+      description: HttpOnly access token cookie
+
+    RefreshTokenCookieAuth:
+      type: apiKey
+      in: cookie
+      name: REFRESH_TOKEN
+      description: HttpOnly refresh token cookie
+
+  schemas:
+    # ==========
+    # Auth Requests
+    # ==========
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Raw password (will be hashed server-side)
+        name:
+          type: string
+          nullable: true
+          description: Display name of the user
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    # ==========
+    # Auth Responses
+    # ==========
+    AuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    RefreshResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/UserSummary'
+
+    UserSummary:
+      type: object
+      description: Public auth user information
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          description: Current user plan
+          enum:
+            - trial
+            - free
+            - paid
+        trial_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Trial end time in UTC (null if not in trial)
+        has_profile:
+          type: boolean
+          description: Whether the user has completed initial profile setup
+        created_at:
+          type: string
+          format: date-time
+          description: User creation time in UTC
+
+    # ==========
+    # Billing Responses
+    # ==========
+    CheckoutSessionResponse:
+      type: object
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          description: Stripe Checkout URL
+
+    BillingPortalUrlResponse:
+      type: object
+      properties:
+        portal_url:
+          type: string
+          format: uri
+          description: Stripe Billing Portal URL
+
+    # ==========
+    # Profile
+    # ==========
+    Sex:
+      type: string
+      description: Biological or self-identified sex of the user
+      enum:
+        - male
+        - female
+        - other
+        - undisclosed
+
+    ProfileRequest:
+      type: object
+      required:
+        - sex
+        - birthdate
+        - height_cm
+        - weight_kg
+      properties:
+        sex:
+          $ref: '#/components/schemas/Sex'
+        birthdate:
+          type: string
+          format: date
+          description: Date of birth (YYYY-MM-DD)
+        height_cm:
+          type: number
+          format: float
+          description: Height in centimeters
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 300
+        weight_kg:
+          type: number
+          format: float
+          description: Weight in kilograms
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 500
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
+          minimum: 1
+          maximum: 6
+
+    ProfileResponse:
+      type: object
+      description: Basic profile information for a user
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        sex:
+          $ref: '#/components/schemas/Sex'
+        birthdate:
+          type: string
+          format: date
+        height_cm:
+          type: number
+          format: float
+        weight_kg:
+          type: number
+          format: float
+        image_id:
+          type: string
+          nullable: true
+          description: >
+            Optional profile image identifier in the storage backend
+            (object key, file name, etc.)
+        meals_per_day:
+          type: integer
+          nullable: true
+          description: >
+            1日にメインの食事をとる回数（例: 2〜4）。
+            未設定の場合は3回として扱う。
+        created_at:
+          type: string
+          format: date-time
+          description: Profile creation timestamp (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          description: Profile last update timestamp (UTC)
+
+    # ==========
+    # Target
+    # ==========
+    GoalType:
+      type: string
+      description: Target goal type.
+      enum:
+        - weight_loss
+        - maintain
+        - weight_gain
+        - health_improve
+
+    ActivityLevel:
+      type: string
+      description: User's activity level used for target calculation.
+      enum:
+        - low
+        - normal
+        - high
+
+    NutrientCode:
+      type: string
+      description: >
+        Code for one of the 10 core nutrients tracked in daily targets and nutrition summaries.
+      enum:
+        - carbohydrate # 炭水化物 (g)
+        - fat # 脂質 (g)
+        - protein # たんぱく質 (g)
+        - water # 水分 (ml)
+        - fiber # 食物繊維 (g)
+        - sodium # ナトリウム (mg)
+        - iron # 鉄 (mg)
+        - calcium # カルシウム (mg)
+        - vitamin_d # ビタミンD (µg)
+        - potassium # カリウム (mg)
+
+    NutrientSource:
+      type: string
+      description: Source of the target or intake nutrient value.
+      enum:
+        - llm
+        - manual
+        - user_input
+        - aggregated
+
+    TargetNutrient:
+      type: object
+      description: Target value for a single nutrient.
+      properties:
+        code:
+          $ref: '#/components/schemas/NutrientCode'
+        amount:
+          type: number
+          format: float
+          description: Target amount of the nutrient.
+          example: 150.0
+        unit:
+          type: string
+          description: Unit of the amount (e.g. "g", "mg", "ml").
+          example: g
+        source:
+          $ref: '#/components/schemas/NutrientSource'
+      required:
+        - code
+        - amount
+        - unit
+        - source
+
+    TargetResponse:
+      type: object
+      description: A single nutrition target definition.
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+        is_active:
+          type: boolean
+        nutrients:
+          type: array
+          items:
+            $ref: '#/components/schemas/TargetNutrient'
+        llm_rationale:
+          type: string
+          nullable: true
+        disclaimer:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - user_id
+        - title
+        - goal_type
+        - activity_level
+        - is_active
+        - nutrients
+        - created_at
+        - updated_at
+
+    TargetListResponse:
+      type: object
+      description: List of targets for the current user.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TargetResponse'
+      required:
+        - items
+
+    CreateTargetRequest:
+      type: object
+      description: Request body to create a new target.
+      properties:
+        title:
+          type: string
+          description: Human-friendly name of the target.
+          example: 'Lean bulk (spring 2025)'
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+          description: Optional free-form description of the goal.
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+      required:
+        - title
+        - goal_type
+        - activity_level
+
+    UpdateTargetNutrient:
+      type: object
+      description: Partial update for a single nutrient in the target.
+      properties:
+        code:
+          $ref: '#/components/schemas/NutrientCode'
+        amount:
+          type: number
+          format: float
+          nullable: true
+          description: New amount. If omitted or null, the amount is not changed.
+        unit:
+          type: string
+          nullable: true
+          description: New unit. If omitted or null, the unit is not changed.
+      required:
+        - code
+
+    UpdateTargetRequest:
+      type: object
+      description: Partial update for a target definition.
+      properties:
+        title:
+          type: string
+          nullable: true
+        goal_type:
+          $ref: '#/components/schemas/GoalType'
+        goal_description:
+          type: string
+          nullable: true
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevel'
+        llm_rationale:
+          type: string
+          nullable: true
+        disclaimer:
+          type: string
+          nullable: true
+        nutrients:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/UpdateTargetNutrient'
+      additionalProperties: false
+
+    # ==========
+    # Daily Nutrition Report
+    # ==========
+    GenerateDailyReportRequest:
+      type: object
+      description: Request body to generate a daily nutrition report.
+      properties:
+        date:
+          type: string
+          format: date
+          description: Target date (YYYY-MM-DD)
+      required:
+        - date
+
+    DailyNutritionReportResponse:
+      type: object
+      description: Daily nutrition report content for a given date.
+      properties:
+        date:
+          type: string
+          format: date
+        summary:
+          type: string
+        good_points:
+          type: array
+          items:
+            type: string
+        improvement_points:
+          type: array
+          items:
+            type: string
+        tomorrow_focus:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - date
+        - summary
+        - good_points
+        - improvement_points
+        - tomorrow_focus
+        - created_at
+
+    NutritionNutrientIntake:
+      type: object
+      description: Actual intake for a single nutrient.
+      properties:
+        code:
+          $ref: '#/components/schemas/NutrientCode'
+        amount:
+          type: number
+          format: float
+        unit:
+          type: string
+        source:
+          $ref: '#/components/schemas/NutrientSource'
+      required:
+        - code
+        - amount
+        - unit
+        - source
+
+    MealNutritionSummary:
+      type: object
+      description: Nutrient summary for a single meal (main or snack).
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        meal_type:
+          $ref: '#/components/schemas/MealType'
+        meal_index:
+          type: integer
+          nullable: true
+          description: >
+            main のとき 1..N。snack のとき null。
+        generated_at:
+          type: string
+          format: date-time
+        nutrients:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionNutrientIntake'
+      required:
+        - id
+        - date
+        - meal_type
+        - nutrients
+        - generated_at
+
+    DailyNutritionSummary:
+      type: object
+      description: Nutrient summary for a single day (aggregated from meals).
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        generated_at:
+          type: string
+          format: date-time
+        nutrients:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionNutrientIntake'
+      required:
+        - id
+        - date
+        - nutrients
+        - generated_at
+
+    # ==========
+    # Daily Meal Nutrition
+    # ==========
+    MealAndDailyNutritionResponse:
+      type: object
+      description: Recomputed meal-level and daily-level nutrition summaries.
+      properties:
+        meal:
+          $ref: '#/components/schemas/MealNutritionSummary'
+        daily:
+          $ref: '#/components/schemas/DailyNutritionSummary'
+      required:
+        - meal
+        - daily
+
+    # ==========
+    # Meal
+    # ==========
+    MealType:
+      type: string
+      enum: [main, snack]
+      description: |
+        main: メインの食事（1回目/2回目/...）
+        snack: 間食
+
+    MealItemRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        meal_type:
+          $ref: '#/components/schemas/MealType'
+        meal_index:
+          type: integer
+          nullable: true
+          description: |
+            meal_type == main のとき: 1..meals_per_day
+            meal_type == snack のとき: null
+        name:
+          type: string
+        amount_value:
+          type: number
+          format: float
+          nullable: true
+        amount_unit:
+          type: string
+          nullable: true
+        serving_count:
+          type: number
+          format: float
+          nullable: true
+        note:
+          type: string
+          nullable: true
+      required:
+        - date
+        - meal_type
+        - name
+
+    MealItemResponse:
+      allOf:
+        - $ref: '#/components/schemas/MealItemRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+          required:
+            - id
+
+    MealItemListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealItemResponse'
+      required:
+        - items
+
+    # ==========
+    # Error
+    # ==========
+    ErrorResponse:
+      type: object
+      description: Generic error response.
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - EMAIL_ALREADY_IN_USE
+                - INVALID_CREDENTIALS
+                - UNAUTHORIZED
+                - USER_NOT_FOUND
+                - PROFILE_NOT_FOUND
+                - TARGET_NOT_FOUND
+                - MAX_TARGETS_REACHED
+                - VALIDATION_ERROR
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message
+      required:
+        - error

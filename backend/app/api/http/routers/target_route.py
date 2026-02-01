@@ -20,6 +20,7 @@ from app.application.auth.dto.auth_user_dto import AuthUserDTO
 from app.application.target.dto.target_dto import (
     ActivateTargetInputDTO,
     CreateTargetInputDTO,
+    DeleteTargetInputDTO,
     GetActiveTargetInputDTO,
     GetTargetInputDTO,
     ListTargetsInputDTO,
@@ -32,11 +33,13 @@ from app.application.target.use_cases.get_active_target import GetActiveTargetUs
 from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
+from app.application.target.use_cases.delete_target import DeleteTargetUseCase
 
 # === DI =====================================================================
 from app.di.container import (
     get_activate_target_use_case,
     get_create_target_use_case,
+    get_delete_target_use_case,
     get_get_active_target_use_case,
     get_get_target_use_case,
     get_list_targets_use_case,
@@ -216,6 +219,42 @@ def update_target(
     )
 
     return target_dto_to_schema(result)
+
+
+# --- DELETE /targets/{target_id}  ターゲット削除 -------------------------
+@router.delete(
+    "/{target_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
+)
+def delete_target(
+    target_id: str,
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
+    use_case: DeleteTargetUseCase = Depends(get_delete_target_use_case),
+) -> None:
+    """
+    指定したターゲットを削除する。
+    """
+    logger.info(
+        "Delete target request: user_id=%s target_id=%s",
+        current_user.id,
+        target_id,
+    )
+    input_dto = DeleteTargetInputDTO(
+        user_id=str(current_user.id),
+        target_id=target_id,
+    )
+
+    use_case.execute(input_dto)
+
+    logger.info(
+        "Target deleted: user_id=%s target_id=%s",
+        current_user.id,
+        target_id,
+    )
 
 
 # --- POST /targets/{target_id}/activate  ターゲットをアクティブ化 --------

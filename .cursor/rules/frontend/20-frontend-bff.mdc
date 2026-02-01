@@ -1,0 +1,34 @@
+---
+description: 'FRONTEND BFF: Next.js Route Handlers proxy rules (params/cookies/set-cookie)'
+globs:
+  [
+    'frontend/src/app/api/**/*.{ts,tsx}',
+    'frontend/src/shared/api/**/*.{ts,tsx}',
+  ]
+alwaysApply: false
+---
+
+# BFF RULES (Next.js app/api)
+
+## Proxy boundary
+
+- Frontend never calls backend directly. It calls `/api/*` (BFF).
+- BFF proxies to backend `/api/v1/*`.
+
+## Route Handler params gotcha
+
+- Treat params as potentially async:
+  - Always `const params = await ctx.params` (or equivalent)
+  - Keep this consistent across methods (GET/POST/etc.)
+
+## Cookies
+
+- Forward request cookies to backend (send `cookie` header).
+- Forward backend `set-cookie` back to the client.
+- Support multiple `set-cookie` headers.
+
+## Errors
+
+- Do not swallow backend errors.
+- Prefer pass-through of status + payload when safe.
+- Normalize errors in `frontend/src/shared/api/*` (unknown → typed/app-error).

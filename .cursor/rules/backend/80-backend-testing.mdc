@@ -1,0 +1,15 @@
+---
+description: 'BACKEND testing: pytest first, keep unit/integration discipline'
+globs: ['backend/**/*']
+alwaysApply: false
+---
+
+# TESTING RULES (Backend)
+
+- Prefer unit tests for domain/application logic.
+- Integration tests for API routing/DI/db boundaries.
+- When changing behavior, update:
+  - unit tests (if logic changed)
+  - integration tests (if endpoints/contracts changed)
+- Always show how to run relevant tests:
+  - `cd backend && pytest ...`

@@ -14,6 +14,7 @@ from app.domain.nutrition import errors as nutrition_domain_errors
 from app.domain.profile import errors as profile_domain_errors
 from app.domain.target import errors as target_domain_errors
 from app.domain.billing import errors as billing_errors
+from app.domain.calendar import errors as calendar_domain_errors
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,40 @@ async def profile_domain_error_handler(
         )
 
     logger.exception("Unhandled ProfileError: %s", exc)
+    return error_response(
+        code="INTERNAL_ERROR",
+        message="予期しないエラーが発生しました。",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+# === Calendar (Domain エラー) ==============================================
+
+
+async def calendar_domain_error_handler(
+    request: Request,
+    exc: calendar_domain_errors.CalendarError,
+) -> JSONResponse:
+    """
+    Calendar ドメインのエラーを HTTP レスポンスに変換するハンドラ。
+    """
+    logger.warning(
+        "CalendarError: type=%s path=%s client=%s msg=%s",
+        exc.__class__.__name__,
+        request.url.path,
+        request.client.host if request.client else None,
+        str(exc),
+    )
+
+    if isinstance(exc, calendar_domain_errors.InvalidDateRangeError):
+        return error_response(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="INVALID_DATE_RANGE",
+            message=str(exc) or "Invalid date range specified",
+        )
+
+    # 想定外の CalendarError → 500 扱い
+    logger.exception("Unhandled CalendarError: %s", exc)
     return error_response(
         code="INTERNAL_ERROR",
         message="予期しないエラーが発生しました。",

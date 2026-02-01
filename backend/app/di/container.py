@@ -75,6 +75,7 @@ from app.application.target.use_cases.get_active_target import GetActiveTargetUs
 from app.application.target.use_cases.get_target import GetTargetUseCase
 from app.application.target.use_cases.list_targets import ListTargetsUseCase
 from app.application.target.use_cases.update_target import UpdateTargetUseCase
+from app.application.target.use_cases.delete_target import DeleteTargetUseCase
 
 # Infra (repo / uow / llm)
 from app.infra.db.uow.target import SqlAlchemyTargetUnitOfWork
@@ -157,6 +158,16 @@ from app.infra.llm.meal_recommendation_generator_openai import (
 
 # Infra (repos)
 from app.infra.db.uow.nutrition import SqlAlchemyNutritionUnitOfWork
+
+# === Calendar ================================================================
+# Ports
+from app.application.calendar.ports.calendar_unit_of_work_port import CalendarUnitOfWorkPort
+
+# Use cases
+from app.application.calendar.use_cases.get_monthly_calendar import GetMonthlyCalendarUseCase
+
+# Infra (uow)
+from app.infra.db.uow.calendar import SqlAlchemyCalendarUnitOfWork
 
 # === Billing ================================================================
 # Ports
@@ -449,6 +460,13 @@ def get_get_target_use_case(
 ) -> GetTargetUseCase:
     uow = _resolve_dep(uow, get_target_uow)
     return GetTargetUseCase(uow=uow)
+
+
+def get_delete_target_use_case(
+    uow: TargetUnitOfWorkPort = Depends(get_target_uow),
+) -> DeleteTargetUseCase:
+    uow = _resolve_dep(uow, get_target_uow)
+    return DeleteTargetUseCase(uow=uow)
 
 
 # =============================================================================
@@ -768,3 +786,17 @@ def get_handle_stripe_webhook_use_case(
         stripe_client=stripe_client,
         clock=clock,
     )
+
+
+# =============================================================================
+# Calendar
+# =============================================================================
+def get_calendar_uow() -> CalendarUnitOfWorkPort:
+    return SqlAlchemyCalendarUnitOfWork()
+
+
+def get_get_monthly_calendar_use_case(
+    uow: CalendarUnitOfWorkPort = Depends(get_calendar_uow),
+) -> GetMonthlyCalendarUseCase:
+    uow = _resolve_dep(uow, get_calendar_uow)
+    return GetMonthlyCalendarUseCase(uow=uow)

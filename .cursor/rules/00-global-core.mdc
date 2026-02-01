@@ -1,0 +1,27 @@
+---
+description: 'GLOBAL (always): plan-first, minimal-diff, no-any, verify'
+globs: ['**/*']
+alwaysApply: true
+---
+
+# GLOBAL RULES (ALWAYS)
+
+## Response format (must)
+
+When asked to implement/change anything:
+
+1. Plan (files + approach + risks)
+2. Patch (smallest diffs)
+3. Verify (commands/tests)
+
+## Change policy (must)
+
+- Minimal diff. No unrelated refactors/renames/moves/formatting.
+- Never introduce `any`. Use `unknown` + normalization.
+- Preserve existing architecture and naming conventions.
+- If unsure, state assumptions explicitly and choose the safest default.
+
+## Quality gate (must)
+
+- Behavior change => tests updated/added (or explain why not applicable).
+- Ensure TypeScript typecheck/build (FE) and pytest (BE) still pass.
