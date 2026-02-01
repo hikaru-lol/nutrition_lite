@@ -4,7 +4,7 @@ import { Providers } from './providers';
 
 export default function RootLayout(props: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" suppressHydrationWarning>
       <body>
         <Providers>{props.children}</Providers>
       </body>

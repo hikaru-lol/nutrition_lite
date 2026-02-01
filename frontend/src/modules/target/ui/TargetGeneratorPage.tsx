@@ -45,7 +45,7 @@ export function TargetGeneratorPage() {
   const isSubmitting = m.state.type === 'submitting';
 
   return (
-    <div className="space-y-4">
+    <div className="w-full max-w-2xl space-y-4">
       <div>
         <div className="text-lg font-semibold">ターゲット生成</div>
         <div className="text-sm text-muted-foreground">

@@ -7,8 +7,8 @@ import { createTarget } from '../api/targetClient';
 import {
   GoalTypeSchema,
   ActivityLevelSchema,
-  type TargetResponse,
   type CreateTargetRequest,
+  type Target,
 } from '../contract/targetContract';
 
 // ============================================================
@@ -29,7 +29,7 @@ export type TargetFormValues = z.input<typeof TargetFormSchema>;
 export type TargetGeneratorViewState =
   | { type: 'idle' }
   | { type: 'submitting' }
-  | { type: 'success'; result: TargetResponse }
+  | { type: 'success'; result: Target }
   | { type: 'error'; message: string };
 
 // ============================================================

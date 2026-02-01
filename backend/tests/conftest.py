@@ -5,6 +5,7 @@ import pytest
 from tests.fakes.auth_repositories import InMemoryUserRepository
 from tests.fakes.auth_services import FakePasswordHasher, FakeTokenService, FixedClock
 from tests.fakes.profile_repositories import InMemoryProfileRepository
+from tests.fakes.calendar_repositories import InMemoryCalendarRepository
 from app.infra.storage.profile_image_storage import InMemoryProfileImageStorage
 
 
@@ -47,6 +48,11 @@ def profile_image_storage() -> InMemoryProfileImageStorage:
     return InMemoryProfileImageStorage()
 
 
+@pytest.fixture(scope="session")
+def calendar_repo() -> InMemoryCalendarRepository:
+    return InMemoryCalendarRepository()
+
+
 # ============================================================
 # Fake の状態リセット（全テスト共通）
 # ============================================================
@@ -55,6 +61,7 @@ def profile_image_storage() -> InMemoryProfileImageStorage:
 def _reset_fakes(
     user_repo: InMemoryUserRepository,
     profile_repo: InMemoryProfileRepository,
+    calendar_repo: InMemoryCalendarRepository,
     clock: FixedClock,
 ):
     """
@@ -63,5 +70,6 @@ def _reset_fakes(
     """
     user_repo.clear()
     profile_repo.clear()
+    calendar_repo.clear()
     clock.reset()
     yield

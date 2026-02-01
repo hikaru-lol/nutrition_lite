@@ -13,7 +13,7 @@ export { NutrientCodeSchema, NutrientSourceSchema };
  */
 export const NutritionNutrientIntakeSchema = z.object({
   code: NutrientCodeSchema,
-  amount: z.number(),
+  value: z.number(), // バックエンドに合わせて value に変更
   unit: z.string(),
   source: NutrientSourceSchema,
 });

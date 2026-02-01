@@ -56,7 +56,7 @@
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
   },
 
-  "envFile": "../.env",
+  "envFile": ".env",
 
   "onCreateCommand": "git config --global --add safe.directory /workspace && git config --global --get user.name  || git config --global user.name  \"hikaru-lol\" && git config --global --get user.email || git config --global user.email \"mr.hkr0507ysd94@gmail.com\"",
 

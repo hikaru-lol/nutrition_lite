@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -30,6 +30,7 @@ import type {
   DailyNutritionReport,
 } from '@/modules/nutrition/contract/nutritionContract';
 import type { NutrientCode } from '@/modules/target/contract/targetContract';
+import { fetchProfile } from '@/modules/profile/api/profileClient';
 
 function formatLocalDateYYYYMMDD(d: Date): string {
   const yyyy = d.getFullYear();
@@ -69,8 +70,20 @@ export type NutrientProgress = {
   percentage: number;
 };
 
-export function useTodayPageModel() {
-  const date = useMemo(() => formatLocalDateYYYYMMDD(new Date()), []);
+interface UseTodayPageModelProps {
+  date?: string; // YYYY-MM-DD format
+}
+
+export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
+  const date = useMemo(() => {
+    return props.date || formatLocalDateYYYYMMDD(new Date());
+  }, [props.date]);
+
+  // 栄養分析対象の食事選択状態
+  const [selectedMealForNutrition, setSelectedMealForNutrition] = useState<{
+    meal_type: MealType;
+    meal_index: number | null;
+  } | null>(null);
 
   // Target（active）
   // → Query を Today で持ってもOKだが、まずは最小で「取得できる/できない」だけ欲しいので
@@ -93,6 +106,13 @@ export function useTodayPageModel() {
     retry: false,
   });
 
+  // プロフィール情報（食事回数設定のため）
+  const profileQuery = useQuery({
+    queryKey: ['profile', 'me'] as const,
+    queryFn: () => fetchProfile(),
+    retry: false,
+  });
+
   // Meal（今日）
   const mealItemsQuery = useMealItemsByDate(date);
 
@@ -104,22 +124,83 @@ export function useTodayPageModel() {
   // ========================================
   // Phase 6: Daily Nutrition Summary (C)
   // ========================================
-  // main meal (index=1) の栄養サマリーを取得
-  // enabled: target と meal が取得できている場合のみ
+  // 実際に存在する最初の食事を使って1日の栄養サマリーを取得
+  const firstMealItem = useMemo(() => {
+    if (!mealItemsQuery.data?.items?.length) return null;
+
+    // main食事を優先、なければsnackを使用
+    const mainMeals = mealItemsQuery.data.items.filter(item => item.meal_type === 'main');
+    if (mainMeals.length > 0) {
+      return {
+        meal_type: mainMeals[0].meal_type,
+        meal_index: mainMeals[0].meal_index ?? 1,
+      };
+    }
+
+    const snackMeals = mealItemsQuery.data.items.filter(item => item.meal_type === 'snack');
+    if (snackMeals.length > 0) {
+      return {
+        meal_type: snackMeals[0].meal_type,
+        meal_index: null,
+      };
+    }
+
+    return null;
+  }, [mealItemsQuery.data?.items]);
+
   const dailySummaryQuery = useQuery({
-    queryKey: ['nutrition', 'meal', date, 'main', 1] as const,
-    queryFn: () =>
-      recomputeMealAndDaily({ date, meal_type: 'main', meal_index: 1 }),
-    enabled:
+    queryKey: [
+      'nutrition',
+      'daily-summary',
+      date,
+      firstMealItem?.meal_type,
+      firstMealItem?.meal_index
+    ] as const,
+    queryFn: () => {
+      if (!firstMealItem) throw new Error('No meals found');
+      return recomputeMealAndDaily({
+        date,
+        meal_type: firstMealItem.meal_type as 'main' | 'snack',
+        meal_index: firstMealItem.meal_index,
+      });
+    },
+    enabled: Boolean(
       activeTargetQuery.isSuccess &&
       mealItemsQuery.isSuccess &&
-      activeTargetQuery.data !== null,
+      activeTargetQuery.data !== null &&
+      firstMealItem
+    ),
     retry: false,
   });
 
   // エラーは握って dailySummary: null に落とす（Today 自体は生かす）
   const dailySummary: DailyNutritionSummary | null =
     dailySummaryQuery.data?.daily ?? null;
+
+  // ========================================
+  // 選択された食事の栄養分析
+  // ========================================
+  const selectedMealNutritionQuery = useQuery({
+    queryKey: [
+      'nutrition',
+      'selected-meal',
+      date,
+      selectedMealForNutrition?.meal_type,
+      selectedMealForNutrition?.meal_index
+    ] as const,
+    queryFn: async () => {
+      if (!selectedMealForNutrition) {
+        throw new Error('No meal selected for nutrition analysis');
+      }
+      return recomputeMealAndDaily({
+        date,
+        meal_type: selectedMealForNutrition.meal_type,
+        meal_index: selectedMealForNutrition.meal_index,
+      });
+    },
+    enabled: selectedMealForNutrition !== null,
+    retry: false,
+  });
 
   // ========================================
   // Phase 7: Daily Report (E)
@@ -147,7 +228,7 @@ export function useTodayPageModel() {
     // dailySummary がなくても target があれば目標値を表示（実績は 0）
     return target.nutrients.map((t) => {
       const actual = dailySummary?.nutrients.find((n) => n.code === t.code);
-      const actualAmount = actual?.amount ?? 0;
+      const actualAmount = actual?.value ?? 0;
       const percentage = t.amount > 0 ? (actualAmount / t.amount) * 100 : 0;
 
       return {
@@ -159,6 +240,52 @@ export function useTodayPageModel() {
         percentage,
       };
     });
+  }, [activeTargetQuery.data, dailySummary]);
+
+  // ========================================
+  // 日次サマリーデータ（カロリー + PFC）
+  // ========================================
+  const dailySummaryData = useMemo(() => {
+    const target = activeTargetQuery.data;
+    if (!target) return null;
+
+    // PFC情報を取得
+    const proteinTarget = target.nutrients.find(n => n.code === 'protein');
+    const proteinActual = dailySummary?.nutrients.find(n => n.code === 'protein');
+
+    const fatTarget = target.nutrients.find(n => n.code === 'fat');
+    const fatActual = dailySummary?.nutrients.find(n => n.code === 'fat');
+
+    const carbohydrateTarget = target.nutrients.find(n => n.code === 'carbohydrate');
+    const carbohydrateActual = dailySummary?.nutrients.find(n => n.code === 'carbohydrate');
+
+    // カロリーは PFC から計算（タンパク質・炭水化物: 4kcal/g, 脂質: 9kcal/g）
+    const currentCalories =
+      ((proteinActual?.value ?? 0) * 4) +
+      ((fatActual?.value ?? 0) * 9) +
+      ((carbohydrateActual?.value ?? 0) * 4);
+
+    const targetCalories =
+      ((proteinTarget?.amount ?? 0) * 4) +
+      ((fatTarget?.amount ?? 0) * 9) +
+      ((carbohydrateTarget?.amount ?? 0) * 4);
+
+    return {
+      currentCalories,
+      targetCalories,
+      protein: {
+        current: proteinActual?.value ?? 0,
+        target: proteinTarget?.amount ?? 0,
+      },
+      fat: {
+        current: fatActual?.value ?? 0,
+        target: fatTarget?.amount ?? 0,
+      },
+      carbohydrate: {
+        current: carbohydrateActual?.value ?? 0,
+        target: carbohydrateTarget?.amount ?? 0,
+      },
+    };
   }, [activeTargetQuery.data, dailySummary]);
 
   const generateReportMutation = useMutation({
@@ -210,11 +337,24 @@ export function useTodayPageModel() {
     await deleteMutation.mutateAsync(entryId);
   }
 
+  // 栄養分析対象の食事を選択
+  function selectMealForNutrition(meal_type: MealType, meal_index: number | null) {
+    setSelectedMealForNutrition({ meal_type, meal_index });
+  }
+
+  // 栄養分析をクリア
+  function clearSelectedMeal() {
+    setSelectedMealForNutrition(null);
+  }
+
   const isLoading = activeTargetQuery.isLoading || mealItemsQuery.isLoading;
   const isError = activeTargetQuery.isError || mealItemsQuery.isError;
 
   return {
     date,
+
+    // profile
+    profileQuery,
 
     // target
     activeTargetQuery,
@@ -232,6 +372,7 @@ export function useTodayPageModel() {
     // Phase 6: daily summary (C)
     dailySummary,
     dailySummaryQuery,
+    dailySummaryData,
 
     // 栄養素達成度
     nutrientProgress,
@@ -240,6 +381,12 @@ export function useTodayPageModel() {
     dailyReport,
     dailyReportQuery,
     generateReportMutation,
+
+    // 選択された食事の栄養分析
+    selectedMealForNutrition,
+    selectedMealNutritionQuery,
+    selectMealForNutrition,
+    clearSelectedMeal,
 
     // UI helpers
     mealTypeLabels,
