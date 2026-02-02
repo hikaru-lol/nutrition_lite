@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { CalendarDate, CalendarDayData } from '@/shared/ui/calendar/Calendar';
+import type { CalendarDate } from '@/shared/ui/calendar/Calendar';
+import { fetchMonthlyCalendar } from '../api/calendarClient';
+import { toCalendarDayData } from '../contract/calendarContract';
 
 // 日付関数ユーティリティ
 function formatLocalDateYYYYMMDD(d: Date): string {
@@ -54,53 +56,29 @@ export function useCalendarModel({
     [selectedDate]
   );
 
-  // TODO: Phase 3で月次データ取得API統合
-  // 現在はダミーデータを返すクエリ
+  // 月次データ取得API
   const monthlyDataQuery = useQuery({
     queryKey: ['calendar', 'monthly', viewingYear, viewingMonth],
-    queryFn: async (): Promise<CalendarDayData[]> => {
-      // Phase 3で実装予定の月次データ取得
-      // const response = await fetchMonthlyCalendarData(viewingYear, viewingMonth);
-      // return response;
-
-      // 暫定的にダミーデータを返す
-      const daysInMonth = new Date(viewingYear, viewingMonth, 0).getDate();
-      const dummyData: CalendarDayData[] = [];
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${viewingYear}-${String(viewingMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const isToday = dateStr === formatLocalDateYYYYMMDD(new Date());
-
-        // ランダムにデータを生成（デモ用）
-        const hasMeals = Math.random() > 0.3; // 70%の確率で食事記録あり
-        const goalAchievementPercentage = hasMeals ? Math.floor(Math.random() * 100) : undefined;
-        const hasReport = hasMeals && Math.random() > 0.5;
-
-        dummyData.push({
-          date: dateStr,
-          hasMeals,
-          mealCount: hasMeals ? Math.floor(Math.random() * 5) + 1 : 0,
-          goalAchievementPercentage,
-          hasReport,
-          isToday,
-          isSelected: dateStr === selectedDateString,
-        });
-      }
-
-      return dummyData;
-    },
+    queryFn: () => fetchMonthlyCalendar(viewingYear, viewingMonth),
     staleTime: 5 * 60 * 1000, // 5分間キャッシュ
   });
 
   // 日付選択ハンドラ
   const handleDateSelect = useCallback((date: CalendarDate) => {
     setSelectedDate(date);
-  }, []);
+    // 異なる月の日付が選択された場合、表示月も更新
+    if (date.year !== viewingYear || date.month !== viewingMonth) {
+      setViewingYear(date.year);
+      setViewingMonth(date.month);
+    }
+  }, [viewingYear, viewingMonth]);
 
   // 月変更ハンドラ
   const handleMonthChange = useCallback((year: number, month: number) => {
     setViewingYear(year);
     setViewingMonth(month);
+    // 選択日もその月の1日に更新
+    setSelectedDate({ year, month, day: 1 });
   }, []);
 
   // 今日に戻る
@@ -137,8 +115,36 @@ export function useCalendarModel({
     return selectedDateString === formatLocalDateYYYYMMDD(new Date());
   }, [selectedDateString]);
 
-  // 月次データ（UIに渡すデータ）
-  const dayData = monthlyDataQuery.data || [];
+  // バックエンドデータをUI用データに変換
+  const dayData = useMemo(() => {
+    if (!monthlyDataQuery.data) {
+      console.log('Calendar Model: No data from API');
+      return [];
+    }
+
+    const converted = monthlyDataQuery.data.days.map(snapshot =>
+      toCalendarDayData(
+        snapshot,
+        snapshot.date === formatLocalDateYYYYMMDD(new Date()), // isToday
+        snapshot.date === selectedDateString // isSelected
+      )
+    );
+
+    // デバッグ用ログ（開発時のみ、有効なデータがある場合のみ）
+    if (process.env.NODE_ENV === 'development') {
+      const itemsWithData = converted.filter(d => d.hasMeals || d.hasReport || d.goalAchievementPercentage !== undefined);
+      if (itemsWithData.length > 0) {
+        console.log('Calendar Model: Data with content found', {
+          month: `${viewingYear}-${viewingMonth}`,
+          totalDays: converted.length,
+          daysWithData: itemsWithData.length,
+          sampleData: itemsWithData[0]
+        });
+      }
+    }
+
+    return converted;
+  }, [monthlyDataQuery.data, selectedDateString, viewingYear, viewingMonth]);
 
   return {
     // 選択状態

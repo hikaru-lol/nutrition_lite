@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, BarChart3, ChevronDown, Edit2, Trash2 } from 'lucide-react';
+import { Plus, X, BarChart3, ChevronDown, Edit2, Trash2, Eye } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 export interface MealItem {
   id: string;
@@ -28,6 +29,19 @@ interface CompactMealListProps {
   onAddClick: (mealType: 'main' | 'snack', mealIndex?: number) => void;
   onAnalyzeNutrition?: (mealType: 'main' | 'snack', mealIndex?: number) => void;
   isDeleting?: boolean;
+  // 新しいキャッシュベースの栄養分析props
+  getNutritionDataFromCache?: (mealType: 'main' | 'snack', mealIndex?: number) => any;
+  onShowNutritionDetails?: (nutritionData: any) => void;
+  // 既存UI用に残す（後で削除予定）
+  selectedMealForNutrition?: { meal_type: 'main' | 'snack'; meal_index: number | null } | null;
+  nutritionData?: {
+    meal: any;
+    daily: any;
+  };
+  isNutritionLoading?: boolean;
+  nutritionError?: boolean;
+  onClearNutritionAnalysis?: () => void;
+  onRefetchNutrition?: () => void;
 }
 
 export function CompactMealList({
@@ -38,6 +52,15 @@ export function CompactMealList({
   onAddClick,
   onAnalyzeNutrition,
   isDeleting = false,
+  getNutritionDataFromCache,
+  onShowNutritionDetails,
+  // 既存UI用に残す
+  selectedMealForNutrition,
+  nutritionData,
+  isNutritionLoading,
+  nutritionError,
+  onClearNutritionAnalysis,
+  onRefetchNutrition,
 }: CompactMealListProps) {
   // アコーディオンの開閉状態管理
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -130,15 +153,26 @@ export function CompactMealList({
     items,
     onAdd,
     onAnalyze,
+    mealType,
+    mealIndex,
     emptyMessage = "(まだ記録がありません)"
   }: {
     title: string;
     items: MealItem[];
     onAdd: () => void;
     onAnalyze?: () => void;
+    mealType: 'main' | 'snack';
+    mealIndex?: number;
     emptyMessage?: string;
   }) => {
     const totals = calculateMealTotals(items);
+
+    // データの有無判定: カロリーがあるか、アイテムが存在するかで判定
+    const hasData = totals.calories > 0 || items.length > 0;
+
+    // このセクションの栄養データがキャッシュに存在するかチェック
+    const cachedNutritionData = getNutritionDataFromCache?.(mealType, mealIndex);
+    const hasNutritionData = Boolean(cachedNutritionData);
 
     return (
     <div className="space-y-2">
@@ -170,26 +204,55 @@ export function CompactMealList({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {onAnalyze && items.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onAnalyze}
-                className="h-6 px-2 text-xs gap-1"
+            {hasData ? (
+              /* データがある場合: アイコン化で省スペース */
+              <>
+                {/* 栄養分析ボタン（アイコンのみ） */}
+                {onAnalyze && (
+                  <button
+                    onClick={onAnalyze}
+                    className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-full transition-all"
+                    title="栄養分析詳細を見る"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* 追加ボタン（アイコンのみ） */}
+                <button
+                  onClick={onAdd}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-full transition-all"
+                  title="この食事に食品を追加"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                {/* 詳細ボタン（アイコンのみ） */}
+                <button
+                  onClick={() => hasNutritionData && onShowNutritionDetails?.(cachedNutritionData)}
+                  disabled={!hasNutritionData}
+                  className={cn(
+                    "p-2 rounded-full transition-all",
+                    hasNutritionData
+                      ? "text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      : "text-gray-300 cursor-not-allowed"
+                  )}
+                  title={hasNutritionData ? "栄養分析詳細を表示" : "栄養分析を実行してください"}
+                  aria-label={hasNutritionData ? "栄養分析詳細を表示" : "栄養分析未実行のため無効"}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              /* データがない場合: 追加ボタンを強調 */
+              <button
+                onClick={onAdd}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 rounded transition-all"
               >
-                <BarChart3 className="h-3 w-3" />
-                栄養分析
-              </Button>
+                <Plus className="w-4 h-4" />
+                食事を追加
+              </button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onAdd}
-              className="h-6 px-2 text-xs gap-1"
-            >
-              <Plus className="h-3 w-3" />
-              追加
-            </Button>
           </div>
         </div>
       </div>
@@ -315,6 +378,7 @@ export function CompactMealList({
           })
         )}
       </div>
+
     </div>
   );
   };
@@ -333,6 +397,8 @@ export function CompactMealList({
             items={items}
             onAdd={() => onAddClick('main', index)}
             onAnalyze={onAnalyzeNutrition ? () => onAnalyzeNutrition('main', index) : undefined}
+            mealType="main"
+            mealIndex={index}
           />
         ))}
 
@@ -342,6 +408,7 @@ export function CompactMealList({
           items={groupedMeals.snacks}
           onAdd={() => onAddClick('snack')}
           onAnalyze={onAnalyzeNutrition ? () => onAnalyzeNutrition('snack') : undefined}
+          mealType="snack"
         />
       </CardContent>
     </Card>

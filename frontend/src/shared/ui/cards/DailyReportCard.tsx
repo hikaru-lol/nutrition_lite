@@ -1,0 +1,220 @@
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Lock, Sparkles, ChefHat, AlertTriangle, X } from 'lucide-react';
+
+// Helper function to check if error is 404 (not found)
+function is404Error(error: Error | null): boolean {
+  if (!error) return false;
+  // TanStack Query error might have status or response properties
+  const anyError = error as any;
+
+  // Debug: エラーオブジェクトの構造をログ出力
+  console.log('Error object structure:', {
+    error,
+    status: anyError?.status,
+    responseStatus: anyError?.response?.status,
+    dataStatus: anyError?.data?.status,
+    causeStatus: anyError?.cause?.status,
+    message: error.message,
+    fullError: anyError
+  });
+
+  const is404 = anyError?.status === 404 ||
+                anyError?.response?.status === 404 ||
+                anyError?.data?.status === 404 ||
+                anyError?.cause?.status === 404 ||
+                (error.message && error.message.includes('404'));
+
+  console.log('is404Error result:', is404);
+  return is404;
+}
+
+interface DailyReportCardProps {
+  date?: string;
+  report?: any | null; // DailyNutritionReport type would be imported from nutrition contract
+  isLoading?: boolean;
+  isError?: boolean;
+  isGenerating?: boolean;
+  generateError?: Error | null;
+  onGenerate?: (date: string) => void; // 日付パラメータを追加
+  queryError?: Error | null; // TanStack Query error object to check status code
+  isMealCompletionValid?: boolean; // Whether meal completion requirement is met
+  mealCompletionStatus?: { completed: number; required: number }; // Meal completion details
+  missingMealsCount?: number; // Number of missing meals
+  hasEnoughData?: boolean; // Whether enough data is available for report generation
+}
+
+export function DailyReportCard({
+  date,
+  report,
+  isLoading = false,
+  isError = false,
+  isGenerating = false,
+  generateError = null,
+  onGenerate,
+  queryError = null,
+  isMealCompletionValid = true,
+  mealCompletionStatus,
+  missingMealsCount = 0,
+  hasEnoughData = true,
+}: DailyReportCardProps) {
+  return (
+    <div className="relative">
+      {/* Background glow effect */}
+      <div className="absolute -top-4 -right-4 w-24 h-24 bg-purple-500/10 rounded-full blur-3xl" />
+      <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-indigo-500/8 rounded-full blur-3xl" />
+
+      <Card className="relative z-10 transition-all duration-500 hover:shadow-lg">
+        <CardHeader>
+          <CardTitle className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+            日次レポート
+          </CardTitle>
+        </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">読み込み中...</div>
+        ) : report ? (
+          // レポートが存在する場合の表示
+          <div className="space-y-3">
+            <div className="text-sm">
+              <div className="whitespace-pre-line">{report.content || report.analysis}</div>
+            </div>
+            {date && (
+              <div className="text-xs text-muted-foreground">
+                生成日: {new Date(report.generated_at || Date.now()).toLocaleDateString()}
+              </div>
+            )}
+            {onGenerate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onGenerate && date && onGenerate(date)}
+                disabled={isGenerating}
+                className="transition-all duration-200 hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-950/20 dark:hover:border-purple-700"
+              >
+                {isGenerating ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent" />
+                    <span>レポート更新中...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-3 w-3" />
+                    <span>レポートを更新</span>
+                  </div>
+                )}
+              </Button>
+            )}
+          </div>
+        ) : (
+          // レポートが未生成の場合
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              日次レポートがまだ生成されていません。
+            </div>
+
+            {/* State A: ロック状態（データ不足） */}
+            {!hasEnoughData && (
+              <div className="relative p-6 rounded-xl bg-amber-500/5 border border-amber-200/50 dark:bg-amber-950/10 dark:border-amber-800/30">
+                <div className="absolute top-4 right-4">
+                  <Lock className="h-5 w-5 text-amber-600/60 dark:text-amber-400/60" />
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                    <ChefHat className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                      分析ロック中
+                    </h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      あと<span className="font-semibold">{missingMealsCount}食</span>の記録でAI分析が利用できます
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-2 w-24 bg-amber-200 dark:bg-amber-800/40 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-500 dark:bg-amber-400 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${mealCompletionStatus ? (mealCompletionStatus.completed / mealCompletionStatus.required) * 100 : 0}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                        {mealCompletionStatus?.completed || 0}/{mealCompletionStatus?.required || 3}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* State B: Ready状態（生成可能） */}
+            {hasEnoughData && onGenerate && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                    🎉 今日の食事記録が揃いました
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => onGenerate && date && onGenerate(date)}
+                  disabled={isGenerating}
+                  className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="relative flex items-center justify-center gap-2">
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                        <span className="font-semibold">AI分析中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5" />
+                        <span className="font-semibold">AI日次レポートを生成</span>
+                      </>
+                    )}
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* State C: エラー表示の改善 */}
+            {generateError && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <div className="font-medium text-red-800 dark:text-red-200 mb-1">
+                    生成に失敗しました
+                  </div>
+                  <div className="text-red-700 dark:text-red-300">
+                    食事ログが完了しているか確認してください。
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* レポートクエリエラーは非表示（404は正常状態として扱う） */}
+        {false && isError && !isLoading && !is404Error(queryError) && !generateError && !report && queryError && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-sm">
+              <div className="font-medium text-red-800 dark:text-red-200 mb-1">
+                レポートの取得に失敗
+              </div>
+              <div className="text-red-700 dark:text-red-300">
+                ネットワーク接続を確認してください。
+              </div>
+            </div>
+          </div>
+        )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

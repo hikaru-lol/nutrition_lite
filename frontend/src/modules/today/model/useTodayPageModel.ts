@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -79,11 +79,32 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
     return props.date || formatLocalDateYYYYMMDD(new Date());
   }, [props.date]);
 
-  // 栄養分析対象の食事選択状態
+  // 栄養分析対象の食事選択状態（既存UI用に残す）
   const [selectedMealForNutrition, setSelectedMealForNutrition] = useState<{
     meal_type: MealType;
     meal_index: number | null;
   } | null>(null);
+
+  // 各食事セクションの栄養データ取得用のフック生成関数
+  const createMealNutritionQuery = (meal_type: 'main' | 'snack', meal_index?: number) => {
+    return useQuery({
+      queryKey: [
+        'nutrition',
+        'meal-section',
+        date,
+        meal_type,
+        meal_index ?? null
+      ] as const,
+      queryFn: () => recomputeMealAndDaily({
+        date,
+        meal_type,
+        meal_index,
+      }),
+      enabled: false, // 手動で呼び出し
+      staleTime: 1000 * 60 * 30, // 30分間キャッシュを保持
+      retry: false,
+    });
+  };
 
   // Target（active）
   // → Query を Today で持ってもOKだが、まずは最小で「取得できる/できない」だけ欲しいので
@@ -347,8 +368,179 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
     setSelectedMealForNutrition(null);
   }
 
+  // 食事セクション毎のキー生成
+  const getMealSectionKey = (meal_type: 'main' | 'snack', meal_index?: number) =>
+    `${meal_type}${meal_index ? `-${meal_index}` : ''}`;
+
+  // 食事セクションの栄養データを手動で取得
+  const fetchMealNutrition = async (meal_type: 'main' | 'snack', meal_index?: number) => {
+    const queryKey = [
+      'nutrition',
+      'meal-section',
+      date,
+      meal_type,
+      meal_index ?? null
+    ] as const;
+
+    // 既にキャッシュにデータがある場合は再取得しない
+    const existingData = queryClient.getQueryData(queryKey);
+    if (existingData) {
+      return existingData;
+    }
+
+    // データを取得してキャッシュに保存
+    const data = await queryClient.fetchQuery({
+      queryKey,
+      queryFn: () => recomputeMealAndDaily({
+        date,
+        meal_type,
+        meal_index,
+      }),
+      staleTime: 1000 * 60 * 30,
+    });
+
+    return data;
+  };
+
+  // 食事セクションの栄養データがキャッシュに存在するかチェック
+  const getMealNutritionFromCache = (meal_type: 'main' | 'snack', meal_index?: number) => {
+    const sectionKey = `${meal_type}-${meal_index ?? 'null'}`;
+    const queryKey = [
+      'nutrition',
+      'meal-section',
+      date,
+      meal_type,
+      meal_index ?? null
+    ] as const;
+
+    // まずメインの栄養データキャッシュを確認
+    const nutritionData = queryClient.getQueryData(queryKey);
+    if (nutritionData) {
+      return nutritionData;
+    }
+
+    // 状態管理から存在確認をチェック
+    const exists = nutritionCheckState[sectionKey];
+    return exists === true ? { exists: true } : null;
+  };
+
+  // 食事アイテムから食事セクションを抽出
+  const getMealSections = (mealItems: any[]) => {
+    const sections = new Set<string>();
+    const result: { mealType: 'main' | 'snack'; mealIndex?: number }[] = [];
+
+    mealItems.forEach(item => {
+      const key = item.meal_type === 'main'
+        ? `${item.meal_type}-${item.meal_index}`
+        : item.meal_type;
+
+      if (!sections.has(key)) {
+        sections.add(key);
+        result.push({
+          mealType: item.meal_type,
+          mealIndex: item.meal_type === 'main' ? item.meal_index : undefined
+        });
+      }
+    });
+
+    return result;
+  };
+
+  // 栄養データ存在確認（軽量版）
+  const checkNutritionDataExists = async (meal_type: 'main' | 'snack', meal_index?: number) => {
+    try {
+      const data = await recomputeMealAndDaily({
+        date,
+        meal_type,
+        meal_index,
+      });
+      // データが取得できた場合はキャッシュに保存
+      const queryKey = [
+        'nutrition',
+        'meal-section',
+        date,
+        meal_type,
+        meal_index ?? null
+      ] as const;
+      queryClient.setQueryData(queryKey, data);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // 食事アイテムから食事セクションのリストを生成
+  const mealSections = useMemo(() => {
+    if (!mealItemsQuery.data?.items) return [];
+    return getMealSections(mealItemsQuery.data.items);
+  }, [mealItemsQuery.data?.items]);
+
+  // 栄養データチェック状態を管理
+  const [nutritionCheckState, setNutritionCheckState] = useState<Record<string, boolean>>({});
+
+  // 各食事セクションの栄養データ存在確認を自動実行
+  useEffect(() => {
+    const checkAllMealSections = async () => {
+      if (mealItemsQuery.isSuccess && mealSections.length > 0) {
+        // 各食事セクションの栄養データが存在するかチェックして存在フラグをキャッシュに保存
+        const checkPromises = mealSections.map(async ({ mealType, mealIndex }) => {
+          const sectionKey = `${mealType}-${mealIndex ?? 'null'}`;
+          const existsQueryKey = [
+            'nutrition',
+            'exists',
+            date,
+            mealType,
+            mealIndex ?? null
+          ] as const;
+
+          // 既にチェック済みならスキップ
+          const existingCheck = queryClient.getQueryData(existsQueryKey);
+          if (existingCheck !== undefined) {
+            setNutritionCheckState(prev => ({ ...prev, [sectionKey]: existingCheck }));
+            return;
+          }
+
+          // 存在確認を実行してキャッシュに保存
+          try {
+            const exists = await checkNutritionDataExists(mealType, mealIndex);
+            queryClient.setQueryData(existsQueryKey, exists);
+            setNutritionCheckState(prev => ({ ...prev, [sectionKey]: exists }));
+          } catch (error) {
+            queryClient.setQueryData(existsQueryKey, false);
+            setNutritionCheckState(prev => ({ ...prev, [sectionKey]: false }));
+          }
+        });
+
+        // 全ての確認が完了するまで待つ
+        await Promise.all(checkPromises);
+      }
+    };
+
+    checkAllMealSections();
+  }, [mealSections, date, mealItemsQuery.isSuccess, queryClient]);
+
   const isLoading = activeTargetQuery.isLoading || mealItemsQuery.isLoading;
   const isError = activeTargetQuery.isError || mealItemsQuery.isError;
+
+  // ========================================
+  // Daily Report
+  // ========================================
+  const dailyReportQuery = useQuery({
+    queryKey: ['nutrition', 'daily-report', date],
+    queryFn: () => getDailyReport(date),
+    retry: false,
+  });
+
+  const generateReportMutation = useMutation({
+    mutationFn: ({ date }: { date: string }) => generateDailyReport(date),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['nutrition', 'daily-report', date]
+      });
+    },
+  });
+
+  const dailyReport = dailyReportQuery.data;
 
   return {
     date,
@@ -387,6 +579,63 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
     selectedMealNutritionQuery,
     selectMealForNutrition,
     clearSelectedMeal,
+
+    // 新しい食事セクション毎の栄養データ管理
+    fetchMealNutrition,
+    getMealNutritionFromCache,
+    getMealSectionKey,
+
+    // Meal completion validation
+    isMealCompletionValid: useMemo(() => {
+      const profile = profileQuery.data;
+      const mealItems = mealItemsQuery.data?.items ?? [];
+
+      if (!profile || !profile.meals_per_day) return false;
+
+      // メイン食事の数をカウント（meal_type === 'main'）
+      const mainMealCount = mealItems.filter(item => item.meal_type === 'main').length;
+
+      // プロフィール設定の食事回数以上の記録があればOK
+      return mainMealCount >= profile.meals_per_day;
+    }, [profileQuery.data, mealItemsQuery.data?.items]),
+
+    getMealCompletionStatus: useMemo(() => {
+      const profile = profileQuery.data;
+      const mealItems = mealItemsQuery.data?.items ?? [];
+
+      if (!profile) return { completed: 0, required: 3 };
+
+      const required = profile.meals_per_day ?? 3;
+      const mainMealCount = mealItems.filter(item => item.meal_type === 'main').length;
+
+      return { completed: mainMealCount, required };
+    }, [profileQuery.data, mealItemsQuery.data?.items]),
+
+    // 不足食事数の計算
+    missingMealsCount: useMemo(() => {
+      const profile = profileQuery.data;
+      const mealItems = mealItemsQuery.data?.items ?? [];
+
+      if (!profile) return 3;
+
+      const required = profile.meals_per_day ?? 3;
+      const mainMealCount = mealItems.filter(item => item.meal_type === 'main').length;
+
+      return Math.max(0, required - mainMealCount);
+    }, [profileQuery.data, mealItemsQuery.data?.items]),
+
+    // 十分なデータがあるかのフラグ
+    hasEnoughData: useMemo(() => {
+      const profile = profileQuery.data;
+      const mealItems = mealItemsQuery.data?.items ?? [];
+
+      if (!profile) return false;
+
+      const required = profile.meals_per_day ?? 3;
+      const mainMealCount = mealItems.filter(item => item.meal_type === 'main').length;
+
+      return mainMealCount >= required;
+    }, [profileQuery.data, mealItemsQuery.data?.items]),
 
     // UI helpers
     mealTypeLabels,

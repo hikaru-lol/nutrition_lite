@@ -44,8 +44,8 @@ class SqlAlchemyCalendarRepository(CalendarRepositoryPort):
         query = text("""
             WITH date_series AS (
                 SELECT generate_series(
-                    :start_date::date,
-                    (:end_date::date - interval '1 day')::date,
+                    CAST(:start_date AS date),
+                    CAST(:end_date AS date) - interval '1 day',
                     '1 day'::interval
                 )::date AS calendar_date
             ),
@@ -55,8 +55,8 @@ class SqlAlchemyCalendarRepository(CalendarRepositoryPort):
                     COUNT(*) > 0 AS has_meals
                 FROM food_entries fe
                 WHERE fe.user_id = :user_id
-                    AND fe.date >= :start_date::date
-                    AND fe.date < :end_date::date
+                    AND fe.date >= CAST(:start_date AS date)
+                    AND fe.date < CAST(:end_date AS date)
                     AND fe.deleted_at IS NULL
                 GROUP BY fe.date
             ),
@@ -66,22 +66,20 @@ class SqlAlchemyCalendarRepository(CalendarRepositoryPort):
                     CASE
                         WHEN target.id IS NOT NULL THEN
                             ROUND(AVG(CASE
-                                WHEN tn.amount > 0 THEN (dnn.value / tn.amount * 100)
+                                WHEN tn.amount_value > 0 THEN (dnn.amount_value / tn.amount_value * 100)
                                 ELSE 0
                             END))
                         ELSE NULL
                     END AS achievement_percentage
                 FROM daily_nutrition_summaries dns
-                JOIN daily_nutrition_nutrients dnn ON dns.id = dnn.daily_nutrition_summary_id
+                JOIN daily_nutrition_nutrients dnn ON dns.id = dnn.summary_id
                 LEFT JOIN targets target ON target.user_id = :user_id
                     AND target.is_active = true
-                    AND target.deleted_at IS NULL
                 LEFT JOIN target_nutrients tn ON target.id = tn.target_id
                     AND dnn.code = tn.code
                 WHERE dns.user_id = :user_id
-                    AND dns.date >= :start_date::date
-                    AND dns.date < :end_date::date
-                    AND dns.deleted_at IS NULL
+                    AND dns.date >= CAST(:start_date AS date)
+                    AND dns.date < CAST(:end_date AS date)
                 GROUP BY dns.date, target.id
             ),
             report_summary AS (
@@ -90,9 +88,8 @@ class SqlAlchemyCalendarRepository(CalendarRepositoryPort):
                     COUNT(*) > 0 AS has_report
                 FROM daily_nutrition_reports dnr
                 WHERE dnr.user_id = :user_id
-                    AND dnr.date >= :start_date::date
-                    AND dnr.date < :end_date::date
-                    AND dnr.deleted_at IS NULL
+                    AND dnr.date >= CAST(:start_date AS date)
+                    AND dnr.date < CAST(:end_date AS date)
                 GROUP BY dnr.date
             )
             SELECT

@@ -189,6 +189,17 @@ from app.application.billing.use_cases.handle_stripe_webhook import (
 from app.infra.db.uow.billing import SqlAlchemyBillingUnitOfWork
 from app.infra.billing.stripe_client import StripeClient
 
+# === Tutorial ===============================================================
+# Ports
+from app.application.tutorial.ports.tutorial_unit_of_work_port import TutorialUnitOfWorkPort
+
+# Use cases
+from app.application.tutorial.use_cases.get_tutorial_status import GetTutorialStatusUseCase
+from app.application.tutorial.use_cases.complete_tutorial import CompleteTutorialUseCase
+
+# Infra (repository)
+from app.infra.db.uow.tutorial import SqlAlchemyTutorialUnitOfWork
+
 
 # =============================================================================
 # Helpers
@@ -800,3 +811,27 @@ def get_get_monthly_calendar_use_case(
 ) -> GetMonthlyCalendarUseCase:
     uow = _resolve_dep(uow, get_calendar_uow)
     return GetMonthlyCalendarUseCase(uow=uow)
+
+
+# =============================================================================
+# Tutorial
+# =============================================================================
+def get_tutorial_uow() -> TutorialUnitOfWorkPort:
+    """チュートリアルUnit of Workを取得"""
+    return SqlAlchemyTutorialUnitOfWork(create_session)
+
+
+def get_get_tutorial_status_use_case(
+    tutorial_uow: TutorialUnitOfWorkPort = Depends(get_tutorial_uow),
+) -> GetTutorialStatusUseCase:
+    """チュートリアル状況取得ユースケースを取得"""
+    tutorial_uow = _resolve_dep(tutorial_uow, get_tutorial_uow)
+    return GetTutorialStatusUseCase(tutorial_uow)
+
+
+def get_complete_tutorial_use_case(
+    tutorial_uow: TutorialUnitOfWorkPort = Depends(get_tutorial_uow),
+) -> CompleteTutorialUseCase:
+    """チュートリアル完了ユースケースを取得"""
+    tutorial_uow = _resolve_dep(tutorial_uow, get_tutorial_uow)
+    return CompleteTutorialUseCase(tutorial_uow)

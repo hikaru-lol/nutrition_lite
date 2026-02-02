@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { TodayPageContent } from './TodayPageContent';
+import { TutorialTrigger } from '@/modules/tutorial';
 
 function formatLocalDateYYYYMMDD(d: Date): string {
   const yyyy = d.getFullYear();
@@ -27,7 +28,10 @@ export function TodayPage() {
   return (
     <div className="w-full space-y-6">
       <div className="space-y-1">
-        <div className="text-lg font-semibold">Today</div>
+        <div className="flex items-center gap-2">
+          <div className="text-lg font-semibold" data-tour="today-title">Today</div>
+          <TutorialTrigger tutorialId="feature_today" className="ml-auto" />
+        </div>
         <div className="text-sm text-muted-foreground">日付: {date}</div>
       </div>
 

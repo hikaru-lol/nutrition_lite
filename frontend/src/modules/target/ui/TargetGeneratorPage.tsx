@@ -21,6 +21,7 @@ import {
   useTargetGeneratorPageModel,
   type TargetFormValues,
 } from '../model/useTargetGeneratorPageModel';
+import { TutorialTrigger } from '@/modules/tutorial';
 
 export function TargetGeneratorPage() {
   const router = useRouter();
@@ -46,8 +47,11 @@ export function TargetGeneratorPage() {
 
   return (
     <div className="w-full max-w-2xl space-y-4">
-      <div>
-        <div className="text-lg font-semibold">ターゲット生成</div>
+      <div data-tour="target-title">
+        <div className="flex items-center gap-2">
+          <div className="text-lg font-semibold">ターゲット生成</div>
+          <TutorialTrigger tutorialId="onboarding_target" className="ml-auto" />
+        </div>
         <div className="text-sm text-muted-foreground">
           目標に合わせた栄養ターゲットを自動生成します
         </div>
@@ -56,7 +60,7 @@ export function TargetGeneratorPage() {
       <Card className="p-4">
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           {/* タイトル */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="target-title-field">
             <div className="text-sm font-medium">タイトル</div>
             <Input
               placeholder="例: ダイエット2026"
@@ -70,7 +74,7 @@ export function TargetGeneratorPage() {
           </div>
 
           {/* 目標タイプ */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="target-goal-type">
             <div className="text-sm font-medium">目標タイプ</div>
             <Select
               value={form.watch('goal_type')}
@@ -96,7 +100,7 @@ export function TargetGeneratorPage() {
           </div>
 
           {/* 活動レベル */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="target-activity-level">
             <div className="text-sm font-medium">活動レベル</div>
             <Select
               value={form.watch('activity_level')}
@@ -125,7 +129,7 @@ export function TargetGeneratorPage() {
           </div>
 
           {/* 目標の詳細（任意） */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="target-description">
             <div className="text-sm font-medium">目標の詳細（任意）</div>
             <Textarea
               placeholder="例: 3ヶ月で5kg減量したい"
@@ -135,7 +139,7 @@ export function TargetGeneratorPage() {
           </div>
 
           {/* 送信ボタン */}
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end" data-tour="target-submit">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? '生成中...' : 'ターゲットを生成'}
             </Button>

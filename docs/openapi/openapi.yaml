@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Nutrition Backend - Auth, Profile, Target, Nutrition & Meal API
+  title: Nutrition Backend - Auth, Profile, Target, Nutrition, Meal & Calendar API
   version: 0.1.0
 
 servers:
@@ -21,6 +21,8 @@ tags:
     description: Daily nutrition report generation and retrieval
   - name: Billing
     description: Billing and Stripe checkout/portal/webhook endpoints
+  - name: Calendar
+    description: Monthly calendar view with daily meal logs, nutrition achievement, and reports
 
 paths:
   # ==========
@@ -974,6 +976,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ==========
+  # Calendar
+  # ==========
+  /calendar/monthly-summary:
+    get:
+      tags: [Calendar]
+      summary: Get monthly calendar summary
+      description: >
+        Get daily summary for each day in the specified month, including:
+        - Whether the user has meal logs for that day
+        - Nutrition achievement percentage (average across all target nutrients)
+        - Whether a daily nutrition report has been generated
+      parameters:
+        - in: query
+          name: year
+          required: true
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 3000
+          description: Year (2000-3000)
+          example: 2024
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Month (1-12)
+          example: 12
+      responses:
+        '200':
+          description: Monthly calendar data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyCalendarResponse'
+        '400':
+          description: Invalid year or month parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     AccessTokenCookieAuth:
@@ -1575,6 +1634,65 @@ components:
             $ref: '#/components/schemas/MealItemResponse'
       required:
         - items
+
+    # ==========
+    # Calendar
+    # ==========
+    CalendarDaySnapshot:
+      type: object
+      description: Daily summary snapshot for calendar view
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date in YYYY-MM-DD format
+          example: "2024-12-15"
+        has_meal_logs:
+          type: boolean
+          description: Whether the user has recorded any meals for this day
+          example: true
+        nutrition_achievement:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Average nutrition achievement percentage across all target nutrients (null if no target or no meals)
+          example: 85
+        has_daily_report:
+          type: boolean
+          description: Whether a daily nutrition report has been generated for this day
+          example: false
+      required:
+        - date
+        - has_meal_logs
+        - nutrition_achievement
+        - has_daily_report
+
+    MonthlyCalendarResponse:
+      type: object
+      description: Monthly calendar data with daily snapshots
+      properties:
+        year:
+          type: integer
+          minimum: 2000
+          maximum: 3000
+          description: Year of the requested month
+          example: 2024
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Month (1-12) of the requested data
+          example: 12
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarDaySnapshot'
+          description: Array of daily snapshots for each day in the month
+      required:
+        - year
+        - month
+        - days
 
     # ==========
     # Error

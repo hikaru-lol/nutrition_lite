@@ -32,6 +32,15 @@ export function CalendarCell({
   const hasReport = dayData?.hasReport || false;
   const goalPercentage = dayData?.goalAchievementPercentage;
 
+  // デバッグ用ログ（開発時のみ、データがある日のみ）
+  if (process.env.NODE_ENV === 'development' && date.day <= 3 && (hasMeals || hasReport || goalPercentage !== undefined)) {
+    const dateStr = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+    console.log(`CalendarCell [${dateStr}] with data:`, {
+      dayData,
+      indicators: { hasMeals, hasReport, goalPercentage }
+    });
+  }
+
   return (
     <button
       onClick={onClick}
@@ -67,6 +76,7 @@ export function CalendarCell({
           <div
             className="w-1.5 h-1.5 rounded-full bg-green-600"
             title="食事記録あり"
+            aria-label="食事記録あり"
           />
         )}
 
@@ -78,6 +88,7 @@ export function CalendarCell({
               getGoalAchievementColor(goalPercentage)
             )}
             title={`目標達成度: ${goalPercentage}%`}
+            aria-label={`目標達成度: ${goalPercentage}%`}
           />
         )}
 
@@ -86,6 +97,7 @@ export function CalendarCell({
           <div
             className="w-1.5 h-1.5 rounded-full bg-purple-600"
             title="レポート生成済み"
+            aria-label="レポート生成済み"
           />
         )}
       </div>

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/shared/ui/calendar';
 import { useCalendarModel } from '@/modules/calendar';
 import { TodayPageContent } from '@/modules/today/ui/TodayPageContent';
+import { TutorialTrigger } from '@/modules/tutorial';
 
 function parseCalendarDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -50,12 +51,12 @@ export function CalendarPage() {
   const {
     selectedDate,
     selectedDateString,
-    viewingYear,
-    viewingMonth,
     dayData,
     handleDateSelect,
     handleMonthChange,
     isLoading,
+    isError,
+    monthlyDataQuery,
   } = useCalendarModel({ initialDate });
 
   // 日付選択時にURLを更新
@@ -80,11 +81,12 @@ export function CalendarPage() {
   return (
     <div className="w-full space-y-6">
       {/* ページヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tour="calendar-header">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <CalendarIcon className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold">カレンダー</h1>
+            <TutorialTrigger tutorialId="feature_calendar" className="ml-auto" />
           </div>
           <p className="text-sm text-muted-foreground">
             日付を選択して食事記録を確認・編集できます
@@ -103,7 +105,7 @@ export function CalendarPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* 左側: カレンダー */}
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="calendar-main">
           <Calendar
             selectedDate={selectedDate}
             onDateSelect={handleDateSelect}
@@ -113,14 +115,29 @@ export function CalendarPage() {
           />
 
           {/* 選択日付の情報 */}
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800" data-tour="calendar-date-info">
             <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
               選択日: {selectedDate.year}年{selectedDate.month}月{selectedDate.day}日
             </h3>
 
+            {/* ローディングとエラー状態 */}
+            {isLoading && (
+              <p className="text-sm text-blue-600 dark:text-blue-400 animate-pulse">
+                データを読み込んでいます...
+              </p>
+            )}
+
+            {isError && (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                データの取得に失敗しました
+              </p>
+            )}
+
             {/* 選択日の概要情報 */}
-            {(() => {
+            {!isLoading && !isError && (() => {
               const selectedDayData = dayData.find(d => d.date === selectedDateString);
+
+              // データが見つからない場合（表示月と選択月が異なる場合など）
               if (!selectedDayData) {
                 return (
                   <p className="text-sm text-blue-700 dark:text-blue-300">
@@ -129,13 +146,24 @@ export function CalendarPage() {
                 );
               }
 
+              // データがあるがすべて空の場合
+              const hasAnyData = selectedDayData.hasMeals || selectedDayData.hasReport || selectedDayData.goalAchievementPercentage !== undefined;
+              if (!hasAnyData) {
+                return (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 italic">
+                    まだデータが記録されていません
+                  </p>
+                );
+              }
+
+              // データがある場合の表示
               return (
                 <div className="space-y-2 text-sm">
                   {selectedDayData.hasMeals && (
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-600 rounded-full"></span>
                       <span className="text-blue-700 dark:text-blue-300">
-                        食事記録: {selectedDayData.mealCount || 0}件
+                        食事記録あり
                       </span>
                     </div>
                   )}
@@ -163,8 +191,8 @@ export function CalendarPage() {
                   )}
 
                   {!selectedDayData.hasMeals && (
-                    <p className="text-blue-600 dark:text-blue-400 italic">
-                      まだ食事が記録されていません
+                    <p className="text-blue-600 dark:text-blue-400 italic text-xs">
+                      食事記録なし
                     </p>
                   )}
                 </div>
@@ -174,8 +202,8 @@ export function CalendarPage() {
         </div>
 
         {/* 右側: 選択日の詳細（Todayページの内容を再利用） */}
-        <div className="space-y-6">
-          <div className="border-l-4 border-blue-500 pl-4">
+        <div className="space-y-6" data-tour="calendar-detail-panel">
+          <div className="border-l-4 border-blue-500 pl-4" data-tour="calendar-detail-header">
             <h2 className="text-lg font-semibold mb-1">
               {selectedDate.year}年{selectedDate.month}月{selectedDate.day}日の詳細
             </h2>

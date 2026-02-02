@@ -28,6 +28,7 @@ from app.api.http.routers.nutrition_route import router as nutrition_router
 from app.api.http.routers.daily_report_route import router as daily_report_router
 from app.api.http.routers.calendar_route import router as calendar_router
 from app.api.http.routers.billing_route import router as billing_router
+from app.api.http.routers.tutorial_route import router as tutorial_router
 
 
 def configure_logging() -> None:
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(daily_report_router, prefix="/api/v1")
     app.include_router(calendar_router, prefix="/api/v1/calendar", tags=["calendar"])
     app.include_router(billing_router, prefix="/api/v1")
+    app.include_router(tutorial_router, prefix="/api/v1")
     app.add_exception_handler(auth_errors.AuthError, auth_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(

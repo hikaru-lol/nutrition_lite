@@ -14,3 +14,5 @@ from app.infra.db.models.daily_nutrition_report import DailyNutritionReportModel
 from app.infra.db.models.meal_recommendation import MealRecommendationModel
 
 from app.infra.db.models.billing_account import BillingAccountModel
+
+from app.infra.db.models.tutorial import TutorialCompletionModel
