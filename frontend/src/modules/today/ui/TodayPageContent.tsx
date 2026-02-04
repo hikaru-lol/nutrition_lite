@@ -15,6 +15,7 @@ import { EditMealModal, type EditMealFormValues, type MealItemForEdit } from '@/
 import { NutritionAnalysisCard } from '@/shared/ui/cards/NutritionAnalysisCard';
 import { DailyReportCard } from '@/shared/ui/cards/DailyReportCard';
 import { EnhancedDailyReportCard } from '@/shared/ui/cards/EnhancedDailyReportCard';
+
 import { MealRecommendationCard, MealRecommendationDetailModal, useMealRecommendationModel } from '@/modules/meal-recommendation';
 
 import {
