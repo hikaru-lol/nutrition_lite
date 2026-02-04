@@ -1,225 +1,18 @@
-# from __future__ import annotations
-
-# import json
-# import logging
-# from dataclasses import dataclass
-# from typing import Any
-
-# from openai import OpenAI, OpenAIError
-
-# from app.application.nutrition.dto.meal_recommendation_llm_dto import (
-#     MealRecommendationLLMInput,
-#     MealRecommendationLLMOutput,
-# )
-# from app.application.nutrition.ports.recommendation_generator_port import (
-#     MealRecommendationGeneratorPort,
-# )
-
-# from app.domain.nutrition.errors import NutritionDomainError  # 既存のベース
-# # なければ専用エラーを追加してもOK
-# # from app.domain.nutrition.errors import MealRecommendationGenerationFailedError など
-
-# logger = logging.getLogger(__name__)
-
-
-# class MealRecommendationGenerationFailedError(NutritionDomainError):
-#     """提案生成（LLM）が失敗した場合のエラー。"""
-
-
-# _SYSTEM_PROMPT = """\
-# You are a registered dietitian and nutrition coach.
-
-# Your task:
-# Given a user's recent daily nutrition reports and profile,
-# propose practical suggestions on how they can eat in the next few days.
-
-# You MUST return ONLY a single JSON object with the following structure:
-
-# {
-#   "body": "<main recommendation text as 1-3 short paragraphs>",
-#   "tips": ["<tip 1>", "<tip 2>", "..."]
-# }
-
-# Requirements:
-
-# - "body" must be a friendly, concise summary (1-3 short paragraphs).
-# - "tips" must be a JSON array of short, actionable suggestions (strings).
-# - Always include at least 2 tips.
-# - Use safe, general wellness advice. Do NOT provide medical diagnoses.
-# - Do NOT mention specific diseases or medications.
-# - Do NOT include any extra keys outside this JSON object.
-# """
-
-
-# @dataclass(slots=True)
-# class OpenAIMealRecommendationGeneratorConfig:
-#     model: str = "gpt-4o-mini"
-#     temperature: float = 0.4
-
-
-# class OpenAIMealRecommendationGenerator(MealRecommendationGeneratorPort):
-#     """
-#     OpenAI Chat Completions API を使って MealRecommendation を生成する実装。
-
-#     - OPENAI_API_KEY は環境変数から読み込む前提。
-#     - JSON モードで body / tips を返させて MealRecommendationLLMOutput にマッピングする。
-#     """
-
-#     def __init__(
-#         self,
-#         client: OpenAI | None = None,
-#         config: OpenAIMealRecommendationGeneratorConfig | None = None,
-
-#     ) -> None:
-#         self._client = client or OpenAI()
-#         self._config = config or OpenAIMealRecommendationGeneratorConfig()
-#     # ------------------------------------------------------------------
-#     # Port 実装
-#     # ------------------------------------------------------------------
-
-#     def generate(
-#         self,
-#         input: MealRecommendationLLMInput,
-#     ) -> MealRecommendationLLMOutput:
-
-#         user_prompt = self._build_user_prompt(input)
-
-#         try:
-#             completion = self._client.chat.completions.create(
-#                 model=self._config.model,
-#                 messages=[
-#                     {"role": "system", "content": _SYSTEM_PROMPT},
-#                     {"role": "user", "content": user_prompt},
-#                 ],
-#                 temperature=self._config.temperature,
-#                 response_format={"type": "json_object"},
-#             )
-#         except OpenAIError as e:
-#             logger.exception(
-#                 "OpenAI API error while generating meal recommendation: user=%s base_date=%s",
-#                 input.user_id.value,
-#                 input.base_date,
-#             )
-#             raise MealRecommendationGenerationFailedError(
-#                 "Failed to generate meal recommendation via OpenAI"
-#             ) from e
-
-#         content = completion.choices[0].message.content
-#         if content is None:
-#             raise MealRecommendationGenerationFailedError(
-#                 "OpenAI returned empty content for meal recommendation"
-#             )
-
-#         try:
-#             data: dict[str, Any] = json.loads(content)
-#         except json.JSONDecodeError as e:
-#             logger.exception(
-#                 "Failed to parse JSON from meal recommendation response: %s",
-#                 content,
-#             )
-#             raise MealRecommendationGenerationFailedError(
-#                 "Failed to parse JSON from meal recommendation response"
-#             ) from e
-
-#         try:
-#             return self._to_output_dto(data)
-#         except Exception as e:
-#             logger.exception(
-#                 "Failed to map JSON to MealRecommendationLLMOutput: %s",
-#                 data,
-#             )
-#             raise MealRecommendationGenerationFailedError(
-#                 "Failed to map JSON to MealRecommendationLLMOutput"
-#             ) from e
-
-#     # ------------------------------------------------------------------
-#     # internal helpers
-#     # ------------------------------------------------------------------
-
-#     def _build_user_prompt(self, input: MealRecommendationLLMInput) -> str:
-#         """
-#         プロフィール + 直近レポートを LLM に渡すテキストにまとめる。
-#         """
-
-#         p = input.profile
-#         reports = input.recent_reports
-
-#         lines: list[str] = []
-
-#         lines.append(f"User ID: {input.user_id.value}")
-#         lines.append(f"Base date: {input.base_date.isoformat()}")
-#         lines.append("")
-#         lines.append("User profile:")
-#         lines.append(f"- Sex: {p.sex}")
-#         lines.append(f"- Birthdate: {p.birthdate}")
-#         lines.append(f"- Height: {p.height_cm} cm")
-#         lines.append(f"- Weight: {p.weight_kg} kg")
-#         lines.append(f"- Meals per day: {p.meals_per_day}")
-#         lines.append("")
-
-#         lines.append(
-#             f"Recent daily nutrition reports (latest {len(reports)} days):")
-#         for r in reports:
-#             lines.append(f"- Date: {r.date}")
-#             lines.append(f"  Summary: {r.summary}")
-#             if r.good_points:
-#                 lines.append(f"  Good points: {', '.join(r.good_points)}")
-#             if r.improvement_points:
-#                 lines.append(
-#                     f"  Improvement points: {', '.join(r.improvement_points)}")
-#             if r.tomorrow_focus:
-#                 lines.append(
-#                     f"  Tomorrow focus: {', '.join(r.tomorrow_focus)}")
-#             lines.append("")
-
-#         lines.append(
-#             "Based on these trends, propose what the user should focus on "
-#             "in the next few days, following the JSON format specified by the system."
-#         )
-
-#         return "\n".join(lines)
-
-#     def _to_output_dto(self, data: dict[str, Any]) -> MealRecommendationLLMOutput:
-#         """
-#         JSON データ -> MealRecommendationLLMOutput への変換とバリデーション。
-#         """
-
-#         def _ensure_str(value: Any, field: str) -> str:
-#             if not isinstance(value, str):
-#                 raise ValueError(f"{field} must be string")
-#             return value
-
-#         def _ensure_str_list(value: Any, field: str) -> list[str]:
-#             if not isinstance(value, list) or not value:
-#                 raise ValueError(
-#                     f"{field} must be a non-empty list of strings")
-#             result: list[str] = []
-#             for i, v in enumerate(value):
-#                 if not isinstance(v, str):
-#                     raise ValueError(f"{field}[{i}] must be string")
-#                 result.append(v)
-#             return result
-
-#         body = _ensure_str(data.get("body"), "body")
-#         tips = _ensure_str_list(data.get("tips"), "tips")
-
-#         return MealRecommendationLLMOutput(
-#             body=body,
-#             tips=tips,
-#         )
-
-
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import date as DateType
+from typing import Any
 
 from openai import OpenAI, OpenAIError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+from openai.types.chat import ParsedChatCompletion
 
 from app.application.nutrition.dto.meal_recommendation_llm_dto import (
     MealRecommendationLLMInput,
     MealRecommendationLLMOutput,
+    RecommendedMealDTO,
 )
 from app.application.nutrition.ports.recommendation_generator_port import (
     MealRecommendationGeneratorPort,
@@ -230,52 +23,80 @@ logger = logging.getLogger(__name__)
 
 
 class MealRecommendationGenerationFailedError(NutritionDomainError):
-    """提案生成（LLM）が失敗した場合のエラー。"""
+    """食事提案生成が失敗した場合のエラー。"""
 
 
 # ------------------------------------------------------------------
-# 1. 出力構造の定義 (Pydantic)
-#    - ここで定義した型と説明文(description)がLLMへの指示になります
+# Structured Outputs用のレスポンススキーマ
 # ------------------------------------------------------------------
+class RecommendedMeal(BaseModel):
+    """推奨される具体的な献立"""
+    title: str = Field(
+        description="献立名。例：「高タンパク朝食セット」「野菜たっぷりランチ」",
+        min_length=5,
+        max_length=30,
+    )
+    description: str = Field(
+        description="献立の詳細説明と栄養価の特徴。50-100文字程度",
+        min_length=30,
+        max_length=120,
+    )
+    ingredients: list[str] = Field(
+        description="主要な食材・料理名のリスト。3-6項目程度",
+        min_items=3,
+        max_items=6,
+    )
+    nutrition_focus: str = Field(
+        description="この献立の栄養的なメリット。例：「タンパク質25g摂取可能」",
+        min_length=10,
+        max_length=50,
+    )
+
+
 class MealRecommendationResponseSchema(BaseModel):
+    """
+    OpenAI Structured Outputsで使用する食事提案のスキーマ。
+
+    各フィールドのdescriptionが実質的なLLMへの指示として機能する。
+    """
     body: str = Field(
-        ...,
-        description="ユーザーへのメインのアドバイス。200〜400文字程度の日本語で、現状の分析とネクストアクションを含めてください。"
+        description=(
+            "ユーザーの栄養状況を分析し、今後数日間で意識すべき食事のポイントを"
+            "200-400文字程度の日本語で記述。現状の良い点と改善点を含める。"
+        ),
+        min_length=50,
+        max_length=500,
     )
     tips: list[str] = Field(
-        ...,
-        description="具体的で実行可能な短いアクションプラン（箇条書き用）。2つ以上提案してください。"
+        description=(
+            "実際に行動に移せる具体的なアドバイス。各項目は30文字程度の簡潔な文で、"
+            "2-5個の項目を提案。例：「朝食にタンパク質を20g追加」など。"
+        ),
+        min_items=2,
+        max_items=5,
+    )
+    recommended_meals: list[RecommendedMeal] = Field(
+        description="今日食べるのにおすすめの具体的な献立3品。バランスを考慮して提案",
+        min_items=3,
+        max_items=3,
     )
 
 
-# ------------------------------------------------------------------
-# 2. システムプロンプト (日本語化)
-# ------------------------------------------------------------------
-_SYSTEM_PROMPT = """\
-あなたは、ユーザーの健康目標達成をサポートする専属の「AI栄養コーチ」です。
-ユーザーはフィットネスやボディメイクに関心があります。
-
-あなたのタスク:
-ユーザーのプロフィールと直近の食事レポート（栄養摂取状況）に基づき、
-今後数日間の食事で意識すべき具体的なアドバイスを提案してください。
-
-制約事項:
-1. 言語は必ず「日本語」で出力してください。
-2. トーンは「親しみやすく、かつ専門的」に。ユーザーを励ます姿勢を崩さないでください。
-3. 医学的な診断や、特定の病気の治療に関する助言は行わないでください。
-"""
-
-
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class OpenAIMealRecommendationGeneratorConfig:
-    # Structured Outputs が使える最新モデルを指定
-    model: str = "gpt-4o-2024-08-06"
-    temperature: float = 0.4
+    """OpenAI食事提案生成の設定。"""
+    model: str = "gpt-4o-mini"  # コスト効率重視、Structured Outputs対応
+    temperature: float = 0.3    # 一貫性を重視して少し下げる
+    max_retries: int = 2        # リトライ回数
 
 
 class OpenAIMealRecommendationGenerator(MealRecommendationGeneratorPort):
     """
-    OpenAI Structured Outputs を使って MealRecommendation を生成する実装。
+    OpenAI Structured Outputsを使用した食事提案生成器。
+
+    - JSON parseエラーを回避
+    - 型安全性の確保
+    - 明確なプロンプト構造
     """
 
     def __init__(
@@ -286,95 +107,176 @@ class OpenAIMealRecommendationGenerator(MealRecommendationGeneratorPort):
         self._client = client or OpenAI()
         self._config = config or OpenAIMealRecommendationGeneratorConfig()
 
-    def generate(
-        self,
-        input: MealRecommendationLLMInput,
-    ) -> MealRecommendationLLMOutput:
-
-        user_prompt = self._build_user_prompt(input)
-
+    def generate(self, input: MealRecommendationLLMInput) -> MealRecommendationLLMOutput:
+        """食事提案を生成する。"""
         try:
-            # ------------------------------------------------------------------
-            # 3. リクエスト実行 (beta.parse を使用)
-            #    - これにより JSON パースエラーがほぼゼロになります
-            # ------------------------------------------------------------------
-            completion = self._client.beta.chat.completions.parse(
+            user_prompt = self._build_user_prompt(input)
+            system_prompt = self._build_system_prompt()
+
+            completion: ParsedChatCompletion[MealRecommendationResponseSchema] = self._client.beta.chat.completions.parse(
                 model=self._config.model,
                 messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=self._config.temperature,
                 response_format=MealRecommendationResponseSchema,
+                max_retries=self._config.max_retries,
             )
 
-            # パース結果の取得 (型は MealRecommendationResponseSchema)
-            parsed_response = completion.choices[0].message.parsed
-
+            parsed_response: MealRecommendationResponseSchema | None = completion.choices[
+                0].message.parsed
             if parsed_response is None:
-                # 拒否された場合などのハンドリング
                 raise MealRecommendationGenerationFailedError(
-                    "OpenAI refused to generate structured output."
+                    "OpenAI failed to generate structured response"
                 )
 
-            # DTOに詰め替えて返す
+            # Pydantic -> DTO 変換
+            recommended_meals_dto = [
+                RecommendedMealDTO(
+                    title=meal.title,
+                    description=meal.description,
+                    ingredients=meal.ingredients,
+                    nutrition_focus=meal.nutrition_focus,
+                )
+                for meal in parsed_response.recommended_meals
+            ]
+
             return MealRecommendationLLMOutput(
                 body=parsed_response.body,
                 tips=parsed_response.tips,
+                recommended_meals=recommended_meals_dto,
             )
 
         except OpenAIError as e:
-            logger.exception(
-                "OpenAI API error: user=%s base_date=%s",
-                input.user_id.value,
-                input.base_date,
+            logger.error(
+                "OpenAI API error during meal recommendation generation",
+                extra={
+                    "user_id": input.user_id.value,
+                    "base_date": input.base_date.isoformat(),
+                    "error": str(e),
+                },
             )
             raise MealRecommendationGenerationFailedError(
-                "Failed to generate meal recommendation via OpenAI"
+                "OpenAI APIエラーにより食事提案の生成に失敗しました"
             ) from e
+
+        except ValidationError as e:
+            logger.error(
+                "Response validation failed",
+                extra={"validation_errors": e.errors()},
+            )
+            raise MealRecommendationGenerationFailedError(
+                "生成された応答の形式が不正でした"
+            ) from e
+
         except Exception as e:
             logger.exception(
-                "Unexpected error during recommendation generation")
+                "Unexpected error during meal recommendation generation")
             raise MealRecommendationGenerationFailedError(
-                "An unexpected error occurred"
+                "予期しないエラーが発生しました"
             ) from e
 
+    def _build_system_prompt(self) -> str:
+        """システムプロンプトを構築する。"""
+        return """\
+あなたは経験豊富な管理栄養士として、ユーザーの栄養改善をサポートします。
+
+## あなたの役割
+- ユーザーの直近の食事記録と栄養状況を分析
+- 実践的で継続可能な食事改善提案を行う
+- 今日食べるべき具体的な献立を3品提案
+- ユーザーのモチベーションを維持する励ましの言葉を添える
+
+## 出力内容
+1. **総合的なアドバイス**: 栄養状況の分析と改善方針
+2. **実行可能なTips**: 具体的なアクション項目
+3. **おすすめ献立3品**: 今日食べるのに最適な具体的な料理
+
+## 献立提案の方針
+- 入手しやすい食材を使用（コンビニ・スーパーで購入可能）
+- 調理時間は30分以内を目安
+- 栄養バランスを考慮（朝食・昼食・夕食 or 主食・主菜・副菜）
+- ユーザーの改善点に直接対応
+- 季節感のある食材を積極的に活用
+- 日本人の食生活に馴染む料理を提案
+
+## 制約事項
+- 言語：日本語
+- トーン：親しみやすく、専門的かつ実践的
+- 医学的診断や治療に関する言及は避ける
+- アレルギー情報がない場合は一般的な食材を使用
+- 特殊な調理器具や高価な食材は避ける
+
+## 分析観点
+1. 栄養バランス（タンパク質、脂質、炭水化物）
+2. 食事のタイミングと頻度
+3. 改善の継続性と実現可能性
+4. 既存の良い習慣の強化
+"""
+
     def _build_user_prompt(self, input: MealRecommendationLLMInput) -> str:
-        """
-        プロフィール + 直近レポートを LLM に渡すテキストにまとめる。
-        """
-        p = input.profile
+        """ユーザー向けプロンプトを構築する。"""
+        profile = input.profile
         reports = input.recent_reports
 
-        lines: list[str] = []
+        sections = [
+            f"## 分析対象日: {input.base_date.isoformat()}",
+            "",
+            "## ユーザー情報",
+            f"- 性別: {self._format_sex(profile.sex or 'unknown')}",
+            f"- 年齢: {self._calculate_age(profile.birthdate, input.base_date) if profile.birthdate else 'unknown'}歳",
+            f"- 身長: {profile.height_cm or 'unknown'}cm",
+            f"- 体重: {profile.weight_kg or 'unknown'}kg",
+            f"- BMI: {self._calculate_bmi(profile.height_cm or 0, profile.weight_kg or 0):.1f}",
+            f"- 1日の食事回数: {profile.meals_per_day}回",
+            "",
+            f"## 栄養レポート履歴（直近{len(reports)}日分）",
+        ]
 
-        lines.append(f"【対象日付】: {input.base_date.isoformat()}")
-        lines.append("")
-        lines.append("【ユーザープロフィール】")
-        lines.append(f"- 性別: {p.sex}")
-        lines.append(f"- 生年月日: {p.birthdate}")
-        lines.append(f"- 身長: {p.height_cm} cm")
-        lines.append(f"- 体重: {p.weight_kg} kg")
-        lines.append(f"- 1日の食事回数: {p.meals_per_day}回")
-        lines.append("")
-
-        lines.append(f"【直近 {len(reports)} 日間の栄養レポート】")
         if not reports:
-            lines.append("（直近の記録はありません）")
+            sections.append("※ 利用可能な栄養レポートがありません")
+        else:
+            for i, report in enumerate(reports, 1):
+                sections.extend([
+                    f"### {i}日前 ({report.date})",
+                    f"**総合評価**: {report.summary}",
+                ])
 
-        for r in reports:
-            lines.append(f"▼ 日付: {r.date}")
-            lines.append(f"  [サマリー]: {r.summary}")
-            if r.good_points:
-                lines.append(f"  [良かった点]: {', '.join(r.good_points)}")
-            if r.improvement_points:
-                lines.append(f"  [改善点]: {', '.join(r.improvement_points)}")
-            if r.tomorrow_focus:
-                lines.append(f"  [次回の意識]: {', '.join(r.tomorrow_focus)}")
-            lines.append("")
+                if report.good_points:
+                    sections.append(
+                        f"**良い点**: {' / '.join(report.good_points)}")
+                if report.improvement_points:
+                    sections.append(
+                        f"**改善点**: {' / '.join(report.improvement_points)}")
+                if report.tomorrow_focus:
+                    sections.append(
+                        f"**注目ポイント**: {' / '.join(report.tomorrow_focus)}")
+                sections.append("")
 
-        lines.append(
-            "これらの情報に基づき、ユーザーへのアドバイスを作成してください。"
+        sections.extend([
+            "## 依頼",
+            "上記の情報を踏まえて、今後数日間の食事で意識すべきポイントを提案してください。",
+            "ユーザーが実際に行動に移せる、具体的で継続可能なアドバイスをお願いします。",
+        ])
+
+        return "\n".join(sections)
+
+    # ------------------------------------------------------------------
+    # ヘルパーメソッド
+    # ------------------------------------------------------------------
+    def _format_sex(self, sex: str) -> str:
+        """性別を日本語で表示。"""
+        mapping = {"male": "男性", "female": "女性", "other": "その他"}
+        return mapping.get(sex.lower(), sex)
+
+    def _calculate_age(self, birthdate: DateType, base_date: DateType) -> int:
+        """年齢を計算。"""
+        return base_date.year - birthdate.year - (
+            (base_date.month, base_date.day) < (birthdate.month, birthdate.day)
         )
 
-        return "\n".join(lines)
+    def _calculate_bmi(self, height_cm: float, weight_kg: float) -> float:
+        """BMIを計算。"""
+        height_m = height_cm / 100
+        return weight_kg / (height_m ** 2)

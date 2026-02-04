@@ -39,6 +39,7 @@ interface DailyReportCardProps {
   isGenerating?: boolean;
   generateError?: Error | null;
   onGenerate?: (date: string) => void; // 日付パラメータを追加
+  onFetch?: (date: string) => void; // 手動取得コールバック追加
   queryError?: Error | null; // TanStack Query error object to check status code
   isMealCompletionValid?: boolean; // Whether meal completion requirement is met
   mealCompletionStatus?: { completed: number; required: number }; // Meal completion details
@@ -54,12 +55,19 @@ export function DailyReportCard({
   isGenerating = false,
   generateError = null,
   onGenerate,
+  onFetch,
   queryError = null,
   isMealCompletionValid = true,
   mealCompletionStatus,
   missingMealsCount = 0,
   hasEnoughData = true,
 }: DailyReportCardProps) {
+  // 選択した日付が今日かどうかを判定
+  const isToday = date === new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD format
+  const displayDate = isToday ? '今日' : date ? new Date(date).toLocaleDateString('ja-JP', {
+    month: 'long',
+    day: 'numeric'
+  }) : '今日';
   return (
     <div className="relative">
       {/* Background glow effect */}
@@ -69,7 +77,7 @@ export function DailyReportCard({
       <Card className="relative z-10 transition-all duration-500 hover:shadow-lg">
         <CardHeader>
           <CardTitle className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-            日次レポート
+            {displayDate}の日次レポート
           </CardTitle>
         </CardHeader>
       <CardContent>
@@ -112,8 +120,31 @@ export function DailyReportCard({
           // レポートが未生成の場合
           <div className="space-y-3">
             <div className="text-sm text-muted-foreground">
-              日次レポートがまだ生成されていません。
+              {displayDate}の日次レポートがまだ生成されていません。
             </div>
+
+            {/* 手動取得ボタン */}
+            {onFetch && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onFetch && date && onFetch(date)}
+                disabled={isLoading}
+                className="transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950/20 dark:hover:border-blue-700"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent" />
+                    <span>確認中...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-3 w-3" />
+                    <span>レポートを確認</span>
+                  </div>
+                )}
+              </Button>
+            )}
 
             {/* State A: ロック状態（データ不足） */}
             {!hasEnoughData && (
@@ -155,7 +186,7 @@ export function DailyReportCard({
               <div className="space-y-4">
                 <div className="text-center">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-                    🎉 今日の食事記録が揃いました
+                    🎉 {displayDate}の食事記録が揃いました
                   </p>
                 </div>
 

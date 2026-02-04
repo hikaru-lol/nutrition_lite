@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Nutrition Backend - Auth, Profile, Target, Nutrition, Meal & Calendar API
+  title: Nutrition Backend - Auth, Profile, Target, Nutrition, Meal, Calendar & Meal Recommendations API
   version: 0.1.0
 
 servers:
@@ -23,6 +23,8 @@ tags:
     description: Billing and Stripe checkout/portal/webhook endpoints
   - name: Calendar
     description: Monthly calendar view with daily meal logs, nutrition achievement, and reports
+  - name: Meal Recommendations
+    description: AI-powered meal recommendations and personalized nutrition advice
 
 paths:
   # ==========
@@ -1033,6 +1035,147 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ==========
+  # Meal Recommendations
+  # ==========
+  /meal-recommendations/generate:
+    post:
+      tags: [Meal Recommendations]
+      summary: Generate meal recommendation
+      description: >
+        Generate AI-powered meal recommendations based on user's nutrition history.
+        Analyzes recent daily reports and provides personalized meal suggestions
+        with specific recipes and nutrition tips.
+
+        Multiple recommendations can be generated per day with cooldown periods
+        and daily limits to prevent abuse.
+      security:
+        - AccessTokenCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateMealRecommendationRequest'
+      responses:
+        '201':
+          description: Meal recommendation generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateMealRecommendationResponse'
+        '400':
+          description: Not enough daily reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Premium feature required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (cooldown period or daily limit reached)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate recommendation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meal-recommendations/{date}:
+    get:
+      tags: [Meal Recommendations]
+      summary: Get meal recommendation for specific date
+      description: >
+        Retrieve the most recent meal recommendation generated for a specific date.
+        If multiple recommendations exist for the same date, returns the latest one.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: path
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Date in YYYY-MM-DD format
+          example: "2026-02-03"
+      responses:
+        '200':
+          description: Meal recommendation retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMealRecommendationResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Recommendation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meal-recommendations:
+    get:
+      tags: [Meal Recommendations]
+      summary: List recent meal recommendations
+      description: >
+        Get a list of recent meal recommendations for the current user,
+        sorted by creation date in descending order (newest first).
+
+        Multiple recommendations per day are supported, allowing users to
+        view their complete recommendation history.
+      security:
+        - AccessTokenCookieAuth: []
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Number of recommendations to retrieve
+          example: 10
+      responses:
+        '200':
+          description: Meal recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMealRecommendationsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     AccessTokenCookieAuth:
@@ -1693,6 +1836,126 @@ components:
         - year
         - month
         - days
+
+    # ==========
+    # Meal Recommendations
+    # ==========
+    GenerateMealRecommendationRequest:
+      type: object
+      description: Request to generate a meal recommendation
+      properties:
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: Target date for recommendation (YYYY-MM-DD). If null, uses today
+          example: "2026-02-03"
+
+    RecommendedMealResponse:
+      type: object
+      description: A specific recommended meal/dish
+      properties:
+        title:
+          type: string
+          description: Name of the recommended meal
+          example: "高タンパク朝食セット"
+        description:
+          type: string
+          description: Detailed description of the meal and its nutritional features
+          example: "卵とアボカドでタンパク質と良質な脂質をバランス良く摂取"
+        ingredients:
+          type: array
+          items:
+            type: string
+          description: List of main ingredients/dishes
+          example: ["卵2個", "アボカド1/2個", "全粒粉パン1枚", "トマト"]
+        nutrition_focus:
+          type: string
+          description: Nutritional benefits of this meal
+          example: "タンパク質20g摂取、食物繊維豊富"
+      required:
+        - title
+        - description
+        - ingredients
+        - nutrition_focus
+
+    MealRecommendationResponse:
+      type: object
+      description: Complete meal recommendation with advice and specific meals
+      properties:
+        id:
+          type: string
+          description: Unique recommendation ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        user_id:
+          type: string
+          description: User ID
+          example: "user123"
+        generated_for_date:
+          type: string
+          format: date
+          description: Date this recommendation was generated for
+          example: "2026-02-03"
+        body:
+          type: string
+          description: Main recommendation text with nutritional analysis
+          example: "今日は野菜を多めに摂取することをお勧めします..."
+        tips:
+          type: array
+          items:
+            type: string
+          description: Actionable nutrition tips
+          example: ["ブロッコリーを1食分追加", "塩分を控えめに"]
+        recommended_meals:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendedMealResponse'
+          description: Three recommended specific meals
+          minItems: 3
+          maxItems: 3
+        created_at:
+          type: string
+          format: date-time
+          description: When the recommendation was created
+          example: "2026-02-03T10:30:00Z"
+      required:
+        - id
+        - user_id
+        - generated_for_date
+        - body
+        - tips
+        - recommended_meals
+        - created_at
+
+    GenerateMealRecommendationResponse:
+      type: object
+      description: Response after generating a meal recommendation
+      properties:
+        recommendation:
+          $ref: '#/components/schemas/MealRecommendationResponse'
+      required:
+        - recommendation
+
+    GetMealRecommendationResponse:
+      type: object
+      description: Response for retrieving a specific meal recommendation
+      properties:
+        recommendation:
+          $ref: '#/components/schemas/MealRecommendationResponse'
+      required:
+        - recommendation
+
+    ListMealRecommendationsResponse:
+      type: object
+      description: Response for listing meal recommendations
+      properties:
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealRecommendationResponse'
+          description: List of meal recommendations sorted by date (newest first)
+      required:
+        - recommendations
 
     # ==========
     # Error

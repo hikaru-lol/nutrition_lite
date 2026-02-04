@@ -13,6 +13,7 @@ from app.domain.auth.value_objects import UserId
 from app.domain.nutrition.meal_recommendation import (
     MealRecommendation,
     MealRecommendationId,
+    RecommendedMeal,
 )
 from app.infra.db.models.meal_recommendation import MealRecommendationModel
 
@@ -30,22 +31,48 @@ class SqlAlchemyMealRecommendationRepository(MealRecommendationRepositoryPort):
     # ------------------------------------------------------------------
 
     def _to_entity(self, model: MealRecommendationModel) -> MealRecommendation:
+        # JSON -> RecommendedMeal エンティティ変換
+        recommended_meals = []
+        if model.recommended_meals:
+            for meal_data in model.recommended_meals:
+                recommended_meals.append(
+                    RecommendedMeal(
+                        title=meal_data.get("title", ""),
+                        description=meal_data.get("description", ""),
+                        ingredients=meal_data.get("ingredients", []),
+                        nutrition_focus=meal_data.get("nutrition_focus", ""),
+                    )
+                )
+
         return MealRecommendation(
             id=MealRecommendationId(str(model.id)),
             user_id=UserId(str(model.user_id)),
             generated_for_date=model.generated_for_date,
             body=model.body,
             tips=list(model.tips or []),
+            recommended_meals=recommended_meals,
             created_at=model.created_at,
         )
 
     def _from_entity(self, rec: MealRecommendation) -> MealRecommendationModel:
+        # RecommendedMeal エンティティ -> JSON 変換
+        recommended_meals_json = [
+            {
+                "title": meal.title,
+                "description": meal.description,
+                "ingredients": meal.ingredients,
+                "nutrition_focus": meal.nutrition_focus,
+            }
+            for meal in rec.recommended_meals
+        ]
+
         return MealRecommendationModel(
             id=UUID(rec.id.value),
             user_id=UUID(rec.user_id.value),
             generated_for_date=rec.generated_for_date,
             body=rec.body,
             tips=rec.tips,
+            recommended_meals=recommended_meals_json,
             created_at=rec.created_at,
         )
 
@@ -70,13 +97,13 @@ class SqlAlchemyMealRecommendationRepository(MealRecommendationRepositoryPort):
                 MealRecommendationModel.generated_for_date == generated_for_date,
             )
             .order_by(MealRecommendationModel.created_at.desc())
-            .one_or_none()
+            .first()
         )
         if model is None:
             return None
         return self._to_entity(model)
 
-    def list_recent(
+    def list_recent_by_user(
         self,
         user_id: UserId,
         limit: int,
@@ -90,13 +117,53 @@ class SqlAlchemyMealRecommendationRepository(MealRecommendationRepositoryPort):
                 MealRecommendationModel.user_id == UUID(user_id.value),
             )
             .order_by(
-                MealRecommendationModel.generated_for_date.desc(),
                 MealRecommendationModel.created_at.desc(),
             )
             .limit(limit)
             .all()
         )
         return [self._to_entity(m) for m in models]
+
+    def count_by_user_and_date(
+        self,
+        user_id: UserId,
+        generated_for_date: DateType,
+    ) -> int:
+        """
+        指定ユーザーの指定日における MealRecommendation の件数を返す。
+        日次制限チェックに使用。
+        """
+        count = (
+            self._session.query(MealRecommendationModel)
+            .filter(
+                MealRecommendationModel.user_id == UUID(user_id.value),
+                MealRecommendationModel.generated_for_date == generated_for_date,
+            )
+            .count()
+        )
+        return count
+
+    def get_latest_by_user(
+        self,
+        user_id: UserId,
+    ) -> MealRecommendation | None:
+        """
+        指定ユーザーの最新の MealRecommendation を返す。
+        クールダウン期間チェックに使用。
+        """
+        model = (
+            self._session.query(MealRecommendationModel)
+            .filter(
+                MealRecommendationModel.user_id == UUID(user_id.value),
+            )
+            .order_by(
+                MealRecommendationModel.created_at.desc(),
+            )
+            .first()
+        )
+        if model is None:
+            return None
+        return self._to_entity(model)
 
     def save(self, recommendation: MealRecommendation) -> None:
         """

@@ -17,6 +17,7 @@ dependencies = [
   "bcrypt==4.3.0",
   "openai>=2.8.1",
   "stripe>=14.0.1",
+  "python-dotenv>=1.2.1",
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,5 @@
-// frontend/app/(app)/billing/plan/page.tsx
-import { BillingPlanPage } from '@/components/billing/BillingPlanPage';
+import { BillingPlanPage } from '@/modules/billing';
 
-export default function Page() {
+export default function PlanSelectPage() {
   return <BillingPlanPage />;
 }

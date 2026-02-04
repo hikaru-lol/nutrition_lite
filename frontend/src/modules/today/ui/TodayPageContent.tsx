@@ -15,6 +15,7 @@ import { EditMealModal, type EditMealFormValues, type MealItemForEdit } from '@/
 import { NutritionAnalysisCard } from '@/shared/ui/cards/NutritionAnalysisCard';
 import { DailyReportCard } from '@/shared/ui/cards/DailyReportCard';
 import { EnhancedDailyReportCard } from '@/shared/ui/cards/EnhancedDailyReportCard';
+import { MealRecommendationCard, MealRecommendationDetailModal, useMealRecommendationModel } from '@/modules/meal-recommendation';
 
 import {
   useTodayPageModel,
@@ -30,6 +31,7 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
   const router = useRouter();
   const m = useTodayPageModel({ date });
   const updateMutation = useUpdateMealItem(date);
+  const mealRecommendationModel = useMealRecommendationModel({ date });
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -38,6 +40,8 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
   const [editingMealItem, setEditingMealItem] = useState<MealItemForEdit | null>(null);
   const [showNutritionDetailsModal, setShowNutritionDetailsModal] = useState(false);
   const [nutritionDetailsData, setNutritionDetailsData] = useState<any>(null);
+  const [showMealRecommendationModal, setShowMealRecommendationModal] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<any>(null);
 
   const handleAddClick = (mealType: 'main' | 'snack', mealIndex?: number) => {
     setSelectedMealType(mealType);
@@ -95,6 +99,15 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
     setShowNutritionDetailsModal(true);
   };
 
+  const handleShowMealRecommendationDetails = () => {
+    // 現在表示されている食事提案データを取得
+    const currentRecommendation = mealRecommendationModel.recommendation;
+    if (currentRecommendation) {
+      setSelectedRecommendation(currentRecommendation);
+      setShowMealRecommendationModal(true);
+    }
+  };
+
   if (m.isLoading) return <LoadingState label="データを読み込み中..." />;
   if (m.isError)
     return (
@@ -117,6 +130,14 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
         <DailySummaryCard
           data={m.dailySummaryData}
           isLoading={m.dailySummaryQuery.isLoading}
+        />
+      </div>
+
+      {/* 食事提案 */}
+      <div data-tour="meal-recommendation">
+        <MealRecommendationCard
+          date={date}
+          onViewDetails={handleShowMealRecommendationDetails}
         />
       </div>
 
@@ -323,6 +344,7 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
             missingMealsCount={m.missingMealsCount}
             hasEnoughData={m.hasEnoughData}
             onGenerate={(targetDate) => m.generateReportMutation.mutate({ date: targetDate })}
+            onFetch={(targetDate) => m.dailyReportQuery.refetch()}
           />
         )}
       </div>
@@ -381,6 +403,28 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
           </div>
         </div>
       )}
+
+      {/* 食事提案詳細モーダル */}
+      <MealRecommendationDetailModal
+        recommendation={selectedRecommendation}
+        isOpen={showMealRecommendationModal}
+        onClose={() => {
+          setShowMealRecommendationModal(false);
+          setSelectedRecommendation(null);
+        }}
+        onShare={() => {
+          // TODO: 共有機能実装
+          console.log('Share recommendation');
+        }}
+        onFavorite={() => {
+          // TODO: お気に入り機能実装
+          console.log('Favorite recommendation');
+        }}
+        onExport={() => {
+          // TODO: エクスポート機能実装
+          console.log('Export recommendation');
+        }}
+      />
     </div>
     </div>
   );

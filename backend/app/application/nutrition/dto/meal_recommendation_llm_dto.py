@@ -8,6 +8,15 @@ from app.domain.nutrition.daily_report import DailyNutritionReport
 from app.application.profile.ports.profile_query_port import ProfileForRecommendation
 
 
+@dataclass(slots=True, frozen=True)
+class RecommendedMealDTO:
+    """推奨献立のDTO"""
+    title: str
+    description: str
+    ingredients: list[str]
+    nutrition_focus: str
+
+
 @dataclass(slots=True)
 class MealRecommendationLLMInput:
     user_id: UserId
@@ -20,3 +29,4 @@ class MealRecommendationLLMInput:
 class MealRecommendationLLMOutput:
     body: str
     tips: list[str]
+    recommended_meals: list[RecommendedMealDTO]

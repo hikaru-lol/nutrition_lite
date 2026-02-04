@@ -21,6 +21,8 @@ import {
   useDeleteMealItem,
 } from '@/modules/meal/model/mealHooks';
 import {
+  getNutritionData,
+  computeNutritionData,
   recomputeMealAndDaily,
   getDailyReport,
   generateDailyReport,
@@ -95,10 +97,10 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
         meal_type,
         meal_index ?? null
       ] as const,
-      queryFn: () => recomputeMealAndDaily({
+      queryFn: () => computeNutritionData({
         date,
         meal_type,
-        meal_index,
+        meal_index: meal_index ?? null,
       }),
       enabled: false, // 手動で呼び出し
       staleTime: 1000 * 60 * 30, // 30分間キャッシュを保持
@@ -179,7 +181,7 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
     ] as const,
     queryFn: () => {
       if (!firstMealItem) throw new Error('No meals found');
-      return recomputeMealAndDaily({
+      return getNutritionData({
         date,
         meal_type: firstMealItem.meal_type as 'main' | 'snack',
         meal_index: firstMealItem.meal_index,
@@ -213,7 +215,7 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
       if (!selectedMealForNutrition) {
         throw new Error('No meal selected for nutrition analysis');
       }
-      return recomputeMealAndDaily({
+      return computeNutritionData({
         date,
         meal_type: selectedMealForNutrition.meal_type,
         meal_index: selectedMealForNutrition.meal_index,
@@ -391,10 +393,10 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
     // データを取得してキャッシュに保存
     const data = await queryClient.fetchQuery({
       queryKey,
-      queryFn: () => recomputeMealAndDaily({
+      queryFn: () => computeNutritionData({
         date,
         meal_type,
-        meal_index,
+        meal_index: meal_index ?? null,
       }),
       staleTime: 1000 * 60 * 30,
     });
@@ -449,10 +451,10 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
   // 栄養データ存在確認（軽量版）
   const checkNutritionDataExists = async (meal_type: 'main' | 'snack', meal_index?: number) => {
     try {
-      const data = await recomputeMealAndDaily({
+      const data = await getNutritionData({
         date,
         meal_type,
-        meal_index,
+        meal_index: meal_index ?? null,
       });
       // データが取得できた場合はキャッシュに保存
       const queryKey = [
@@ -522,25 +524,6 @@ export function useTodayPageModel(props: UseTodayPageModelProps = {}) {
   const isLoading = activeTargetQuery.isLoading || mealItemsQuery.isLoading;
   const isError = activeTargetQuery.isError || mealItemsQuery.isError;
 
-  // ========================================
-  // Daily Report
-  // ========================================
-  const dailyReportQuery = useQuery({
-    queryKey: ['nutrition', 'daily-report', date],
-    queryFn: () => getDailyReport(date),
-    retry: false,
-  });
-
-  const generateReportMutation = useMutation({
-    mutationFn: ({ date }: { date: string }) => generateDailyReport(date),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['nutrition', 'daily-report', date]
-      });
-    },
-  });
-
-  const dailyReport = dailyReportQuery.data;
 
   return {
     date,

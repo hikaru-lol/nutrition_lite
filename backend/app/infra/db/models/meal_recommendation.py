@@ -35,6 +35,14 @@ class MealRecommendationModel(Base):
         server_default="{}",  # DB側（空配列）
     )
 
+    # 推奨献立のJSONデータ（新規追加）
+    recommended_meals = sa.Column(
+        pg.JSONB,
+        nullable=False,
+        default=list,       # Python側
+        server_default="[]",  # DB側（空配列）
+    )
+
     created_at = sa.Column(
         sa.DateTime(timezone=True),
         nullable=False,
