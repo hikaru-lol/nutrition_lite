@@ -4,91 +4,35 @@
 
 // Main Page Component
 export { TodayPage } from './ui/TodayPage';
+export { TodayPageContent } from './ui/TodayPageContent';
 
-// Legacy Model (Phase 6で削除予定)
+// Current Implementation Model (5-layer architecture)
 export { useTodayPageModel } from './model/useTodayPageModel';
+export { useTodayNutritionProgress } from './hooks/useTodayNutritionProgress';
 
-// ========================================
-// New Architecture Exports (Phase 5+)
-// ========================================
+// Layer 4: Feature Logic
+export { useDailyReportManagement } from './hooks/useDailyReportManagement';
+export type { DailyReportManagementModel } from './hooks/useDailyReportManagement';
 
-// Context & Hooks
-export { TodayPageProvider, useTodayPageContext } from './context/TodayPageContext';
-export {
-  useTodayMeals,
-  useTodayTargets,
-  useTodayNutrition,
-  useTodayReports,
-  useTodayProfile,
-  useTodayModals,
-} from './context/TodayPageContext';
+// Layer 2: UI Orchestration
+export { useNutritionAnalysisState } from './ui/hooks/useNutritionAnalysisState';
+export type { NutritionAnalysisStateModel } from './ui/hooks/useNutritionAnalysisState';
 
-// Domain Hooks (直接利用も可能)
-export { useTodayMeals as useTodayMealsDirect } from './model/useTodayMeals';
-export { useTodayTargets as useTodayTargetsDirect } from './model/useTodayTargets';
-export { useTodayNutrition as useTodayNutritionDirect } from './model/useTodayNutrition';
-export { useTodayReports as useTodayReportsDirect } from './model/useTodayReports';
-export { useTodayProfile as useTodayProfileDirect } from './model/useTodayProfile';
-export { useTodayModals as useTodayModalsDirect } from './model/useTodayModals';
-
-// Integrated Data Hook
-export { useTodayPageData } from './model/useTodayPageData';
-
-// Layout Components
-export { TodayPageLayout } from './ui/TodayPageLayout';
-
-// Section Components
-export {
-  DailySummarySection,
-  CaloriesSummarySection,
-  PFCSummarySection,
-} from './ui/sections/DailySummarySection';
-
-export {
-  MealListSection,
-  MealCountSection,
-  LatestMealSection,
-} from './ui/sections/MealListSection';
-
-export {
-  TargetProgressSection,
-  PFCProgressSection,
-  TargetAchievementSection,
-} from './ui/sections/TargetProgressSection';
-
-export {
-  DailyReportSection,
-  ReportStatusSection,
-  ReportGenerateSection,
-} from './ui/sections/DailyReportSection';
-
-export {
-  TodayModalsContainer,
-  SpecificModalContainer,
-} from './ui/sections/TodayModalsContainer';
+// Services (Layer 5)
+export { useNutritionService } from '../nutrition/services/nutritionService';
+export { useNutritionProgressService } from '../nutrition-progress/services/nutritionProgressService';
+export { useTargetService } from '../target/services/targetService';
+export { useMealService } from '../meal/services/mealService';
 
 // Types
 export type {
-  TodayPageContextValue,
-  TodayMealsModel,
-  TodayTargetsModel,
-  TodayNutritionModel,
-  TodayReportsModel,
-  TodayProfileModel,
-  TodayModalsModel,
-  MigrationFlags,
-} from './types/todayTypes';
+  TodayNutritionProgressModel,
+  NutrientProgress,
+} from './hooks/useTodayNutritionProgress';
 
-// Query Keys
-export { todayQueryKeys } from './lib/queryKeys';
-
-// ========================================
-// Development & Testing (開発環境のみ)
-// ========================================
-
-// テスト用コンポーネント
-export { TodayPageTest } from './ui/TodayPageTest';
-export { TodayPageMigrationTest } from './ui/TodayPageMigrationTest';
+export type {
+  NutritionDetailsData,
+} from '../nutrition/types/nutritionTypes';
 
 // Utility Functions
 export { formatLocalDateYYYYMMDD } from './types/todayTypes';

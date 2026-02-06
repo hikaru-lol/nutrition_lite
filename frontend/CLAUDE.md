@@ -2,7 +2,7 @@
 
 ## このディレクトリについて
 
-Next.js 16 (App Router) + React 19 ベースのフロントエンド。モジュラーアーキテクチャを採用。
+Next.js 16 (App Router) + React 19 ベースのフロントエンド。5層レイヤードアーキテクチャを採用。
 
 ## 技術スタック
 
@@ -18,6 +18,7 @@ Next.js 16 (App Router) + React 19 ベースのフロントエンド。モジュ
 ## 重要: 実装前に必読
 
 - `docs/ai/DEPENDENCY_ANALYSIS`
+- `docs/ai/frontend/5-layer-architecture-guide.v2.md` - 5層レイヤードアーキテクチャガイド
 
 ## ディレクトリ構造
 
@@ -45,22 +46,55 @@ src/
 └── lib/                   # グローバルユーティリティ（cn関数等）
 ```
 
-## モジュール構造
+## アーキテクチャ: 5層レイヤードアーキテクチャ
 
-各モジュールは以下の構造に従う:
+このプロジェクトは5層レイヤードアーキテクチャを採用しています:
+
+```
+┌─────────────────────────────────────────┐
+│ Layer 1: UI Presentation                │ ← 純粋な表現
+├─────────────────────────────────────────┤
+│ Layer 2: UI Orchestration               │ ← UI協調
+├─────────────────────────────────────────┤
+│ Layer 3: Page Aggregation               │ ← ページ集約
+├─────────────────────────────────────────┤
+│ Layer 4: Feature Logic                  │ ← 機能ロジック
+├─────────────────────────────────────────┤
+│ Layer 5: Domain Services                │ ← ドメインサービス
+└─────────────────────────────────────────┘
+```
+
+### モジュール構造
+
+各モジュールは5層アーキテクチャに従った構造:
 
 ```
 modules/{moduleName}/
-├── api/                   # APIクライアント関数
-│   └── {module}Client.ts  # fetch/post関数
-├── model/                 # 状態管理・ビジネスロジック
-│   └── use{Module}PageModel.ts  # TanStack Query hooks
-├── ui/                    # Reactコンポーネント
-│   └── {Module}Page.tsx   # ページコンポーネント
-├── contract/              # 型定義・Zodスキーマ
+├── services/                  # Layer 5: Domain Services
+│   └── {module}Service.ts
+├── hooks/                     # Layer 4: Feature Logic
+│   └── use{Module}Feature.ts
+├── model/                     # Layer 3: Page Aggregation
+│   └── use{Module}PageModel.ts
+├── ui/                        # Layer 2 & 1: UI
+│   ├── {Module}Page.tsx       # Layer 2: Orchestration
+│   ├── {Module}PageContent.tsx # Layer 2: Orchestration
+│   └── sections/              # Layer 1: Presentation
+│       └── {Feature}Section.tsx
+├── contract/                  # 型定義・スキーマ
 │   └── {module}Contract.ts
-└── index.ts               # Public exports
+├── api/                       # APIクライアント
+│   └── {module}Client.ts
+└── index.ts                   # Public exports
 ```
+
+### 層別の責務
+
+- **Layer 5**: 外部API呼び出し、ドメイン固有のビジネスロジック、データ変換
+- **Layer 4**: React Queryによる状態管理、非同期データフェッチング協調、UI向けデータ統合
+- **Layer 3**: ページレベルでの複数機能統合、ページ状態の一元管理、機能間の協調
+- **Layer 2**: UIコンポーネント間の協調、イベントハンドリング、モーダル・フォーム状態管理
+- **Layer 1**: 純粋な表現コンポーネント、propsによる制御、再利用可能なUI部品
 
 ## コマンド
 
@@ -115,34 +149,70 @@ import { bffServerFetch } from '@/shared/api/bffServer';
 const profile = await bffServerFetch<Profile>('/profile/me');
 ```
 
-## 状態管理パターン
+## 状態管理パターン（5層アーキテクチャ）
 
-### TanStack Query
-
+### Layer 5: Domain Services
 ```typescript
-// Query Keys (shared/lib/query/keys.ts)
-const qk = {
-  target: {
-    current: () => ['target', 'current'],
-    list: () => ['target', 'list'],
-  },
-};
+// services/targetService.ts
+export class TargetService {
+  async getActiveTarget(): Promise<Target> {
+    // 純粋なAPI呼び出し + データ変換
+    const response = await fetchActiveTarget();
+    return this.normalizeTargetData(response);
+  }
+}
 
-// Custom Hook (modules/target/model/useTargetPageModel.ts)
-export function useTargetPageModel() {
-  const query = useQuery({
-    queryKey: qk.target.current(),
-    queryFn: () => fetchActiveTarget(),
+export function useTargetService(): TargetService {
+  return useMemo(() => new TargetService(), []);
+}
+```
+
+### Layer 4: Feature Logic
+```typescript
+// hooks/useTargetManagement.ts
+export function useTargetManagement(): TargetManagementModel {
+  const targetService = useTargetService();
+
+  const activeTargetQuery = useQuery({
+    queryKey: ['targets', 'active'],
+    queryFn: () => targetService.getActiveTarget(),
   });
 
-  const mutation = useMutation({
-    mutationFn: createTarget,
+  const createMutation = useMutation({
+    mutationFn: targetService.createTarget,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk.target.list() });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
     },
   });
 
-  return { query, mutation };
+  return {
+    activeTarget: activeTargetQuery.data,
+    isLoading: activeTargetQuery.isLoading,
+    createTarget: createMutation.mutateAsync,
+  };
+}
+```
+
+### Layer 3: Page Aggregation
+```typescript
+// model/useTargetPageModel.ts
+export function useTargetPageModel() {
+  const targets = useTargetManagement();
+  const nutrition = useNutritionProgress();
+
+  // ページレベルの協調ロジック
+  const handleTargetUpdate = useCallback(async (data) => {
+    await targets.createTarget(data);
+    // 目標更新後に栄養進捗も再計算
+    nutrition.refetch();
+  }, [targets, nutrition]);
+
+  return {
+    targets,
+    nutrition,
+    handleTargetUpdate,
+    isLoading: targets.isLoading || nutrition.isLoading,
+  };
 }
 ```
 
@@ -284,14 +354,32 @@ import { Button } from '@/components/ui/button'; // src/components/ui/button
 import { cn } from '@/lib/utils'; // src/lib/utils
 ```
 
-## 新規モジュール実装の流れ
+## 新規モジュール実装の流れ（5層アーキテクチャ）
+
+### 新機能開発時の順序
 
 1. **contract/**: Zod スキーマと型定義
 2. **api/**: API クライアント関数
-3. **model/**: TanStack Query hooks (useXxxPageModel)
-4. **ui/**: React コンポーネント
-5. **index.ts**: Public exports
-6. **app/**: ページ統合 (route.tsx, page.tsx)
+3. **Layer 5**: services/ - ドメインサービス作成
+4. **Layer 4**: hooks/ - フィーチャーロジックフック作成
+5. **Layer 3**: model/ - ページ集約モデル統合
+6. **Layer 1**: ui/sections/ - プレゼンテーションコンポーネント
+7. **Layer 2**: ui/ - UIオーケストレーション
+8. **index.ts**: Public exports
+9. **app/**: ページ統合
+
+### 既存機能リファクタリング時の順序
+
+1. **現状分析**: 既存の責務分散状況を分析
+2. **移行計画**: 段階的移行計画を策定
+3. **Layer 1から開始**: 表現層から始めて段階的に下位層をリファクタ
+4. **並行稼働検証**: 新旧実装を並行稼働させて検証
+
+### 段階的移行戦略
+
+- **部分移行**: 特定の機能・コンポーネントから段階的に適用
+- **並行稼働**: 既存システムを壊さずに新アーキテクチャを検証
+- **漸進的改善**: 一度に全体を書き換えるのではなく、継続的に改善
 
 ## BFF API Route 実装例
 

@@ -25,7 +25,7 @@ function is404Error(error: Error | null): boolean {
                 anyError?.response?.status === 404 ||
                 anyError?.data?.status === 404 ||
                 anyError?.cause?.status === 404 ||
-                (error.message && error.message.includes('404'));
+                Boolean(error.message && error.message.includes('404'));
 
   console.log('is404Error result:', is404);
   return is404;

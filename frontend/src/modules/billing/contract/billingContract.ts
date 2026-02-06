@@ -107,7 +107,7 @@ export const BillingErrorSchema = z.object({
     'payment_required',
   ]),
   message: z.string(),
-  details: z.record(z.unknown()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 export type BillingError = z.infer<typeof BillingErrorSchema>;
 
@@ -147,7 +147,7 @@ export function checkFeatureLimit(
   const limit = limits[plan];
 
   if (typeof limit === 'boolean') {
-    return { allowed: limit, limit };
+    return { allowed: limit };
   }
 
   if (limit === null) {

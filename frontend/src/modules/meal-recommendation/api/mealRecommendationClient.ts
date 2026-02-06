@@ -4,6 +4,8 @@ import type {
   GenerateMealRecommendationResponse,
   GetMealRecommendationResponse,
   ListMealRecommendationsResponse,
+} from '../contract/mealRecommendationContract';
+import {
   MealRecommendationCooldownError,
   MealRecommendationDailyLimitError,
 } from '../contract/mealRecommendationContract';

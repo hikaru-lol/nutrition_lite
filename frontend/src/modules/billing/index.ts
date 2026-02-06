@@ -5,22 +5,26 @@
 // Contract (型定義・スキーマ)
 export type {
   UserPlan,
-  BillingPlan,
   CurrentPlanInfo,
-  CreateCheckoutRequest,
-  CreateCheckoutResponse,
-  GetBillingPortalResponse,
+  CreateCheckoutSessionRequest,
+  CreateCheckoutSessionResponse,
+  GetBillingPortalUrlResponse,
+  BillingSubscriptionStatus,
+  BillingError,
 } from './contract/billingContract';
 
 export {
   UserPlanSchema,
-  BillingPlanSchema,
   CurrentPlanInfoSchema,
-  CreateCheckoutRequestSchema,
-  CreateCheckoutResponseSchema,
-  GetBillingPortalResponseSchema,
+  CreateCheckoutSessionRequestSchema,
+  CreateCheckoutSessionResponseSchema,
+  GetBillingPortalUrlResponseSchema,
+  BillingSubscriptionStatusSchema,
+  BillingErrorSchema,
   PLAN_DEFINITIONS,
   BETA_NOTICE,
+  FEATURE_LIMITS,
+  checkFeatureLimit,
 } from './contract/billingContract';
 
 // API Client

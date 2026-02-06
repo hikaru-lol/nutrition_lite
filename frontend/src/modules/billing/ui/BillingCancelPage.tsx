@@ -47,7 +47,7 @@ export function BillingCancelPage() {
               <Button
                 size="lg"
                 className="w-full gap-2"
-                onClick={() => startCheckout()}
+                onClick={() => startCheckout({})}
                 disabled={isCheckoutPending}
               >
                 <RefreshCw className="h-4 w-4" />

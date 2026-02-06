@@ -6,7 +6,11 @@
 export * from './contract/tutorialContract';
 
 // API Client
-export * from './api/tutorialClient';
+export {
+  fetchTutorialStatus,
+  completeTutorial,
+  getCompletedTutorialCount,
+} from './api/tutorialClient';
 
 // State Management
 export * from './model/useTutorialModel';

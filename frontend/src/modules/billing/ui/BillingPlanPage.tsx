@@ -109,7 +109,7 @@ export function BillingPlanPage() {
           planData={PLAN_DEFINITIONS.paid}
           currentPlan={planInfo?.user_plan}
           isPremiumActive={isPremium}
-          onSelectPlan={() => startCheckout()}
+          onSelectPlan={() => startCheckout({})}
           isLoading={isCheckoutPending}
         />
       </div>
