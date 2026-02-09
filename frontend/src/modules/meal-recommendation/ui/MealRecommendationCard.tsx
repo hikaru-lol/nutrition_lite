@@ -30,7 +30,9 @@ export function MealRecommendationCard({
   onViewDetails
 }: MealRecommendationCardProps) {
   const model = useMealRecommendationModel({ date });
-  const { cardState, generate, refresh, planLimit, currentCount } = model;
+  const { cardState } = model.state;
+  const { generate, refresh } = model.actions;
+  const { planLimit, currentCount } = model.limits;
 
   // ローディング状態
   if (cardState.status === 'loading') {

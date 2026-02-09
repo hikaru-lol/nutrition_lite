@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 
 import { TodayPageContent } from './TodayPageContent';
 import { TutorialTrigger } from '@/modules/tutorial';
-import { formatLocalDateYYYYMMDD } from '../types/todayTypes';
+import { formatLocalDateYYYYMMDD } from '../contract/todayContract';
 
 export function TodayPage() {
   const searchParams = useSearchParams();

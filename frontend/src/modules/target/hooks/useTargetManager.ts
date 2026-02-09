@@ -1,5 +1,5 @@
 /**
- * useTargetManagement - Layer 4: Feature Logic
+ * useTargetManager - Layer 4: Feature Logic
  *
  * ターゲット管理機能
  *
@@ -20,7 +20,7 @@ import type { Target } from '../contract/targetContract';
 // Types
 // ========================================
 
-export interface TargetManagementModel {
+export interface TargetManagerModel {
   targets: Target[];
   isLoading: boolean;
   isError: boolean;
@@ -36,7 +36,7 @@ export interface TargetManagementModel {
 // Hook Implementation
 // ========================================
 
-export function useTargetManagement(): TargetManagementModel {
+export function useTargetManager(): TargetManagerModel {
   const queryClient = useQueryClient();
   const targetService = useTargetService();
 

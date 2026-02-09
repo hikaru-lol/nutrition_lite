@@ -241,14 +241,11 @@ export class MealService implements IMealService {
 // Service Factory & Hook
 // ========================================
 
-import { useMemo } from 'react';
-
 /**
  * React Hook形式でMealServiceを取得
- * Layer 4以上で使用するDependency Injection pattern
  */
 export function useMealService(): MealService {
-  return useMemo(() => new MealService(), []);
+  return new MealService();
 }
 
 /**

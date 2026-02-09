@@ -1,5 +1,5 @@
 /**
- * useDailyReportManagement - Layer 4: Feature Logic
+ * useDailyReportManager - Layer 4: Feature Logic
  *
  * 日次レポート管理機能
  *
@@ -9,8 +9,6 @@
  * - UIに最適化されたインターフェース提供
  */
 
-'use client';
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDailyReport, generateDailyReport } from '@/modules/nutrition/api/nutritionClient';
 import type { DailyNutritionReport } from '@/modules/nutrition/contract/nutritionContract';
@@ -19,7 +17,7 @@ import type { DailyNutritionReport } from '@/modules/nutrition/contract/nutritio
 // Types
 // ========================================
 
-export interface DailyReportManagementModel {
+export interface DailyReportManagerModel {
   report: DailyNutritionReport | null;
   isLoading: boolean;
   isError: boolean;
@@ -34,15 +32,15 @@ export interface DailyReportManagementModel {
 // Hook Implementation
 // ========================================
 
-interface UseDailyReportManagementProps {
+interface UseDailyReportManagerProps {
   date: string;
   enabled?: boolean;
 }
 
-export function useDailyReportManagement({
+export function useDailyReportManager({
   date,
   enabled = true,
-}: UseDailyReportManagementProps): DailyReportManagementModel {
+}: UseDailyReportManagerProps): DailyReportManagerModel {
   const queryClient = useQueryClient();
 
   // ========================================

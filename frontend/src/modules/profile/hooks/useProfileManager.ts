@@ -1,5 +1,5 @@
 /**
- * useProfileManagement - Layer 4: Feature Logic
+ * useProfileManager - Layer 4: Feature Logic
  *
  * プロフィール管理機能
  *
@@ -18,7 +18,7 @@ import { fetchProfile } from '../api/profileClient';
 // Types
 // ========================================
 
-export interface ProfileManagementModel {
+export interface ProfileManagerModel {
   profile: Awaited<ReturnType<typeof fetchProfile>> | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -30,7 +30,7 @@ export interface ProfileManagementModel {
 // Hook Implementation
 // ========================================
 
-export function useProfileManagement(): ProfileManagementModel {
+export function useProfileManager(): ProfileManagerModel {
   const profileQuery = useQuery({
     queryKey: ['profile', 'me'] as const,
     queryFn: () => fetchProfile(),

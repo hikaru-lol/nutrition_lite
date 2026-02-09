@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from 'react';
 import type { MealItem } from '@/modules/meal/contract/mealContract';
-import type { MealItemForEdit } from '../components/EditMealModal';
+import type { MealItemForEdit } from '../components/modals/EditMealModal';
 
 // ========================================
 // Types

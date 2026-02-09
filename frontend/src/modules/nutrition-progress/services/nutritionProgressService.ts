@@ -9,8 +9,8 @@
 
 import type { Target, NutrientCode } from '@/modules/target/contract/targetContract';
 import type { DailyNutritionSummary } from '@/modules/nutrition/contract/nutritionContract';
-import type { NutrientProgress } from '@/modules/today/types/todayTypes';
-import { nutrientLabels } from '@/modules/today/types/todayTypes';
+import type { NutrientProgress } from '@/modules/today/contract/todayContract';
+import { nutrientLabels } from '@/modules/today/contract/todayContract';
 
 // ========================================
 // Domain Types
@@ -71,14 +71,14 @@ export interface INutritionProgressService {
  */
 function calculateNutrientProgress(
   target: Target,
-  summary: DailyNutritionSummary
+  summary: DailyNutritionSummary | null
 ): NutrientProgress[] {
-  if (!target?.nutrients || !summary?.nutrients) {
+  if (!target?.nutrients) {
     return [];
   }
 
   return target.nutrients.map((targetNutrient: any) => {
-    const actualNutrient = summary.nutrients.find(
+    const actualNutrient = summary?.nutrients?.find(
       (n: any) => n.code === targetNutrient.code
     );
     const actualAmount = actualNutrient?.value ?? 0;
@@ -198,12 +198,13 @@ export class NutritionProgressService implements INutritionProgressService {
     }
 
     // ターゲットは有効だが食事データがない場合
-    // → 目標値は計算できるので、current=0で返す
+    // → 目標値は設定されているので、actual=0, percentage=0 で表示
     if (!summaryValid) {
       try {
         const targetOnlyData = calculateTargetOnlyData(target!);
+        const nutrientProgress = calculateNutrientProgress(target!, null);
         return {
-          nutrientProgress: [],
+          nutrientProgress,
           dailySummaryData: targetOnlyData,
         };
       } catch (error) {
@@ -248,22 +249,6 @@ export class NutritionProgressService implements INutritionProgressService {
 }
 
 // ========================================
-// Service Factory
-// ========================================
-
-/**
- * NutritionProgressServiceのシングルトンインスタンス作成
- */
-let nutritionProgressServiceInstance: NutritionProgressService | null = null;
-
-export function getNutritionProgressService(): NutritionProgressService {
-  if (!nutritionProgressServiceInstance) {
-    nutritionProgressServiceInstance = new NutritionProgressService();
-  }
-  return nutritionProgressServiceInstance;
-}
-
-// ========================================
 // Hook for Service
 // ========================================
 
@@ -271,7 +256,7 @@ export function getNutritionProgressService(): NutritionProgressService {
  * React Hook形式でNutritionProgressServiceを取得
  */
 export function useNutritionProgressService(): NutritionProgressService {
-  return getNutritionProgressService();
+  return new NutritionProgressService();
 }
 
 // ========================================

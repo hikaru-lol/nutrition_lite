@@ -1,19 +1,11 @@
 /**
  * Tutorial Module - Public Exports
+ * ヘルプシステムとして機能
  */
 
-// Contract (型定義)
+// Contract (型定義・ステップ定義)
 export * from './contract/tutorialContract';
-
-// API Client
-export {
-  fetchTutorialStatus,
-  completeTutorial,
-  getCompletedTutorialCount,
-} from './api/tutorialClient';
-
-// State Management
-export * from './model/useTutorialModel';
+export * from './contract/tutorialSteps';
 
 // UI Components
 export * from './ui/TutorialProvider';

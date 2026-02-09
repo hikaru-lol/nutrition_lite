@@ -87,22 +87,6 @@ export class NutritionService implements INutritionService {
 }
 
 // ========================================
-// Service Factory
-// ========================================
-
-/**
- * NutritionServiceのシングルトンインスタンス作成
- */
-let nutritionServiceInstance: NutritionService | null = null;
-
-export function getNutritionService(): NutritionService {
-  if (!nutritionServiceInstance) {
-    nutritionServiceInstance = new NutritionService();
-  }
-  return nutritionServiceInstance;
-}
-
-// ========================================
 // Hook for Service
 // ========================================
 
@@ -110,7 +94,7 @@ export function getNutritionService(): NutritionService {
  * React Hook形式でNutritionServiceを取得
  */
 export function useNutritionService(): NutritionService {
-  return getNutritionService();
+  return new NutritionService();
 }
 
 // ========================================
@@ -118,4 +102,3 @@ export function useNutritionService(): NutritionService {
 // ========================================
 
 export default NutritionService;
-// export { NutritionService };

@@ -9,11 +9,14 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Utensils, Cookie } from 'lucide-react';
 import type { MealItem } from '@/modules/meal/contract/mealContract';
+import { groupMealsByType, type GroupedMeals } from '@/modules/meal/lib/groupMeals';
+
+
 
 // ========================================
 // Types
@@ -34,34 +37,15 @@ export interface MealListSectionProps {
   onDeleteMeal: (id: string) => void;
   onAnalyzeNutrition: (type: 'main' | 'snack', index?: number) => void;
 
-  // Nutrition analysis compatibility (CompactMealList互換性)
-  nutritionAnalysis?: {
+  // Nutrition analysis (統一インターフェース)
+  nutritionAnalysis: {
     selectedMeal: { meal_type: 'main' | 'snack'; meal_index: number | null } | null;
     data: any | null;
     isLoading: boolean;
-    onShowDetails: (data: any) => void;
+    nutritionDataAvailability: Map<string, boolean>;
+    onShowDetails: (mealType: 'main' | 'snack', mealIndex?: number) => void;
     onClear: () => void;
   };
-
-  // 新しいキャッシュベースの栄養分析props（CompactMealList互換）
-  getNutritionDataFromCache?: (mealType: 'main' | 'snack', mealIndex?: number) => any;
-  onShowNutritionDetails?: (nutritionData: any) => void;
-
-  // 既存UI用に残す（CompactMealList互換）
-  selectedMealForNutrition?: { meal_type: 'main' | 'snack'; meal_index: number | null } | null;
-  nutritionData?: {
-    meal: any;
-    daily: any;
-  };
-  isNutritionLoading?: boolean;
-  nutritionError?: boolean;
-  onClearNutritionAnalysis?: () => void;
-  onRefetchNutrition?: () => void;
-}
-
-interface GroupedMeals {
-  main: Array<{ index: number; items: MealItem[] }>;
-  snacks: MealItem[];
 }
 
 // ========================================
@@ -78,48 +62,13 @@ export const MealListSection = React.memo(function MealListSection({
   onDeleteMeal,
   onAnalyzeNutrition,
   nutritionAnalysis,
-  // CompactMealList互換のprops
-  getNutritionDataFromCache,
-  onShowNutritionDetails,
-  selectedMealForNutrition,
-  nutritionData,
-  isNutritionLoading,
-  nutritionError,
-  onClearNutritionAnalysis,
-  onRefetchNutrition
 }: MealListSectionProps) {
 
   // ========================================
   // Computed Data
   // ========================================
 
-  const groupedMeals = useMemo((): GroupedMeals => {
-    const mainMeals: { [key: number]: MealItem[] } = {};
-    const snacks: MealItem[] = [];
-
-    mealItems.forEach(item => {
-      if (item.meal_type === 'main') {
-        const index = item.meal_index ?? 1;
-        if (!mainMeals[index]) {
-          mainMeals[index] = [];
-        }
-        mainMeals[index].push(item);
-      } else {
-        snacks.push(item);
-      }
-    });
-
-    // メイン食事を連番で配列に変換
-    const mainArray: Array<{ index: number; items: MealItem[] }> = [];
-    for (let i = 1; i <= mealsPerDay; i++) {
-      mainArray.push({
-        index: i,
-        items: mainMeals[i] || []
-      });
-    }
-
-    return { main: mainArray, snacks };
-  }, [mealItems, mealsPerDay]);
+  const groupedMeals = groupMealsByType(mealItems, mealsPerDay);
 
   // ========================================
   // Loading State
@@ -176,8 +125,6 @@ export const MealListSection = React.memo(function MealListSection({
                 onAnalyze={() => onAnalyzeNutrition('main', index)}
                 isDeleting={isDeleting}
                 nutritionAnalysis={nutritionAnalysis}
-                getNutritionDataFromCache={getNutritionDataFromCache}
-                onShowNutritionDetails={onShowNutritionDetails}
               />
             ))}
           </div>
@@ -200,8 +147,6 @@ export const MealListSection = React.memo(function MealListSection({
             onAnalyze={() => onAnalyzeNutrition('snack')}
             isDeleting={isDeleting}
             nutritionAnalysis={nutritionAnalysis}
-            getNutritionDataFromCache={getNutritionDataFromCache}
-            onShowNutritionDetails={onShowNutritionDetails}
           />
         </div>
 
@@ -224,17 +169,15 @@ interface MealIndexSectionProps {
   onDelete: (id: string) => void;
   onAnalyze: () => void;
   isDeleting: boolean;
-  // 栄養分析関連props
-  nutritionAnalysis?: {
+  // 栄養分析（統一インターフェース）
+  nutritionAnalysis: {
     selectedMeal: { meal_type: 'main' | 'snack'; meal_index: number | null } | null;
     data: any | null;
     isLoading: boolean;
-    onShowDetails: (data: any) => void;
+    nutritionDataAvailability: Map<string, boolean>;
+    onShowDetails: (mealType: 'main' | 'snack', mealIndex?: number) => void;
     onClear: () => void;
   };
-  // CompactMealList互換props
-  getNutritionDataFromCache?: (mealType: 'main' | 'snack', mealIndex?: number) => any;
-  onShowNutritionDetails?: (nutritionData: any) => void;
 }
 
 const MealIndexSection = React.memo(function MealIndexSection({
@@ -248,19 +191,15 @@ const MealIndexSection = React.memo(function MealIndexSection({
   onAnalyze,
   isDeleting,
   nutritionAnalysis,
-  getNutritionDataFromCache,
-  onShowNutritionDetails
 }: MealIndexSectionProps) {
   const hasItems = items.length > 0;
-  const isSelected = nutritionAnalysis?.selectedMeal?.meal_type === mealType &&
-                    nutritionAnalysis?.selectedMeal?.meal_index === mealIndex;
 
-  // このセクションの栄養データがキャッシュに存在するかチェック（CompactMealList互換）
-  const cachedNutritionData = getNutritionDataFromCache?.(mealType, mealIndex ?? undefined);
-  const hasNutritionData = Boolean(cachedNutritionData);
+  // Layer 1: propsから栄養データの有無を取得（純粋な表現）
+  const sectionKey = mealType === 'main' ? `main-${mealIndex}` : 'snack';
+  const hasNutritionData = nutritionAnalysis.nutritionDataAvailability.get(sectionKey) ?? false;
 
   return (
-    <div className={`border rounded-lg p-4 space-y-3 ${isSelected ? 'border-primary bg-primary/5' : 'border-border'}`}>
+    <div className="border border-border rounded-lg p-4 space-y-3">
 
       {/* セクションヘッダー */}
       <div className="flex items-center justify-between">
@@ -272,16 +211,15 @@ const MealIndexSection = React.memo(function MealIndexSection({
                 variant="outline"
                 size="sm"
                 onClick={onAnalyze}
-                disabled={nutritionAnalysis?.isLoading}
+                disabled={nutritionAnalysis.isLoading}
               >
                 栄養分析
               </Button>
-              {/* CompactMealList互換：栄養分析詳細表示ボタン */}
               {hasNutritionData && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onShowNutritionDetails?.(cachedNutritionData)}
+                  onClick={() => nutritionAnalysis.onShowDetails(mealType, mealIndex ?? undefined)}
                   className="flex items-center gap-1"
                 >
                   詳細表示
@@ -317,34 +255,6 @@ const MealIndexSection = React.memo(function MealIndexSection({
       ) : (
         <div className="text-sm text-muted-foreground text-center py-8">
           まだ食事が記録されていません
-        </div>
-      )}
-
-      {/* 栄養分析結果表示 */}
-      {isSelected && nutritionAnalysis?.data && (
-        <div className="mt-4 p-3 bg-secondary rounded-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">栄養分析結果</span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => nutritionAnalysis.onShowDetails(nutritionAnalysis.data)}
-              >
-                詳細表示
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={nutritionAnalysis.onClear}
-              >
-                ✕
-              </Button>
-            </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            カロリー: {nutritionAnalysis.data?.totalCalories || 0} kcal
-          </div>
         </div>
       )}
 

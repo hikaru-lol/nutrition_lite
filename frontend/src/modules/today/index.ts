@@ -1,38 +1,45 @@
+/**
+ * Today Module - Public API
+ *
+ * Todayページに関連する公開インターフェース
+ */
+
 // ========================================
-// Public API Exports
+// Components
 // ========================================
 
-// Main Page Component
 export { TodayPage } from './ui/TodayPage';
-export { TodayPageContent } from './ui/TodayPageContent';
 
-// Current Implementation Model (5-layer architecture)
+// ========================================
+// Hooks - Layer 3 & 4
+// ========================================
+
+// Layer 3: Page Aggregation
 export { useTodayPageModel } from './model/useTodayPageModel';
-export { useTodayNutritionProgress } from './hooks/useTodayNutritionProgress';
 
 // Layer 4: Feature Logic
-export { useDailyReportManagement } from './hooks/useDailyReportManagement';
-export type { DailyReportManagementModel } from './hooks/useDailyReportManagement';
+export { useTodayNutritionCalculator } from './hooks/useTodayNutritionCalculator';
+export { useDailyReportManager } from './hooks/useDailyReportManager';
 
-// Layer 2: UI Orchestration
-export { useNutritionAnalysisState } from './ui/hooks/useNutritionAnalysisState';
-export type { NutritionAnalysisStateModel } from './ui/hooks/useNutritionAnalysisState';
-
-// Services (Layer 5)
-export { useNutritionService } from '../nutrition/services/nutritionService';
-export { useNutritionProgressService } from '../nutrition-progress/services/nutritionProgressService';
-export { useTargetService } from '../target/services/targetService';
-export { useMealService } from '../meal/services/mealService';
-
+// ========================================
 // Types
+// ========================================
+
 export type {
-  TodayNutritionProgressModel,
   NutrientProgress,
-} from './hooks/useTodayNutritionProgress';
+  TodayMealItemFormValues,
+} from './contract/todayContract';
 
 export type {
-  NutritionDetailsData,
-} from '../nutrition/types/nutritionTypes';
+  TodayNutritionCalculatorModel,
+} from './hooks/useTodayNutritionCalculator';
 
-// Utility Functions
-export { formatLocalDateYYYYMMDD } from './types/todayTypes';
+export type {
+  DailyReportManagerModel,
+} from './hooks/useDailyReportManager';
+
+// ========================================
+// Utilities
+// ========================================
+
+export { formatLocalDateYYYYMMDD } from './contract/todayContract';

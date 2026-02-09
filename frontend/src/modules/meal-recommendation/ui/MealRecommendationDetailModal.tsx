@@ -58,7 +58,7 @@ export function MealRecommendationDetailModal({
 
   const handleShowHistory = () => {
     setShowHistory(true);
-    historyModel.loadHistory();
+    historyModel.actions.loadHistory();
   };
 
   return (
@@ -217,15 +217,15 @@ export function MealRecommendationDetailModal({
                   <Clock className="h-5 w-5" />
                   提案履歴
                 </h3>
-                {historyModel.isLoadingHistory ? (
+                {historyModel.state.isLoadingHistory ? (
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-sm text-muted-foreground">履歴を読み込み中...</div>
                     </CardContent>
                   </Card>
-                ) : historyModel.recommendations && historyModel.recommendations.length > 0 ? (
+                ) : historyModel.data.recommendations && historyModel.data.recommendations.length > 0 ? (
                   <div className="space-y-3">
-                    {historyModel.recommendations.slice(0, 5).map((historyRec) => {
+                    {historyModel.data.recommendations.slice(0, 5).map((historyRec) => {
                       const historyDate = new Date(historyRec.created_at);
                       const historyForDate = new Date(historyRec.generated_for_date);
                       return (
@@ -249,9 +249,9 @@ export function MealRecommendationDetailModal({
                         </Card>
                       );
                     })}
-                    {historyModel.recommendations.length > 5 && (
+                    {historyModel.data.recommendations.length > 5 && (
                       <div className="text-center text-sm text-muted-foreground">
-                        他 {historyModel.recommendations.length - 5} 件の履歴があります
+                        他 {historyModel.data.recommendations.length - 5} 件の履歴があります
                       </div>
                     )}
                   </div>

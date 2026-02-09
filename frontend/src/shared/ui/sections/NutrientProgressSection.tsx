@@ -3,32 +3,26 @@
  *
  * 責務:
  * - 栄養素の目標達成度をカテゴリ別に表示
- * - 5つの状態（未設定/食事なし/ローディング/エラー/正常表示）の管理
+ * - 状態に応じた適切な表示（no-target/no-meals/loading/error/success）
  * - プログレスバーの色分け表示
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { Target } from '@/modules/target/contract/targetContract';
-import type { NutrientProgress } from '@/modules/today/types/todayTypes';
+import type { NutrientProgress } from '@/modules/today/contract/todayContract';
+import type { NutritionProgressState } from '@/modules/today/hooks/useTodayNutritionCalculator';
 
 // ========================================
 // Types
 // ========================================
 
 interface NutrientProgressSectionProps {
-  /** アクティブな目標設定 */
-  activeTarget: Target | null;
   /** 栄養素進捗データ */
   nutrientProgress: NutrientProgress[];
-  /** ローディング状態 */
-  isLoading: boolean;
-  /** エラー状態 */
-  isError: boolean;
+  /** 表示状態 */
+  progressState: NutritionProgressState;
   /** 再試行コールバック */
   onRetry: () => void;
-  /** 食事アイテム数（表示分岐用） */
-  mealItemsCount: number;
 }
 
 // ========================================
@@ -89,7 +83,7 @@ function NoTargetState() {
 }
 
 /**
- * 食事なし状態
+ * 食事記録なし状態
  */
 function NoMealsState() {
   return (
@@ -99,7 +93,7 @@ function NoMealsState() {
       </CardHeader>
       <CardContent>
         <div className="text-sm text-muted-foreground">
-          食事を追加すると達成度が表示されます。
+          食事を記録してください。
         </div>
       </CardContent>
     </Card>
@@ -242,33 +236,23 @@ function ProgressView({ nutrientProgress }: { nutrientProgress: NutrientProgress
  * 再利用可能なコンポーネントとして分離
  */
 export function NutrientProgressSection({
-  activeTarget,
   nutrientProgress,
-  isLoading,
-  isError,
+  progressState,
   onRetry,
-  mealItemsCount
 }: NutrientProgressSectionProps) {
-  // 状態別の表示分岐
-  if (!activeTarget) {
-    return <NoTargetState />;
+  // 状態に応じた表示分岐
+  switch (progressState) {
+    case 'no-target':
+      return <NoTargetState />;
+    case 'no-meals':
+      return <NoMealsState />;
+    case 'loading':
+      return <LoadingState />;
+    case 'error':
+      return <ErrorState onRetry={onRetry} />;
+    case 'success':
+      return nutrientProgress.length === 0
+        ? <NoDataState />
+        : <ProgressView nutrientProgress={nutrientProgress} />;
   }
-
-  if (mealItemsCount === 0) {
-    return <NoMealsState />;
-  }
-
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (isError) {
-    return <ErrorState onRetry={onRetry} />;
-  }
-
-  if (nutrientProgress.length === 0) {
-    return <NoDataState />;
-  }
-
-  return <ProgressView nutrientProgress={nutrientProgress} />;
 }

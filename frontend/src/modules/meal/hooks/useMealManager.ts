@@ -1,5 +1,5 @@
 /**
- * useMealManagement - Layer 4: Feature Logic
+ * useMealManager - Layer 4: Feature Logic
  *
  * 責務:
  * - 食事CRUD操作のReact Query統合
@@ -9,10 +9,15 @@
 
 'use client';
 
-import { useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMealService } from '../services/mealService';
-import { useMealItemsByDate } from '../model/mealHooks';
+import {
+  useMealItemsByDate,
+  useCreateMealItem,
+  useUpdateMealItem,
+  useDeleteMealItem
+} from './mealOptimisticMutations';
 import type { MealItem, MealItemRequest } from '../contract/mealContract';
 import type { MealIdentifier, MealSection } from '../services/mealService';
 
@@ -20,11 +25,11 @@ import type { MealIdentifier, MealSection } from '../services/mealService';
 // Types
 // ========================================
 
-interface UseMealManagementProps {
+interface UseMealManagerProps {
   date: string; // YYYY-MM-DD format
 }
 
-export interface MealManagementModel {
+export interface MealManagerModel {
   // Data
   mealItems: readonly MealItem[];
   mealSections: readonly MealSection[];
@@ -80,9 +85,9 @@ export interface MealManagementModel {
 // Hook Implementation
 // ========================================
 
-export function useMealManagement({
+export function useMealManager({
   date,
-}: UseMealManagementProps): MealManagementModel {
+}: UseMealManagerProps): MealManagerModel {
 
   // Layer 5 Service注入
   const mealService = useMealService();
@@ -96,39 +101,13 @@ export function useMealManagement({
   const mealItemsQuery = useMealItemsByDate(date);
 
   // ========================================
-  // CRUD Mutations
+  // CRUD Mutations - 楽観的更新を活用
   // ========================================
 
-  const createMutation = useMutation({
-    mutationFn: (data: MealItemRequest) => mealService.createMealItem(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['meal-items', date] });
-    },
-    onError: (error) => {
-      console.error('Failed to create meal item:', error);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ entryId, data }: { entryId: string; data: MealItemRequest }) =>
-      mealService.updateMealItem(entryId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['meal-items', date] });
-    },
-    onError: (error) => {
-      console.error('Failed to update meal item:', error);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (entryId: string) => mealService.deleteMealItem(entryId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['meal-items', date] });
-    },
-    onError: (error) => {
-      console.error('Failed to delete meal item:', error);
-    },
-  });
+  // mealHooks.ts の楽観的更新付き mutation を使用
+  const createMutation = useCreateMealItem(date);
+  const updateMutation = useUpdateMealItem(date);
+  const deleteMutation = useDeleteMealItem(date);
 
   // ========================================
   // Computed Data
@@ -148,41 +127,29 @@ export function useMealManagement({
   // Actions
   // ========================================
 
-  const createMeal = useCallback(
-    async (data: MealItemRequest): Promise<MealItem> => {
-      return createMutation.mutateAsync(data);
-    },
-    [createMutation]
-  );
+  const createMeal = async (data: MealItemRequest): Promise<MealItem> => {
+    return createMutation.mutateAsync(data);
+  };
 
-  const updateMeal = useCallback(
-    async (entryId: string, data: MealItemRequest): Promise<MealItem> => {
-      return updateMutation.mutateAsync({ entryId, data });
-    },
-    [updateMutation]
-  );
+  const updateMeal = async (entryId: string, data: MealItemRequest): Promise<MealItem> => {
+    return updateMutation.mutateAsync({ entryId, data });
+  };
 
-  const deleteMeal = useCallback(
-    async (entryId: string): Promise<void> => {
-      return deleteMutation.mutateAsync(entryId);
-    },
-    [deleteMutation]
-  );
+  const deleteMeal = async (entryId: string): Promise<void> => {
+    return deleteMutation.mutateAsync(entryId);
+  };
 
-  const findFirstMealForNutrition = useCallback(
-    (): MealIdentifier | null => {
-      return mealService.findFirstMealForNutrition(mealItems);
-    },
-    [mealService, mealItems]
-  );
+  const findFirstMealForNutrition = (): MealIdentifier | null => {
+    return mealService.findFirstMealForNutrition(mealItems);
+  };
 
-  const refetch = useCallback(() => {
+  const refetch = () => {
     mealItemsQuery.refetch();
-  }, [mealItemsQuery]);
+  };
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['meal-items', date] });
-  }, [queryClient, date]);
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['meal-items', 'by-date', date] });
+  };
 
   // ========================================
   // Return Model

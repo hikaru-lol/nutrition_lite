@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { MealItem } from '@/modules/meal/contract/mealContract';
 
 // Shared UI
 import { LoadingState } from '@/shared/ui/Status/LoadingState';
@@ -18,14 +17,13 @@ import { MealRecommendationCard, MealRecommendationDetailModal, useMealRecommend
 import { useTodayPageModel } from '../model/useTodayPageModel';
 
 // Local Components & Hooks
-import { AddMealModal, type AddMealFormValues } from './components/AddMealModal';
-import { EditMealModal, type EditMealFormValues } from './components/EditMealModal';
+import { AddMealModal } from './components/modals/AddMealModal';
+import { EditMealModal } from './components/modals/EditMealModal';
 import { useAddMealModalState } from './hooks/useAddMealModalState';
 import { useEditMealModalState } from './hooks/useEditMealModalState';
 import { useMealRecommendationModalState } from './hooks/useMealRecommendationModalState';
 import { useNutritionAnalysisModalState } from './hooks/useNutritionAnalysisModalState';
-import { useMealSectionNutritionManager } from './hooks/useMealSectionNutritionManager';
-import type { DailySummaryData } from '@/shared/ui/cards/DailySummaryCard';
+
 
 interface TodayPageContentProps {
   date: string;
@@ -35,7 +33,20 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
   const router = useRouter();
 
   // Page Model
-  const m = useTodayPageModel({ date });
+
+  const {
+    isPageLoading,
+    isPageError,
+    profileManager,
+    nutritionCalculator,
+    mealManager,
+    dailyReportManager,
+    mealCompletionCalculator,
+    nutritionAnalysisState,
+    mealSectionState,
+    nutritionDataAvailability,
+  } = useTodayPageModel({ date });
+
   const mealRecommendationModel = useMealRecommendationModel({ date });
 
   // Modal States
@@ -44,59 +55,29 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
   const mealRecommendationModal = useMealRecommendationModalState();
   const nutritionAnalysisModal = useNutritionAnalysisModalState();
 
-  // Nutrition Manager
-  const mealSectionNutritionManager = useMealSectionNutritionManager({
-    date,
-    mealItems: m.meals.mealItems,
-  });
-
-
-  // Meal Handlers
-  const handleAddClick = (mealType: 'main' | 'snack', mealIndex?: number) => {
-    addMealModal.open(mealType, mealIndex);
-  };
-
-  const handleAddModalSubmit = async (values: AddMealFormValues) => {
-    await m.meals.createMeal(values);
-    addMealModal.close();
-  };
-
-  const handleEditClick = (mealItem: MealItem) => {
-    editMealModal.open(mealItem, date);
-  };
-
-  const handleEditModalSubmit = async (values: EditMealFormValues) => {
-    if (editMealModal.editingMealItem) {
-      await m.meals.updateMeal(editMealModal.editingMealItem.id, values);
-      editMealModal.close();
-    }
-  };
-
-  // Nutrition Handlers
+  // Handlers
   const handleNutritionAnalysis = async (mealType: 'main' | 'snack', mealIndex?: number) => {
+    console.log('🎯 handleNutritionAnalysis called:', { mealType, mealIndex });
     try {
-      await mealSectionNutritionManager.fetchMealNutrition(mealType, mealIndex);
-      m.nutritionAnalysis.selectMealForNutrition(mealType, mealIndex ?? null);
+      const result = await mealSectionState.fetchNutrition(mealType, mealIndex);
+      console.log('✅ Nutrition fetched successfully:', result);
+      nutritionAnalysisState.selectMealForNutrition(mealType, mealIndex ?? null);
+      console.log('✅ Meal selected for nutrition display');
     } catch (error) {
-      console.error('Nutrition analysis error:', error);
+      console.error('❌ Nutrition analysis error:', error);
     }
   };
 
-  const handleShowNutritionDetails = (nutritionData: any) => {
-    nutritionAnalysisModal.open(nutritionData);
-  };
-
-  // Recommendation Handler
-  const handleShowMealRecommendationDetails = () => {
-    const currentRecommendation = mealRecommendationModel.recommendation;
-    if (currentRecommendation) {
-      mealRecommendationModal.open(currentRecommendation);
+  const handleShowNutritionDetails = (mealType: 'main' | 'snack', mealIndex?: number) => {
+    const data = mealSectionState.getFromCache(mealType, mealIndex);
+    if (data) {
+      nutritionAnalysisModal.open(data);
     }
   };
 
   // Loading & Error States
-  if (m.isLoading) return <LoadingState label="データを読み込み中..." />;
-  if (m.isError) {
+  if (isPageLoading) return <LoadingState label="データを読み込み中..." />;
+  if (isPageError) {
     return (
       <ErrorState
         title="データの取得に失敗"
@@ -107,85 +88,85 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
   }
 
   // Derived Data
-  const profile = m.profile.profile;
+  const profile = profileManager.profile;
   const mealsPerDay = profile?.meals_per_day ?? 3;
-  const mealItems = m.meals.mealItems;
-
-  // for DailySummaryCard props
-  const dailySummaryData: DailySummaryData | null = m.nutrition.dailySummaryData;
-  const isDailySummaryLoading: boolean = m.nutrition.isDailySummaryLoading;
+  const mealItems = mealManager.mealItems;
 
   return (
     <div className="w-full space-y-6">
       <div data-tour="daily-summary">
         <DailySummaryCard
-          data={dailySummaryData}
-          isLoading={isDailySummaryLoading}
+          data={nutritionCalculator.dailySummaryData}
+          isLoading={nutritionCalculator.isDailySummaryLoading}
         />
       </div>
 
       <div data-tour="meal-recommendation">
         <MealRecommendationCard
           date={date}
-          onViewDetails={handleShowMealRecommendationDetails}
+          onViewDetails={() => {
+            if (mealRecommendationModel.data.recommendation) {
+              mealRecommendationModal.open(mealRecommendationModel.data.recommendation);
+            }
+          }}
         />
       </div>
 
       <div data-tour="meal-list">
         <MealListSection
-          mealItems={m.meals.mealItems}
+          mealItems={mealItems}
           mealsPerDay={mealsPerDay}
-          isLoading={m.meals.isLoading}
-          isDeleting={m.meals.isDeleting}
-          onAddMeal={handleAddClick}
-          onEditMeal={handleEditClick}
-          onDeleteMeal={(id: string) => m.meals.deleteMeal(id)}
+          isLoading={mealManager.isLoading}
+          isDeleting={mealManager.isDeleting}
+          onAddMeal={addMealModal.open}
+          onEditMeal={(mealItem) => editMealModal.open(mealItem, date)}
+          onDeleteMeal={mealManager.deleteMeal}
           onAnalyzeNutrition={handleNutritionAnalysis}
-          getNutritionDataFromCache={mealSectionNutritionManager.getMealNutritionFromCache}
-          onShowNutritionDetails={handleShowNutritionDetails}
-          selectedMealForNutrition={m.nutritionAnalysis.selectedMealForNutrition}
-          nutritionData={m.nutritionAnalysis.nutritionData}
-          isNutritionLoading={m.nutritionAnalysis.isLoadingNutrition}
-          nutritionError={m.nutritionAnalysis.isErrorNutrition}
-          onClearNutritionAnalysis={m.nutritionAnalysis.clearSelectedMeal}
-          onRefetchNutrition={() => m.nutritionAnalysis.refetchNutrition()}
+          nutritionAnalysis={{
+            selectedMeal: nutritionAnalysisState.selectedMealForNutrition,
+            data: nutritionAnalysisState.nutritionData,
+            isLoading: nutritionAnalysisState.isLoadingNutrition,
+            nutritionDataAvailability: nutritionDataAvailability,
+            onShowDetails: handleShowNutritionDetails,
+            onClear: nutritionAnalysisState.clearSelectedMeal,
+          }}
         />
       </div>
 
       <div data-tour="target-progress">
         <NutrientProgressSection
-          activeTarget={m.nutrition.activeTarget}
-          nutrientProgress={m.nutrition.nutrientProgress}
-          isLoading={m.nutrition.isDailySummaryLoading}
-          isError={m.nutrition.isDailySummaryError}
-          onRetry={m.nutrition.refetchDailySummary}
-          mealItemsCount={mealItems.length}
+          nutrientProgress={nutritionCalculator.nutrientProgress}
+          progressState={nutritionCalculator.progressState}
+          onRetry={nutritionCalculator.refetchDailySummary}
         />
       </div>
 
       <div data-tour="daily-report">
-        {m.dailyReport.report ? (
+        {dailyReportManager.report ? (
           <EnhancedDailyReportCard
-            report={m.dailyReport.report}
-            isLoading={m.dailyReport.isLoading}
+            report={dailyReportManager.report}
+            isLoading={dailyReportManager.isLoading}
             onShare={() => console.log('Share report')}
             onExport={() => console.log('Export report')}
           />
         ) : (
           <DailyReportCard
             date={date}
-            report={m.dailyReport.report}
-            isLoading={m.dailyReport.isLoading}
-            isError={m.dailyReport.isError}
-            isGenerating={m.dailyReport.isGenerating}
-            generateError={m.dailyReport.generateError}
-            queryError={m.dailyReport.error}
-            isMealCompletionValid={m.mealCompletion.isValid}
-            mealCompletionStatus={m.mealCompletion.status}
-            missingMealsCount={m.mealCompletion.missingCount}
-            hasEnoughData={m.mealCompletion.hasEnoughData}
-            onGenerate={(targetDate) => m.dailyReport.generateReport()}
-            onFetch={(targetDate) => m.dailyReport.refetch()}
+            dailyReport={{
+              report: dailyReportManager.report,
+              isLoading: dailyReportManager.isLoading,
+              isError: dailyReportManager.isError,
+              isGenerating: dailyReportManager.isGenerating,
+              generateError: dailyReportManager.generateError,
+              onGenerate: dailyReportManager.generateReport,
+              onFetch: dailyReportManager.refetch,
+            }}
+            mealCompletion={{
+              isValid: mealCompletionCalculator.isValid,
+              status: mealCompletionCalculator.status,
+              missingCount: mealCompletionCalculator.missingCount,
+              hasEnoughData: mealCompletionCalculator.hasEnoughData,
+            }}
           />
         )}
       </div>
@@ -193,12 +174,15 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
       <AddMealModal
         isOpen={addMealModal.isOpen}
         onClose={addMealModal.close}
-        onSubmit={handleAddModalSubmit}
+        onSubmit={async (values) => {
+          await mealManager.createMeal(values);
+          addMealModal.close();
+        }}
         mealType={addMealModal.selectedMealType}
         mealIndex={addMealModal.selectedMealIndex}
         date={date}
-        isLoading={m.meals.createMutation.isPending}
-        error={m.meals.createMutation.isError
+        isLoading={mealManager.createMutation.isPending}
+        error={mealManager.createMutation.isError
           ? '追加に失敗しました。/meal-items エンドポイントを確認してください。'
           : null
         }
@@ -207,16 +191,21 @@ export function TodayPageContent({ date }: TodayPageContentProps) {
       <EditMealModal
         isOpen={editMealModal.isOpen}
         onClose={editMealModal.close}
-        onSubmit={handleEditModalSubmit}
+        onSubmit={async (values) => {
+          if (editMealModal.editingMealItem) {
+            await mealManager.updateMeal(editMealModal.editingMealItem.id, values);
+            editMealModal.close();
+          }
+        }}
         mealItem={editMealModal.editingMealItem}
-        isLoading={m.meals.updateMutation.isPending}
-        error={m.meals.updateMutation.isError
+        isLoading={mealManager.updateMutation.isPending}
+        error={mealManager.updateMutation.isError
           ? '更新に失敗しました。/meal-items/{id} エンドポイントを確認してください。'
           : null
         }
       />
 
-      {m.meals.deleteMutation.isError && (
+      {mealManager.deleteMutation.isError && (
         <div className="text-sm text-destructive">
           削除に失敗しました。/meal-items/{'{id}'} を確認してください。
         </div>
