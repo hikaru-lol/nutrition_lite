@@ -1,19 +1,9 @@
 name: Backend Real Integration Tests
 
-# 一時的に自動実行を無効化（ユニットテスト確認のため）
-# on:
-#   push:
-#     paths:
-#       - 'backend/**'
-#       - '.github/workflows/backend-real-*'
-#   pull_request:
-#     branches:
-#       - main
-#     paths:
-#       - 'backend/**'
-#       - '.github/workflows/backend-real-*'
 on:
-  workflow_dispatch:  # 手動実行のみ許可
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   real-integration-tests:

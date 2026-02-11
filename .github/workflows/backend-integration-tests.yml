@@ -1,22 +1,21 @@
 name: Backend Integration Tests
 
-# 一時的に自動実行を無効化（ユニットテスト確認のため）
-# on:
-#   push:
-#     paths:
-#       - 'backend/**'
-#       - '.github/workflows/backend-integration-tests.yml'
-#   pull_request:
-#     paths:
-#       - 'backend/**'
-#       - '.github/workflows/backend-integration-tests.yml'
 on:
-  workflow_dispatch:  # 手動実行のみ許可
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   tests:
     name: Run backend integration tests
     runs-on: ubuntu-latest
+
+    env:
+      # OpenAI Stub flags (統合テストはフェイク実装を使用)
+      USE_OPENAI_TARGET_GENERATOR: 'false'
+      USE_OPENAI_NUTRITION_ESTIMATOR: 'false'
+      USE_OPENAI_DAILY_REPORT_GENERATOR: 'false'
+      USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR: 'false'
 
     defaults:
       run:
