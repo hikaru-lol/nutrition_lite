@@ -29,19 +29,23 @@ logger = logging.getLogger(__name__)
 class DailyReportResponseSchema(BaseModel):
     summary: str = Field(
         ...,
-        description="本日の食事内容全体の総評。200〜300文字程度の日本語で、ユーザーを労いながら概要を伝えてください。"
+        description="本日の食事内容全体の総評。200〜300文字程度の日本語で、ユーザーを労いながら概要を伝えてください。",
+        min_length=1
     )
     good_points: list[str] = Field(
         ...,
-        description="本日の食事で良かった点（例：タンパク質が目標通り、野菜を摂取できた等）。箇条書き用リスト。"
+        description="本日の食事で良かった点（例：タンパク質が目標通り、野菜を摂取できた等）。箇条書き用リスト。",
+        min_length=1
     )
     improvement_points: list[str] = Field(
         ...,
-        description="改善できる点や注意点（例：塩分が少し多め、脂質が不足気味等）。箇条書き用リスト。"
+        description="改善できる点や注意点（例：塩分が少し多め、脂質が不足気味等）。箇条書き用リスト。",
+        min_length=1
     )
     tomorrow_focus: list[str] = Field(
         ...,
-        description="明日意識すべき具体的なアクション（例：朝食で卵を追加する、水分を多めに摂る等）。箇条書き用リスト。"
+        description="明日意識すべき具体的なアクション（例：朝食で卵を追加する、水分を多めに摂る等）。箇条書き用リスト。",
+        min_length=1
     )
 
 
@@ -143,11 +147,11 @@ class OpenAIDailyNutritionReportGenerator(DailyNutritionReportGeneratorPort):
         height = getattr(profile, 'height_cm', None)
         weight = getattr(profile, 'weight_kg', None)
 
-        if height and (height < 100 or height > 250):
-            logger.warning(f"身長の値が異常です: {height}cm")
+        if height and (height.value < 100 or height.value > 250):
+            logger.warning(f"身長の値が異常です: {height.value}cm")
 
-        if weight and (weight < 20 or weight > 300):
-            logger.warning(f"体重の値が異常です: {weight}kg")
+        if weight and (weight.value < 20 or weight.value > 300):
+            logger.warning(f"体重の値が異常です: {weight.value}kg")
 
     def generate(self, input: DailyReportLLMInput) -> DailyReportLLMOutput:
         """
