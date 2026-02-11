@@ -3,3 +3,6 @@
 cookies.txt
 debug-cookies.txt
 *.cookie
+
+# Log files
+*.log
