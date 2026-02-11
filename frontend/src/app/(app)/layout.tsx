@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation';
 import { fetchCurrentUserServer } from '@/modules/auth/server';
 import { AppLayout } from '@/shared/ui/layout/AppLayout';
+import { TutorialProvider } from '@/modules/tutorial';
 
 // TODO: 認証・プロファイル・ターゲットのガードを実装する
 
@@ -20,8 +21,10 @@ export default async function Layout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <AppLayout user={user} showSidebar={true}>
-      {children}
-    </AppLayout>
+    <TutorialProvider>
+      <AppLayout user={user} showSidebar={true}>
+        {children}
+      </AppLayout>
+    </TutorialProvider>
   );
 }

@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation';
 import { fetchCurrentUserServer } from '@/modules/auth/server';
 import { AppLayout } from '@/shared/ui/layout/AppLayout';
+import { TutorialProvider } from '@/modules/tutorial';
 
 export default async function OnboardingLayout(props: {
   children: React.ReactNode;
@@ -21,10 +22,12 @@ export default async function OnboardingLayout(props: {
 
   // オンボーディング用の軽量レイアウト（サイドバーなし）
   return (
-    <AppLayout user={user} showSidebar={false}>
-      <div className="max-w-2xl mx-auto">
-        {props.children}
-      </div>
-    </AppLayout>
+    <TutorialProvider>
+      <AppLayout user={user} showSidebar={false}>
+        <div className="max-w-2xl mx-auto">
+          {props.children}
+        </div>
+      </AppLayout>
+    </TutorialProvider>
   );
 }

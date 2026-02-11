@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { useRouter } from 'next/navigation';
 
@@ -43,7 +42,7 @@ export function DailySummaryCard({ data, isLoading }: DailySummaryCardProps) {
   const router = useRouter();
 
   // PFCバランス用のデータ準備
-  const pfcData = useMemo(() => {
+  const getPfcData = () => {
     if (!data) return [];
 
     const totalPFC = data.protein.current + data.fat.current + data.carbohydrate.current;
@@ -75,13 +74,17 @@ export function DailySummaryCard({ data, isLoading }: DailySummaryCardProps) {
         achievement: data.carbohydrate.target > 0 ? (data.carbohydrate.current / data.carbohydrate.target) * 100 : 0,
       },
     ];
-  }, [data]);
+  };
+
+  const pfcData = getPfcData();
 
   // カロリー達成率
-  const caloriePercentage = useMemo(() => {
+  const getCaloriePercentage = () => {
     if (!data || data.targetCalories === 0) return 0;
     return (data.currentCalories / data.targetCalories) * 100;
-  }, [data]);
+  };
+
+  const caloriePercentage = getCaloriePercentage();
 
   if (isLoading) {
     return (

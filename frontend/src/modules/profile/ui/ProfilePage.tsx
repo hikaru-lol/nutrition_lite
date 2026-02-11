@@ -18,6 +18,7 @@ import {
 
 import { LoadingState } from '@/shared/ui/Status/LoadingState';
 import { ErrorState } from '@/shared/ui/Status/ErrorState';
+import { TutorialTrigger } from '@/modules/tutorial';
 
 import {
   useProfilePageModel,
@@ -62,16 +63,19 @@ export function ProfilePage() {
 
   return (
     <div className="w-full max-w-2xl space-y-4">
-      <div>
-        <div className="text-lg font-semibold">プロフィール</div>
+      <div data-tour="profile-title">
+        <div className="flex items-center gap-2">
+          <div className="text-lg font-semibold">プロフィール</div>
+          <TutorialTrigger tutorialId="onboarding_profile" className="ml-auto" />
+        </div>
         <div className="text-sm text-muted-foreground">
           目標生成に必要な情報を入力します
         </div>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4" data-tour="profile-form">
         <form className="space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="profile-sex">
             <div className="text-sm font-medium">性別</div>
             <Select
               value={form.watch('sex')}
@@ -94,12 +98,12 @@ export function ProfilePage() {
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="profile-birthdate">
             <div className="text-sm font-medium">生年月日</div>
             <Input type="date" {...form.register('birthdate')} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3" data-tour="profile-body">
             <div className="space-y-2">
               <div className="text-sm font-medium">身長 (cm)</div>
               <Input
@@ -118,7 +122,7 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end" data-tour="profile-submit">
             <Button type="submit" disabled={m.upsertMutation.isPending}>
               {m.upsertMutation.isPending ? '保存中...' : '保存して次へ'}
             </Button>

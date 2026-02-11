@@ -1,4 +1,4 @@
-import { CalendarPage } from '@/modules/calendar/ui/CalendarPage';
+import { CalendarPage } from '@/modules/calendar';
 
 export default function Page() {
   return <CalendarPage />;

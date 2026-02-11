@@ -1,119 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useActiveTargetQuery } from '../hooks/useActiveTargetQuery';
+import { useTargetManager } from '../hooks/useTargetManager';
+import { useCreateTargetMutation } from '../hooks/useCreateTargetMutation';
+import type { Target, CreateTargetRequest } from '../contract/targetContract';
 
-import {
-  fetchActiveTarget,
-  listTargets,
-  createTarget,
-  activateTarget,
-  deleteTarget,
-} from '../api/targetClient';
-import {
-  type Target,
-  type TargetListResponse,
-  type CreateTargetRequest,
-} from '../contract/targetContract';
+export interface TargetManagementPageModel {
+  // Data
+  activeTarget: Target | null;
+  targetList: Target[];
 
-export interface TargetManagementPageModelState {
-  // UI State
-  isCreateModalOpen: boolean;
+  // State - Active Target
+  isLoadingActive: boolean;
+  isErrorActive: boolean;
 
-  // Methods
-  openCreateModal: () => void;
-  closeCreateModal: () => void;
-  handleActivateTarget: (id: string) => Promise<void>;
-  handleDeleteTarget: (id: string) => Promise<void>;
-  handleCreateTarget: (data: CreateTargetRequest) => Promise<void>;
+  // State - Target List
+  isLoadingList: boolean;
+  isErrorList: boolean;
+
+  // Create
+  createTarget: (data: CreateTargetRequest) => Promise<Target>;
+  isCreating: boolean;
+  isCreateError: boolean;
+  createError: Error | null;
+
+  // Activate
+  activateTarget: (id: string) => Promise<void>;
+  isActivating: boolean;
+
+  // Delete
+  deleteTarget: (id: string) => Promise<void>;
+  isDeleting: boolean;
+
+  // Refetch
+  refetch: () => void;
 }
 
-export function useTargetManagementPageModel(): TargetManagementPageModelState & {
-  // Queries
-  activeTargetQuery: ReturnType<typeof useQuery<Target | null>>;
-  targetListQuery: ReturnType<typeof useQuery<TargetListResponse>>;
-
-  // Mutations
-  createMutation: ReturnType<typeof useMutation<Target, Error, CreateTargetRequest>>;
-  activateMutation: ReturnType<typeof useMutation<Target, Error, string>>;
-  deleteMutation: ReturnType<typeof useMutation<void, Error, string>>;
-} {
-  const queryClient = useQueryClient();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // Queries
-  const activeTargetQuery = useQuery({
-    queryKey: ['targets', 'active'] as const,
-    queryFn: () => fetchActiveTarget(),
-    retry: false,
-  });
-
-  const targetListQuery = useQuery({
-    queryKey: ['targets', 'list'] as const,
-    queryFn: () => listTargets({ limit: 50 }), // 最大50件取得
-    retry: false,
-  });
-
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: createTarget,
-    onSuccess: async () => {
-      // 作成成功時はリストとアクティブターゲットを更新
-      await queryClient.invalidateQueries({ queryKey: ['targets'] });
-      setIsCreateModalOpen(false);
-    },
-  });
-
-  const activateMutation = useMutation({
-    mutationFn: activateTarget,
-    onSuccess: async () => {
-      // 有効化成功時はリストとアクティブターゲットを更新
-      await queryClient.invalidateQueries({ queryKey: ['targets'] });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteTarget,
-    onSuccess: async () => {
-      // 削除成功時はリストとアクティブターゲットを更新
-      await queryClient.invalidateQueries({ queryKey: ['targets'] });
-    },
-  });
-
-  // Handlers
-  const openCreateModal = () => setIsCreateModalOpen(true);
-  const closeCreateModal = () => setIsCreateModalOpen(false);
-
-  const handleActivateTarget = async (id: string) => {
-    await activateMutation.mutateAsync(id);
-  };
-
-  const handleDeleteTarget = async (id: string) => {
-    await deleteMutation.mutateAsync(id);
-  };
-
-  const handleCreateTarget = async (data: CreateTargetRequest) => {
-    await createMutation.mutateAsync(data);
-  };
+export function useTargetManagementPageModel(): TargetManagementPageModel {
+  // Layer 4 フックを組み合わせる
+  const activeTargetQuery = useActiveTargetQuery();
+  const targetManager = useTargetManager();
+  const createTargetMutation = useCreateTargetMutation();
 
   return {
-    // UI State
-    isCreateModalOpen,
+    // Data
+    activeTarget: activeTargetQuery.activeTarget,
+    targetList: targetManager.targets,
 
-    // Queries
-    activeTargetQuery,
-    targetListQuery,
+    // State - Active Target
+    isLoadingActive: activeTargetQuery.isLoading,
+    isErrorActive: activeTargetQuery.isError,
 
-    // Mutations
-    createMutation,
-    activateMutation,
-    deleteMutation,
+    // State - Target List
+    isLoadingList: targetManager.isLoading,
+    isErrorList: targetManager.isError,
 
-    // Methods
-    openCreateModal,
-    closeCreateModal,
-    handleActivateTarget,
-    handleDeleteTarget,
-    handleCreateTarget,
+    // Create
+    createTarget: createTargetMutation.createTarget,
+    isCreating: createTargetMutation.isPending,
+    isCreateError: createTargetMutation.isError,
+    createError: createTargetMutation.error,
+
+    // Activate
+    activateTarget: targetManager.activateTarget,
+    isActivating: targetManager.isActivating,
+
+    // Delete
+    deleteTarget: targetManager.deleteTarget,
+    isDeleting: targetManager.isDeleting,
+
+    // Refetch
+    refetch: () => {
+      activeTargetQuery.refetch();
+      targetManager.refetch();
+    },
   };
 }

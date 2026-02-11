@@ -16,6 +16,15 @@ class MealRecommendationId:
         return cls(value=str(uuid4()))
 
 
+@dataclass(slots=True, frozen=True)
+class RecommendedMeal:
+    """推奨される具体的な献立"""
+    title: str              # 献立名（例：「高タンパク朝食セット」）
+    description: str        # 献立の詳細説明と栄養価の特徴
+    ingredients: list[str]  # 主要な食材・料理名のリスト
+    nutrition_focus: str    # この献立の栄養的なメリット
+
+
 @dataclass(slots=True)
 class MealRecommendation:
     """
@@ -26,8 +35,9 @@ class MealRecommendation:
     user_id: UserId
     generated_for_date: date  # この日までの履歴をもとにした提案
 
-    body: str                 # メインの提案文
-    tips: list[str]           # 実行可能なアクション（箇条書き）
+    body: str                           # メインの提案文
+    tips: list[str]                     # 実行可能なアクション（箇条書き）
+    recommended_meals: list[RecommendedMeal]  # 推奨する具体的な献立3品
 
     created_at: datetime
 
@@ -38,6 +48,7 @@ class MealRecommendation:
         generated_for_date: date,
         body: str,
         tips: list[str],
+        recommended_meals: list[RecommendedMeal],
         created_at: datetime,
     ) -> MealRecommendation:
         return cls(
@@ -46,5 +57,6 @@ class MealRecommendation:
             generated_for_date=generated_for_date,
             body=body,
             tips=tips,
+            recommended_meals=recommended_meals,
             created_at=created_at,
         )

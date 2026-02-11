@@ -86,6 +86,16 @@ export function Calendar({
       const dateString = formatDateString(currentYear, currentMonth, day);
       const data = dayData.find(d => d.date === dateString);
 
+      // デバッグ用ログ（開発時のみ）
+      if (process.env.NODE_ENV === 'development' && day <= 3) {
+        console.log(`Calendar debug: ${dateString}`, {
+          found: !!data,
+          data,
+          dayDataLength: dayData.length,
+          firstDayData: dayData[0]
+        });
+      }
+
       calendarDays.push({
         year: currentYear,
         month: currentMonth,

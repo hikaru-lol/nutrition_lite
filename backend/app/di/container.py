@@ -129,6 +129,12 @@ from app.application.nutrition.use_cases.generate_daily_nutrition_report import 
 from app.application.nutrition.use_cases.get_daily_nutrition_report import (
     GetDailyNutritionReportUseCase,
 )
+from app.application.nutrition.use_cases.get_meal_nutrition import (
+    GetMealNutritionUseCase,
+)
+from app.application.nutrition.use_cases.get_daily_nutrition import (
+    GetDailyNutritionUseCase,
+)
 
 # infra (estimators / llm)
 from app.infra.nutrition.estimator_stub import StubNutritionEstimator
@@ -149,6 +155,9 @@ from app.infra.llm.stub_daily_report_generator import (
 from app.application.nutrition.use_cases.generate_meal_recommendation import (
     GenerateMealRecommendationUseCase,
     GenerateMealRecommendationInput,  # JOB から使うなら import
+)
+from app.application.nutrition.use_cases.list_meal_recommendations import (
+    ListMealRecommendationsUseCase,
 )
 from app.infra.llm.stub_recommendation_generator import StubMealRecommendationGenerator
 from app.infra.llm.meal_recommendation_generator_openai import (
@@ -188,6 +197,17 @@ from app.application.billing.use_cases.handle_stripe_webhook import (
 # Infra (uow / stripe client / repo)
 from app.infra.db.uow.billing import SqlAlchemyBillingUnitOfWork
 from app.infra.billing.stripe_client import StripeClient
+
+# === Tutorial ===============================================================
+# Ports
+from app.application.tutorial.ports.tutorial_unit_of_work_port import TutorialUnitOfWorkPort
+
+# Use cases
+from app.application.tutorial.use_cases.get_tutorial_status import GetTutorialStatusUseCase
+from app.application.tutorial.use_cases.complete_tutorial import CompleteTutorialUseCase
+
+# Infra (repository)
+from app.infra.db.uow.tutorial import SqlAlchemyTutorialUnitOfWork
 
 
 # =============================================================================
@@ -575,6 +595,32 @@ def get_compute_daily_nutrition_summary_use_case(
     )
 
 
+def get_get_meal_nutrition_use_case(
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
+) -> GetMealNutritionUseCase:
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
+
+    return GetMealNutritionUseCase(
+        nutrition_uow=nutrition_uow,
+        plan_checker=plan_checker,
+    )
+
+
+def get_get_daily_nutrition_use_case(
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
+) -> GetDailyNutritionUseCase:
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
+
+    return GetDailyNutritionUseCase(
+        nutrition_uow=nutrition_uow,
+        plan_checker=plan_checker,
+    )
+
+
 _daily_report_generator_singleton: DailyNutritionReportGeneratorPort | None = None
 
 
@@ -708,12 +754,35 @@ def get_generate_meal_recommendation_use_case(
     clock = _resolve_dep(clock, get_clock)
     plan_checker = _resolve_dep(plan_checker, get_plan_checker)
 
+    cooldown_minutes = int(os.getenv("MEAL_RECOMMENDATION_COOLDOWN_MINUTES", "30"))
+    daily_limit = int(os.getenv("MEAL_RECOMMENDATION_DAILY_LIMIT", "5"))
+
+    # デバッグログ: 実際に読み込まれた制限値を出力
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"MealRecommendation settings: cooldown_minutes={cooldown_minutes}, daily_limit={daily_limit}")
+
     return GenerateMealRecommendationUseCase(
         profile_query=profile_query,
         nutrition_uow=nutrition_uow,
         generator=generator,
         clock=clock,
-        required_days=5,
+        min_required_days=1,
+        max_lookup_days=5,
+        plan_checker=plan_checker,
+        cooldown_minutes=cooldown_minutes,
+        daily_limit=daily_limit,
+    )
+
+
+def get_list_meal_recommendations_use_case(
+    nutrition_uow: NutritionUnitOfWorkPort = Depends(get_nutrition_uow),
+    plan_checker: PlanCheckerPort = Depends(get_plan_checker),
+) -> ListMealRecommendationsUseCase:
+    nutrition_uow = _resolve_dep(nutrition_uow, get_nutrition_uow)
+    plan_checker = _resolve_dep(plan_checker, get_plan_checker)
+    return ListMealRecommendationsUseCase(
+        nutrition_uow=nutrition_uow,
         plan_checker=plan_checker,
     )
 
@@ -800,3 +869,27 @@ def get_get_monthly_calendar_use_case(
 ) -> GetMonthlyCalendarUseCase:
     uow = _resolve_dep(uow, get_calendar_uow)
     return GetMonthlyCalendarUseCase(uow=uow)
+
+
+# =============================================================================
+# Tutorial
+# =============================================================================
+def get_tutorial_uow() -> TutorialUnitOfWorkPort:
+    """チュートリアルUnit of Workを取得"""
+    return SqlAlchemyTutorialUnitOfWork(create_session)
+
+
+def get_get_tutorial_status_use_case(
+    tutorial_uow: TutorialUnitOfWorkPort = Depends(get_tutorial_uow),
+) -> GetTutorialStatusUseCase:
+    """チュートリアル状況取得ユースケースを取得"""
+    tutorial_uow = _resolve_dep(tutorial_uow, get_tutorial_uow)
+    return GetTutorialStatusUseCase(tutorial_uow)
+
+
+def get_complete_tutorial_use_case(
+    tutorial_uow: TutorialUnitOfWorkPort = Depends(get_tutorial_uow),
+) -> CompleteTutorialUseCase:
+    """チュートリアル完了ユースケースを取得"""
+    tutorial_uow = _resolve_dep(tutorial_uow, get_tutorial_uow)
+    return CompleteTutorialUseCase(tutorial_uow)

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date as DateType
+from typing import Sequence
 
 from app.application.auth.ports.plan_checker_port import PlanCheckerPort
 from app.domain.auth.value_objects import UserId
+from app.domain.nutrition.meal_nutrition import MealNutritionSummary
 from app.domain.nutrition.daily_nutrition import (
     DailyNutritionSummary,
-    DailyNutritionSummaryId,
 )
 from app.domain.target.value_objects import NutrientCode, NutrientAmount, NutrientSource
 from app.application.nutrition.ports.uow_port import NutritionUnitOfWorkPort
@@ -45,7 +46,7 @@ class ComputeDailyNutritionSummaryUseCase:
         self._plan_checker.ensure_premium_feature(user_id)
 
         with self._uow as uow:
-            meals = uow.meal_nutrition_repo.list_by_user_and_date(
+            meals: Sequence[MealNutritionSummary] = uow.meal_nutrition_repo.list_by_user_and_date(
                 user_id=user_id,
                 target_date=date_,
             )

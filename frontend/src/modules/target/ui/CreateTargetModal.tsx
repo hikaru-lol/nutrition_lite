@@ -24,13 +24,13 @@ import {
 } from '@/components/ui/select';
 
 import {
-  TargetFormSchema,
-  defaultFormValues,
+  CreateTargetFormSchema,
+  createTargetFormDefaultValues,
   goalTypeLabels,
   activityLevelLabels,
-  type TargetFormValues,
-} from '../model/useTargetGeneratorPageModel';
-import type { CreateTargetRequest } from '../contract/targetContract';
+  type CreateTargetFormValues,
+  type CreateTargetRequest,
+} from '../contract/targetContract';
 
 interface CreateTargetModalProps {
   isOpen: boolean;
@@ -47,29 +47,27 @@ export function CreateTargetModal({
   isLoading = false,
   error = null,
 }: CreateTargetModalProps) {
-  const form = useForm<TargetFormValues>({
-    resolver: zodResolver(TargetFormSchema),
-    defaultValues: defaultFormValues,
+  const form = useForm<CreateTargetFormValues>({
+    resolver: zodResolver(CreateTargetFormSchema),
+    defaultValues: createTargetFormDefaultValues,
   });
 
   // モーダルが開かれる度にフォームをリセット
   React.useEffect(() => {
     if (isOpen) {
-      form.reset(defaultFormValues);
+      form.reset(createTargetFormDefaultValues);
     }
   }, [isOpen, form]);
 
-  const handleSubmit: SubmitHandler<TargetFormValues> = async (values) => {
-    const parsed = TargetFormSchema.parse(values);
+  const handleSubmit: SubmitHandler<CreateTargetFormValues> = async (values) => {
     const req: CreateTargetRequest = {
-      title: parsed.title,
-      goal_type: parsed.goal_type,
-      goal_description: parsed.goal_description ?? null,
-      activity_level: parsed.activity_level,
+      title: values.title,
+      goal_type: values.goal_type,
+      goal_description: values.goal_description || null,
+      activity_level: values.activity_level,
     };
 
     await onSubmit(req);
-    // 成功時はモーダルが自動で閉じられる（useTargetManagementPageModel内で処理）
   };
 
   const handleClose = () => {
@@ -110,7 +108,7 @@ export function CreateTargetModal({
             <Select
               value={form.watch('goal_type')}
               onValueChange={(v) =>
-                form.setValue('goal_type', v as TargetFormValues['goal_type'])
+                form.setValue('goal_type', v as CreateTargetFormValues['goal_type'])
               }
               disabled={isLoading}
             >
@@ -120,7 +118,7 @@ export function CreateTargetModal({
               <SelectContent>
                 {(
                   Object.keys(goalTypeLabels) as Array<
-                    TargetFormValues['goal_type']
+                    CreateTargetFormValues['goal_type']
                   >
                 ).map((key) => (
                   <SelectItem key={key} value={key}>
@@ -139,7 +137,7 @@ export function CreateTargetModal({
               onValueChange={(v) =>
                 form.setValue(
                   'activity_level',
-                  v as TargetFormValues['activity_level']
+                  v as CreateTargetFormValues['activity_level']
                 )
               }
               disabled={isLoading}
@@ -150,7 +148,7 @@ export function CreateTargetModal({
               <SelectContent>
                 {(
                   Object.keys(activityLevelLabels) as Array<
-                    TargetFormValues['activity_level']
+                    CreateTargetFormValues['activity_level']
                   >
                 ).map((key) => (
                   <SelectItem key={key} value={key}>

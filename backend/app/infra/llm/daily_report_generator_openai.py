@@ -255,7 +255,7 @@ class OpenAIDailyNutritionReportGenerator(DailyNutritionReportGeneratorPort):
 
             if actual and target_nutrient:
                 # TargetNutrient は amount 属性を直接持つ (value_objects.py参照)
-                target_amount = target_nutrient.amount
+                target_amount = target_nutrient.amount.value
                 actual_amount = actual.amount.value
                 percentage = (actual_amount / target_amount) * 100
                 status_emoji = self._get_status_emoji(percentage)

@@ -1,21 +1,41 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 import { useTargetManagementPageModel } from '../model/useTargetManagementPageModel';
+import type { CreateTargetRequest } from '../contract/targetContract';
 import { ActiveTargetCard } from './ActiveTargetCard';
 import { TargetListCard } from './TargetListCard';
 import { CreateTargetModal } from './CreateTargetModal';
 
 export function TargetManagementPage() {
-  const m = useTargetManagementPageModel();
+  const {
+    activeTarget,
+    targetList,
+    isLoadingActive,
+    isLoadingList,
+    createTarget,
+    isCreating,
+    createError,
+    activateTarget,
+    isActivating,
+    deleteTarget,
+    isDeleting,
+  } = useTargetManagementPageModel();
 
-  const activeTarget = m.activeTargetQuery.data ?? null;
-  const targetList = m.targetListQuery.data?.items ?? [];
+  // UI 状態管理 (Layer 2)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const isLoadingActive = m.activeTargetQuery.isLoading;
-  const isLoadingList = m.targetListQuery.isLoading;
+  // ========================================
+  // Event Handlers
+  // ========================================
+
+  const handleCreateTarget = async (data: CreateTargetRequest) => {
+    await createTarget(data);
+    setIsCreateModalOpen(false); // 成功時にモーダルを閉じる
+  };
 
   return (
     <div className="w-full space-y-6">
@@ -27,79 +47,40 @@ export function TargetManagementPage() {
             栄養目標の作成・管理・切り替えを行えます
           </p>
         </div>
-        <Button onClick={m.openCreateModal} className="gap-2">
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           新規作成
         </Button>
       </div>
 
       {/* メインコンテンツ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左側: アクティブターゲット詳細 */}
-        <div className="lg:col-span-2">
-          <ActiveTargetCard
-            target={activeTarget}
-            isLoading={isLoadingActive}
-          />
-        </div>
+      <div className="space-y-6">
+        {/* アクティブターゲット詳細 */}
+        <ActiveTargetCard
+          target={activeTarget}
+          isLoading={isLoadingActive}
+        />
 
-        {/* 右側: 新規作成ボタン（モバイル時は非表示） */}
-        <div className="hidden lg:block">
-          <div className="sticky top-4">
-            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center hover:border-muted-foreground/50 transition-colors">
-              <Plus className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-              <p className="text-sm font-medium mb-2">新しいターゲット</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                目標に応じて栄養ターゲットを自動生成
-              </p>
-              <Button onClick={m.openCreateModal} variant="outline" size="sm">
-                作成する
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* 下部: ターゲット一覧 */}
-        <div className="lg:col-span-3">
-          <TargetListCard
-            targets={targetList}
-            activeTargetId={activeTarget?.id ?? null}
-            isLoading={isLoadingList}
-            isActivating={m.activateMutation.isPending}
-            isDeleting={m.deleteMutation.isPending}
-            onActivate={m.handleActivateTarget}
-            onDelete={m.handleDeleteTarget}
-          />
-        </div>
+        {/* ターゲット一覧 */}
+        <TargetListCard
+          targets={targetList}
+          activeTargetId={activeTarget?.id ?? null}
+          isLoading={isLoadingList}
+          isActivating={isActivating}
+          isDeleting={isDeleting}
+          onActivate={activateTarget}
+          onDelete={deleteTarget}
+        />
       </div>
 
       {/* ターゲット作成モーダル */}
       <CreateTargetModal
-        isOpen={m.isCreateModalOpen}
-        onClose={m.closeCreateModal}
-        onSubmit={m.handleCreateTarget}
-        isLoading={m.createMutation.isPending}
-        error={
-          m.createMutation.isError
-            ? m.createMutation.error instanceof Error
-              ? m.createMutation.error.message
-              : 'ターゲットの作成に失敗しました'
-            : null
-        }
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateTarget}
+        isLoading={isCreating}
+        error={createError?.message ?? null}
       />
-
-      {/* エラー表示 */}
-      {m.activateMutation.isError && (
-        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
-          ターゲットの有効化に失敗しました
-        </div>
-      )}
-
-      {m.deleteMutation.isError && (
-        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
-          ターゲットの削除に失敗しました
-        </div>
-      )}
     </div>
   );
 }

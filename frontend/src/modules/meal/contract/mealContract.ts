@@ -15,6 +15,8 @@ export const MealItemRequestSchema = z.object({
 
 export const MealItemResponseSchema = MealItemRequestSchema.extend({
   id: z.string(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
 });
 
 export const MealItemListResponseSchema = z.object({
@@ -24,4 +26,5 @@ export const MealItemListResponseSchema = z.object({
 export type MealType = z.infer<typeof MealTypeSchema>;
 export type MealItemRequest = z.infer<typeof MealItemRequestSchema>;
 export type MealItemResponse = z.infer<typeof MealItemResponseSchema>;
+export type MealItem = MealItemResponse; // Domain entity alias
 export type MealItemListResponse = z.infer<typeof MealItemListResponseSchema>;

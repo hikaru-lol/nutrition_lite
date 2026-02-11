@@ -7,6 +7,7 @@ from app.di.container import (
     get_create_checkout_session_use_case,
     get_billing_portal_url_use_case,
     get_handle_stripe_webhook_use_case,
+    get_clock,
 )
 from app.application.billing.use_cases.handle_stripe_webhook import (
     HandleStripeWebhookInput,
@@ -21,9 +22,11 @@ from app.application.billing.use_cases.create_checkout_session import (
     CreateCheckoutSessionUseCase,
 )
 from app.application.auth.dto.auth_user_dto import AuthUserDTO
+from app.application.auth.ports.clock_port import ClockPort
 from app.api.http.schemas.billing import (
     CheckoutSessionResponse,
     BillingPortalUrlResponse,
+    CurrentPlanResponse,
 )
 from app.api.http.dependencies.auth import get_current_user_dto
 
@@ -174,3 +177,49 @@ async def stripe_webhook(
 
     # Stripe は 2xx を返せば OK（ボディは空 or {} でよい）
     return {}
+
+
+@router.get(
+    "/current-plan",
+    response_model=CurrentPlanResponse,
+    responses={
+        401: {"description": "Unauthorized"},
+    },
+)
+def get_current_plan(
+    current_user: AuthUserDTO = Depends(get_current_user_dto),
+    clock: ClockPort = Depends(get_clock),
+) -> CurrentPlanResponse:
+    """
+    現在のユーザーのプラン情報を取得する。
+
+    【データソース】
+    - AuthUserDTO: get_current_user_dto から取得される認証済みユーザー情報
+      - このDTOは User エンティティから生成され、以下の情報を含む:
+        - plan: UserPlan enum (TRIAL, FREE, PAID)
+        - trial_ends_at: トライアル終了日時
+        - その他ユーザー基本情報
+
+    【トライアル状態の判定ロジック】
+    - trial_ends_at が null でない かつ 現在時刻 < trial_ends_at の場合にトライアル有効
+    - ClockPort を使用して現在時刻を取得し、環境に依存しない時刻判定を実現
+
+    【フロントエンドでの使用目的】
+    - billing 機能でのプラン表示
+    - 機能制限チェック（プレミアム機能へのアクセス制御）
+    - UI上でのプラン状態表示
+    """
+    now = clock.now()
+
+    # AuthUserDTO.trial_ends_at と現在時刻を比較してトライアル有効性を判定
+    # AuthUserDTO は User エンティティの TrialInfo.is_trial_active() と同じロジック
+    is_trial_active = (
+        current_user.trial_ends_at is not None
+        and now < current_user.trial_ends_at
+    )
+
+    return CurrentPlanResponse(
+        user_plan=current_user.plan.value,  # UserPlan enum の文字列値を返す
+        is_trial_active=is_trial_active,
+        trial_ends_at=current_user.trial_ends_at,
+    )

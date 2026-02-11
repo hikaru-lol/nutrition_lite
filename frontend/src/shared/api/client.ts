@@ -22,7 +22,10 @@ export async function clientApiFetch<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(text || `API Error: ${res.status}`);
+    const error = new Error(text || `API Error: ${res.status}`);
+    // HTTPステータスコードも含めたエラー情報を追加
+    (error as any).status = res.status;
+    throw error;
   }
 
   if (res.status === 204) return undefined as T;

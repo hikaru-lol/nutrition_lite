@@ -19,11 +19,24 @@ class MealRecommendationRepositoryPort(Protocol):
     ) -> MealRecommendation | None:
         ...
 
-    def list_recent(
+    def list_recent_by_user(
         self,
         user_id: UserId,
         limit: int,
     ) -> Sequence[MealRecommendation]:
+        ...
+
+    def count_by_user_and_date(
+        self,
+        user_id: UserId,
+        generated_for_date: date,
+    ) -> int:
+        ...
+
+    def get_latest_by_user(
+        self,
+        user_id: UserId,
+    ) -> MealRecommendation | None:
         ...
 
     def save(self, recommendation: MealRecommendation) -> None:
