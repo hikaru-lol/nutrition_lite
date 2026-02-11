@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -58,6 +59,11 @@ def create_app() -> FastAPI:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+
+    # 本番環境のフロントエンドURLを追加
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        origins.append(frontend_url)
 
     app.add_middleware(
         CORSMiddleware,
