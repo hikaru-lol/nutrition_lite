@@ -52,6 +52,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 markers = [
+  "unit: unit tests that use in-memory implementations",
   "real_integration: tests that hit real infra (real DB, MinIO, etc.)",
 ]
 

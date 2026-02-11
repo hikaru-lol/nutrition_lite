@@ -57,9 +57,65 @@ class _FakeChat:
         self.completions = completions
 
 
+# New classes for beta.chat.completions.parse() API
+class _FakeParsedMessage:
+    """Mock for message.parsed attribute in structured outputs"""
+    def __init__(self, parsed_obj) -> None:
+        self.parsed = parsed_obj
+
+
+class _FakeParsedChoice:
+    """Mock for choices[0] in structured outputs"""
+    def __init__(self, parsed_obj) -> None:
+        self.message = _FakeParsedMessage(parsed_obj)
+
+
+class _FakeParsedCompletion:
+    """Mock for completion response in structured outputs"""
+    def __init__(self, parsed_obj) -> None:
+        self.choices = [_FakeParsedChoice(parsed_obj)]
+
+
+class _FakeChatCompletionsParse:
+    """Mock for beta.chat.completions with parse() method"""
+    def __init__(self, response_dict: dict) -> None:
+        self._response_dict = response_dict
+
+    def parse(self, *args, **kwargs):
+        """Mock the parse() method for structured outputs"""
+        from app.infra.llm.daily_report_generator_openai import DailyReportResponseSchema
+
+        # If response is invalid, let Pydantic raise validation error
+        parsed_model = DailyReportResponseSchema(**self._response_dict)
+        return _FakeParsedCompletion(parsed_model)
+
+
+class _FakeBetaChat:
+    """Mock for beta.chat attribute"""
+    def __init__(self, completions: _FakeChatCompletionsParse) -> None:
+        self.completions = completions
+
+
+class _FakeBeta:
+    """Mock for beta attribute"""
+    def __init__(self, chat: _FakeBetaChat) -> None:
+        self.chat = chat
+
+
 class FakeOpenAIClient:
-    def __init__(self, content: str | None) -> None:
+    def __init__(self, content: str | None = None, response_dict: dict | None = None) -> None:
+        # Old API (deprecated, kept for backwards compatibility if needed)
         self.chat = _FakeChat(_FakeChatCompletions(content))
+
+        # New beta API with structured outputs
+        response = response_dict or {}
+        if content and not response_dict:
+            # For backwards compatibility, parse JSON content if provided
+            response = json.loads(content) if content else {}
+
+        beta_completions = _FakeChatCompletionsParse(response)
+        beta_chat = _FakeBetaChat(beta_completions)
+        self.beta = _FakeBeta(beta_chat)
 
 
 def _build_target_nutrients() -> tuple[TargetNutrient, ...]:
