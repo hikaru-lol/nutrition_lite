@@ -176,13 +176,6 @@ export function getTutorialCount(): number {
 }
 
 /**
- * 有効なチュートリアルIDかチェック
- */
-export function isValidTutorialId(id: string): id is TutorialId {
-  return id in TUTORIAL_STEPS;
-}
-
-/**
  * 全チュートリアルIDを取得
  */
 export function getAllTutorialIds(): TutorialId[] {

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import date as DateType
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from app.di.container import (
     get_auth_uow,
     get_generate_meal_recommendation_use_case,
 )
+from app.settings import settings
 
 # プロジェクトルート（backend/）を基準に .env を読む
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,7 +44,7 @@ def _list_active_user_ids() -> list[UserId]:
 def main() -> None:
     # 今日の日付
     # GenerateMealRecommendationUseCase 側が None を today に解決するので省略も可
-    base_date_str = os.getenv("JOB_RECOMMEND_BASE_DATE")
+    base_date_str = settings.JOB_RECOMMEND_BASE_DATE
     base_date: DateType | None = (
         DateType.fromisoformat(base_date_str) if base_date_str else None
     )

@@ -56,13 +56,48 @@ class Settings:
     # テストで Fake を使うかどうか切り替えるためのフラグ
     USE_FAKE_INFRA: bool = _env_bool("USE_FAKE_INFRA", True)
 
+    # ===== CORS =====
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
+
     # ===== OpenAI API 関連 =====
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    # OPENAI_ORG_ID: str | None = os.getenv("OPENAI_ORG_ID") or None
-    # OPENAI_PROJECT_ID: str | None = os.getenv("OPENAI_PROJECT_ID") or None
+
+    # --- OpenAI フィーチャーフラグ ---
+    USE_OPENAI_TARGET_GENERATOR: bool = _env_bool(
+        "USE_OPENAI_TARGET_GENERATOR", False)
+    USE_OPENAI_NUTRITION_ESTIMATOR: bool = _env_bool(
+        "USE_OPENAI_NUTRITION_ESTIMATOR", False)
+    USE_OPENAI_DAILY_REPORT_GENERATOR: bool = _env_bool(
+        "USE_OPENAI_DAILY_REPORT_GENERATOR", False)
+    USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR: bool = _env_bool(
+        "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", False)
+
+    # --- OpenAI モデル設定 ---
+    OPENAI_TARGET_MODEL: str = os.getenv(
+        "OPENAI_TARGET_MODEL", "gpt-4o-mini")
+    OPENAI_TARGET_TEMPERATURE: float = float(
+        os.getenv("OPENAI_TARGET_TEMPERATURE", "0.2"))
+    OPENAI_NUTRITION_MODEL: str = os.getenv(
+        "OPENAI_NUTRITION_MODEL", "gpt-4o-mini")
+    OPENAI_NUTRITION_TEMPERATURE: float = float(
+        os.getenv("OPENAI_NUTRITION_TEMPERATURE", "0.1"))
+    OPENAI_DAILY_REPORT_MODEL: str = os.getenv(
+        "OPENAI_DAILY_REPORT_MODEL", "gpt-4o-mini")
+    OPENAI_DAILY_REPORT_TEMPERATURE: float = float(
+        os.getenv("OPENAI_DAILY_REPORT_TEMPERATURE", "0.4"))
+    OPENAI_MEAL_RECOMMENDATION_MODEL: str = os.getenv(
+        "OPENAI_MEAL_RECOMMENDATION_MODEL", "gpt-4o-mini")
+    OPENAI_MEAL_RECOMMENDATION_TEMPERATURE: float = float(
+        os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4"))
+
+    # ===== 食事推薦レート制限 =====
+    MEAL_RECOMMENDATION_COOLDOWN_MINUTES: int = int(
+        os.getenv("MEAL_RECOMMENDATION_COOLDOWN_MINUTES", "30"))
+    MEAL_RECOMMENDATION_DAILY_LIMIT: int = int(
+        os.getenv("MEAL_RECOMMENDATION_DAILY_LIMIT", "5"))
 
     # ===== Stripe API 関連 =====
-    STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
+    STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "")
     STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     STRIPE_PRICE_ID: str = os.getenv("STRIPE_PRICE_ID", "")
     STRIPE_CHECKOUT_SUCCESS_URL: str = os.getenv(
@@ -71,6 +106,10 @@ class Settings:
         "STRIPE_CHECKOUT_CANCEL_URL", "")
     STRIPE_PORTAL_RETURN_URL: str = os.getenv(
         "STRIPE_PORTAL_RETURN_URL", "")
+
+    # ===== バッチジョブ =====
+    JOB_RECOMMEND_BASE_DATE: str = os.getenv(
+        "JOB_RECOMMEND_BASE_DATE", "")
 
 
 settings = Settings()

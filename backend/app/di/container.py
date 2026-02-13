@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # === Standard library =======================================================
-import os
 from typing import Callable, TypeVar, cast
 
 # === Third-party ============================================================
@@ -227,12 +226,6 @@ def _resolve_dep(value: object, fallback_factory: Callable[[], T]) -> T:
     return cast(T, value)
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.lower() in ("1", "true", "yes", "on")
-
 
 # =============================================================================
 # Common / DB / Clock
@@ -414,13 +407,11 @@ def get_target_generator() -> TargetGeneratorPort:
     """
     global _target_generator_singleton
     if _target_generator_singleton is None:
-        use_openai = _env_bool("USE_OPENAI_TARGET_GENERATOR", default=False)
-        if use_openai:
+        if settings.USE_OPENAI_TARGET_GENERATOR:
             _target_generator_singleton = OpenAITargetGenerator(
                 config=OpenAITargetGeneratorConfig(
-                    model=os.getenv("OPENAI_TARGET_MODEL", "gpt-4o-mini"),
-                    temperature=float(
-                        os.getenv("OPENAI_TARGET_TEMPERATURE", "0.2")),
+                    model=settings.OPENAI_TARGET_MODEL,
+                    temperature=settings.OPENAI_TARGET_TEMPERATURE,
                 )
             )
         else:
@@ -547,13 +538,11 @@ def get_nutrition_estimator() -> NutritionEstimatorPort:
     """
     global _nutrition_estimator_singleton
     if _nutrition_estimator_singleton is None:
-        use_openai = _env_bool("USE_OPENAI_NUTRITION_ESTIMATOR", default=False)
-        if use_openai:
+        if settings.USE_OPENAI_NUTRITION_ESTIMATOR:
             _nutrition_estimator_singleton = OpenAINutritionEstimator(
                 config=OpenAINutritionEstimatorConfig(
-                    model=os.getenv("OPENAI_NUTRITION_MODEL", "gpt-4o-mini"),
-                    temperature=float(
-                        os.getenv("OPENAI_NUTRITION_TEMPERATURE", "0.1")),
+                    model=settings.OPENAI_NUTRITION_MODEL,
+                    temperature=settings.OPENAI_NUTRITION_TEMPERATURE,
                 )
             )
         else:
@@ -630,12 +619,9 @@ def get_daily_nutrition_report_generator() -> DailyNutritionReportGeneratorPort:
     """
     global _daily_report_generator_singleton
     if _daily_report_generator_singleton is None:
-        use_openai = _env_bool(
-            "USE_OPENAI_DAILY_REPORT_GENERATOR", default=False)
-        if use_openai:
-            model = os.getenv("OPENAI_DAILY_REPORT_MODEL", "gpt-4o-mini")
-            temperature = float(
-                os.getenv("OPENAI_DAILY_REPORT_TEMPERATURE", "0.4"))
+        if settings.USE_OPENAI_DAILY_REPORT_GENERATOR:
+            model = settings.OPENAI_DAILY_REPORT_MODEL
+            temperature = settings.OPENAI_DAILY_REPORT_TEMPERATURE
             _daily_report_generator_singleton = OpenAIDailyNutritionReportGenerator(
                 config=OpenAIDailyReportGeneratorConfig(
                     model=model,
@@ -722,13 +708,9 @@ def get_meal_recommendation_generator() -> MealRecommendationGeneratorPort:
     """
     global _recommendation_generator_singleton
     if _recommendation_generator_singleton is None:
-        use_openai = _env_bool(
-            "USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR", default=False)
-        if use_openai:
-            model = os.getenv(
-                "OPENAI_MEAL_RECOMMENDATION_MODEL", "gpt-4o-mini")
-            temperature = float(
-                os.getenv("OPENAI_MEAL_RECOMMENDATION_TEMPERATURE", "0.4"))
+        if settings.USE_OPENAI_MEAL_RECOMMENDATION_GENERATOR:
+            model = settings.OPENAI_MEAL_RECOMMENDATION_MODEL
+            temperature = settings.OPENAI_MEAL_RECOMMENDATION_TEMPERATURE
             _recommendation_generator_singleton = OpenAIMealRecommendationGenerator(
                 config=OpenAIMealRecommendationGeneratorConfig(
                     model=model,
@@ -754,8 +736,8 @@ def get_generate_meal_recommendation_use_case(
     clock = _resolve_dep(clock, get_clock)
     plan_checker = _resolve_dep(plan_checker, get_plan_checker)
 
-    cooldown_minutes = int(os.getenv("MEAL_RECOMMENDATION_COOLDOWN_MINUTES", "30"))
-    daily_limit = int(os.getenv("MEAL_RECOMMENDATION_DAILY_LIMIT", "5"))
+    cooldown_minutes = settings.MEAL_RECOMMENDATION_COOLDOWN_MINUTES
+    daily_limit = settings.MEAL_RECOMMENDATION_DAILY_LIMIT
 
     # デバッグログ: 実際に読み込まれた制限値を出力
     import logging

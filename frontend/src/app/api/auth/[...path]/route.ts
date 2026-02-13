@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
+import { serverEnv } from '@/shared/config/env';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ORIGIN = process.env.BACKEND_INTERNAL_ORIGIN ?? 'http://127.0.0.1:8000';
-const PREFIX = process.env.BACKEND_AUTH_PREFIX ?? '/api/v1/auth';
+const ORIGIN = serverEnv.BACKEND_INTERNAL_ORIGIN;
+const PREFIX = serverEnv.BACKEND_AUTH_PREFIX;
 
 type Ctx = { params: Promise<{ path: string[] }> };
 
