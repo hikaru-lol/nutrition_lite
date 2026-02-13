@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import stripe
@@ -9,19 +8,19 @@ from app.application.billing.ports.stripe_client_port import (
     StripeClientPort,
     StripeSubscriptionInfo,
 )
+from app.settings import settings
 
 
 class StripeClient(StripeClientPort):
     """
     StripeClientPort の stripe-python 実装。
 
-    - STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET は環境変数から読む想定。
+    - STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET は settings.py 経由で読む。
     """
 
     def __init__(self, api_key: str | None = None, webhook_secret: str | None = None) -> None:
-        self._api_key = api_key or os.getenv("STRIPE_API_KEY", "")
-        self._webhook_secret = webhook_secret or os.getenv(
-            "STRIPE_WEBHOOK_SECRET", "")
+        self._api_key = api_key or settings.STRIPE_API_KEY
+        self._webhook_secret = webhook_secret or settings.STRIPE_WEBHOOK_SECRET
         stripe.api_key = self._api_key
 
     # --- Checkout / Portal -------------------------------------------

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import os
+from app.settings import settings
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -61,9 +61,8 @@ def create_app() -> FastAPI:
     ]
 
     # 本番環境のフロントエンドURLを追加
-    frontend_url = os.getenv("FRONTEND_URL")
-    if frontend_url:
-        origins.append(frontend_url)
+    if settings.FRONTEND_URL:
+        origins.append(settings.FRONTEND_URL)
 
     app.add_middleware(
         CORSMiddleware,
