@@ -1,5 +1,10 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
+import { serverEnv } from '@/shared/config/env';
+
+export function backendUrl(path: string, search: string = '') {
+  return `${serverEnv.BACKEND_INTERNAL_ORIGIN}${serverEnv.BACKEND_API_PREFIX}${path}${search}`;
+}
 
 export async function proxyToBackend(req: NextRequest, backendUrl: string) {
   const body =

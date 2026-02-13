@@ -1,12 +1,12 @@
-// src/shared/config/env.ts
-import { z } from 'zod';
+import 'server-only';
 
-const EnvSchema = z.object({
-  NEXT_PUBLIC_API_BASE_URL: z.string().optional().default(''), // 同一オリジンなら空でOK
-});
+const BACKEND_INTERNAL_ORIGIN =
+  process.env.BACKEND_INTERNAL_ORIGIN ?? 'http://127.0.0.1:8000';
+const BACKEND_API_PREFIX =
+  process.env.BACKEND_API_PREFIX ?? '/api/v1';
 
-export const env = EnvSchema.parse({
-  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-});
-
-export const API_BASE_URL = env.NEXT_PUBLIC_API_BASE_URL;
+export const serverEnv = {
+  BACKEND_INTERNAL_ORIGIN,
+  BACKEND_API_PREFIX,
+  BACKEND_AUTH_PREFIX: process.env.BACKEND_AUTH_PREFIX ?? '/api/v1/auth',
+} as const;

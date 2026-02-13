@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-
-const BACKEND = process.env.BACKEND_INTERNAL_ORIGIN ?? 'http://127.0.0.1:8000';
-const PREFIX = '/api/v1';
+import { backendUrl } from '@/shared/api/proxy';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +15,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 新しい billing/current-plan エンドポイントを使用
-    const planResponse = await fetch(`${BACKEND}${PREFIX}/billing/current-plan`, {
+    const planResponse = await fetch(backendUrl('/billing/current-plan'), {
       headers: {
         'Cookie': `ACCESS_TOKEN=${accessToken}`,
       },
