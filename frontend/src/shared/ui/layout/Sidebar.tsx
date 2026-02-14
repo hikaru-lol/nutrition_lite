@@ -4,9 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3,
   Target,
-  User,
   CreditCard,
   Home,
   ChevronLeft,
@@ -45,12 +43,6 @@ const navItems: NavItem[] = [
     title: '目標',
     href: '/targets',
     icon: Target,
-  },
-  {
-    title: 'レポート',
-    href: '/reports',
-    icon: BarChart3,
-    badge: 'Soon',
   },
   {
     title: '料金プラン',

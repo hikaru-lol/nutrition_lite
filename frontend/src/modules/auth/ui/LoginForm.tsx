@@ -69,6 +69,20 @@ export function LoginForm(props: { onSuccess?: () => void }) {
         >
           {m.isSubmitting ? 'ログイン中…' : 'ログイン'}
         </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={m.isSubmitting}
+          onClick={() => {
+            form.setValue('email', 'demo@example.com');
+            form.setValue('password', 'demo1234demo');
+            form.handleSubmit(onSubmit)();
+          }}
+        >
+          デモアカウントでログイン
+        </Button>
       </CardContent>
     </Card>
   );
