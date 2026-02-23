@@ -33,14 +33,14 @@ export function AppLayout({ children, user, showSidebar = true }: AppLayoutProps
         showMenuButton={showSidebar}
       />
 
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex">
         {/* サイドバー */}
         {showSidebar && (
           <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
         )}
 
         {/* メインコンテンツ */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 min-h-[calc(100vh-4rem)]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
             {children}
           </div>
