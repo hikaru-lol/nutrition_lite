@@ -1,84 +1,213 @@
-# Nutrition Backend
+# 🥗 Nutrition Tracker
 
-FastAPI と SQLAlchemy で構成された栄養管理アプリ向けバックエンドです。まずは認証まわりを作り込み、Cookie ベースのアクセストークン / リフレッシュトークン運用を支えるユースケースとドメイン層を整備しています。今後 API を拡張しやすいようにクリーンアーキテクチャ寄りのレイヤー構成・DI コンテナ・ユニットテスト群を用意済みです。
+**AI駆動の栄養管理SaaS** — 日々の食事記録・栄養分析・目標管理・食事推薦を提供するフルスタックWebアプリケーション
 
-## リポジトリ構成
+[![Backend Unit Tests](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-unit-tests.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
+[![Backend Integration Tests](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-integration-tests.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
+[![Backend Real Integration](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-real-integration.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
 
-- `backend/app` – FastAPI アプリ本体。`api`(HTTP I/F), `application`(ユースケース), `domain`, `infra`, `di`, `settings` でレイヤーを分離。
-- `backend/tests` – application/domain 層を中心にした unit / integration テスト。
-- `backend/docs` – OpenAPI スナップショットや refactor メモなど技術ドキュメント。
-- `docs/GIT_WORKFLOW.md` – ブランチ戦略や PR 運用ルール。
-- `scripts/` – 将来的な補助スクリプト置き場。
+---
 
-## セットアップ
+## Tech Stack
 
-### 前提
+**Frontend:** Next.js 16 (App Router) / React 19 / TypeScript 5 / TailwindCSS v4 / TanStack Query v5
 
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) または標準 `pip`
-- (推奨) ローカル DB: SQLite もしくは PostgreSQL
+**Backend:** FastAPI / SQLAlchemy 2.0 / PostgreSQL 16 / Pydantic v2
 
-### 依存関係のインストール
+**AI:** OpenAI API（栄養推定・目標生成・日次レポート・食事推薦）
 
-```bash
-cd backend
-uv sync                     # 推奨: uv によるロックファイル運用
-# もしくは
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+**Infra:** Docker Compose / GitHub Actions (CI 3ワークフロー) / Vercel / Railway
+
+**Other:** Stripe（サブスクリプション課金） / MinIO（S3互換ストレージ） / JWT認証（Cookieベース）
+
+---
+
+## Architecture
+
+### システム全体構成
+
+```
+Browser (React 19)
+    ↕
+Next.js BFF (API Routes)  ← Cookie中継・プロキシ
+    ↕
+FastAPI REST API
+    ↕
+┌────────────┬────────────┬────────────┐
+│ PostgreSQL │   MinIO    │  OpenAI    │
+│     16     │  (S3互換)  │   API      │
+└────────────┴────────────┴────────────┘
+                                │
+                            Stripe
 ```
 
-### 主な環境変数（`app/settings.py`）
+### バックエンド：クリーンアーキテクチャ + ポート&アダプター
 
-| 変数 | デフォルト | 役割 |
-| --- | --- | --- |
-| `ENV` | `local` | 実行環境タグ。ログや将来の分岐に使用予定。 |
-| `DATABASE_URL` | `sqlite+pysqlite:///:memory:` | SQLAlchemy 用接続。ローカル開発では `sqlite:///./local.db`、本番では PostgreSQL を指定。 |
-| `JWT_SECRET_KEY` / `JWT_ALGORITHM` | `dev-secret-change-me` / `HS256` | 署名キーとアルゴリズム。 |
-| `ACCESS_TOKEN_TTL_MINUTES` | `15` | アクセストークン寿命（分）。 |
-| `REFRESH_TOKEN_TTL_DAYS` | `7` | リフレッシュトークン寿命（日）。 |
-| `BACKEND_DOMAIN` | `localhost` | Cookie に紐づくドメイン。 |
-| `COOKIE_SECURE` / `COOKIE_SAMESITE` | `False` / `lax` | Set-Cookie の制御。HTTPS 本番では `COOKIE_SECURE=1` 推奨。 |
+```
+┌──────────────────────────────────────────────┐
+│  api/http    ← HTTP層（Router / Schema）      │
+├──────────────────────────────────────────────┤
+│  application ← ユースケース層（UseCase / DTO） │
+├──────────────────────────────────────────────┤
+│  domain      ← ドメイン層（Entity / VO）       │
+├──────────────────────────────────────────────┤
+│  infra       ← インフラ層（DB / LLM / Stripe）│
+└──────────────────────────────────────────────┘
 
-`.env` を backend 直下に置き、`uvicorn` 起動前に読み込ませる運用が簡単です。
-
-### サーバー起動
-
-```bash
-cd backend
-uv run uvicorn app.main:app --reload
-# または (仮想環境有効化済みなら)
-uvicorn app.main:app --reload
+依存方向:  api/http → application → domain ← infra
 ```
 
-- Swagger UI: http://localhost:8000/docs
-- Redoc: http://localhost:8000/redoc
+- **Unit of Work** でトランザクション管理
+- **Repository パターン** でポート定義 → SQLAlchemy実装
+- **DI（依存性注入）** で FastAPI Depends() による自動解決
+- **Feature Flags** で環境変数により OpenAI / Stub 実装を切替
 
-## 実装されている認証 API
+### フロントエンド：5層レイヤードアーキテクチャ
 
-| Method | Path | 説明 |
-| --- | --- | --- |
-| `POST /api/v1/auth/register` | ユーザー作成 & 自動ログイン。成功時に HTTP-only `ACCESS_TOKEN` / `REFRESH_TOKEN` をセット。 |
-| `POST /api/v1/auth/login` | メール + パスワードで認証し、Cookie にトークンを書き込み。 |
-| `POST /api/v1/auth/logout` | 現状はクライアント側 Cookie を削除（将来的にサーバーサイド無効化予定）。 |
-| `GET /api/v1/auth/me` | Cookie のアクセストークンから現在のユーザー情報を返却。 |
-| `DELETE /api/v1/auth/me` | 自アカウント削除 + Cookie クリア。 |
-| `POST /api/v1/auth/refresh` | `REFRESH_TOKEN` Cookie から新しいトークンペアを払い出し。 |
-
-FastAPI レイヤーでは DTO/Schema を使ったバリデーションを行い、`app.application` 配下のユースケースがドメインルールを実装、`app.infra` が SQLAlchemy リポジトリ・Bcrypt ハッシャー・JWT サービスを担います。DI は `app.di.container` で管理しており、テスト時には各 Port を差し替え可能です。
-
-## テスト
-
-```bash
-cd backend
-uv run pytest      # もしくは pytest
+```
+Layer 1: UI Presentation     ← 純粋な表現コンポーネント
+Layer 2: UI Orchestration     ← イベントハンドリング
+Layer 3: Page Aggregation     ← ページレベルの機能統合
+Layer 4: Feature Logic        ← React Query + 状態管理
+Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 ```
 
-- `tests/unit` : ユースケース単位の検証。フェイクリポジトリを使って振る舞いを担保。
-- `tests/integration` : 実際の SQLAlchemy セッション・JWT 実装と合わせた疎通確認。
+---
 
-## 今後の追加に向けて
+## Features
 
-- 認証以外の機能追加時も、application 層に新ユースケース・infra にリポジトリ実装を足すだけで API へ組み込み可能です。
-- `backend/docs/openapi` に API スナップショットを置いているので、更新時は `uv run uvicorn ...` + `curl` 等で随時確認してください。
-- 運用ルールや PR の流れは `docs/GIT_WORKFLOW.md` を参照。
+| 機能 | 説明 | 技術的ポイント |
+|------|------|---------------|
+| 🔐 認証 | Cookie JWT + BFFプロキシ | HttpOnly / SameSite=Lax / XSS防止 |
+| 🎯 栄養目標 | AI生成 + 手動設定 | OpenAI → ポート抽象化 → Stub切替 |
+| 🍽️ 食事記録 | 日次記録 + AI栄養推定 | 10種栄養素の自動計算 |
+| 📊 日次レポート | AI分析レポート生成 | 目標との差分分析 + 改善提案 |
+| 🤖 食事推薦 | 個人最適化された提案 | レート制限（30分間隔 / 日次5回） |
+| 💳 課金 | Stripe サブスクリプション | Checkout / Portal / Webhook |
+| 📅 カレンダー | 月間記録一覧 | 記録完了ステータス可視化 |
+
+---
+
+## Testing Strategy
+
+**3層テストアーキテクチャ** で段階的に品質を検証。
+
+```
+┌──────────────────────────────────────┐
+│  Real Integration Tests              │  ← PostgreSQL + MinIO 実接続
+│  tests/integration_real/             │
+├──────────────────────────────────────┤
+│  Integration Tests (Fake Infra)      │  ← インメモリ実装で高速実行
+│  tests/integration/                  │
+├──────────────────────────────────────┤
+│  Unit Tests                          │  ← モック / フェイクで独立実行
+│  tests/unit/                         │
+└──────────────────────────────────────┘
+```
+
+- 全ドメインに **Fake実装** を用意（InMemoryRepository, FakePasswordHasher, FixedClock）
+- GitHub Actions で **3ワークフロー** が自動実行
+- Real Integration テストでは PostgreSQL 16 + MinIO をサービスコンテナで起動
+
+---
+
+## Project Structure
+
+```
+/workspace
+├── frontend/src/
+│   ├── app/                    # Next.js App Router（22 BFF Routes）
+│   ├── modules/                # 機能モジュール（12モジュール）
+│   │   ├── auth/    meal/    nutrition/    target/
+│   │   ├── billing/ profile/ calendar/     today/
+│   │   └── reports/ tutorial/ meal-recommendation/
+│   ├── components/ui/          # shadcn/ui（13コンポーネント）
+│   └── shared/                 # API Client / Providers / Hooks
+│
+├── backend/app/
+│   ├── api/http/               # 10 Router / Schemas / Mappers
+│   ├── application/            # 35 UseCases / DTOs / Ports
+│   ├── domain/                 # 7 Domains / Entities / VOs
+│   ├── infra/                  # DB(14テーブル) / LLM / Stripe / Storage
+│   └── di/container.py         # DIコンテナ
+│
+├── .github/workflows/          # CI/CD（3ワークフロー）
+└── .devcontainer/              # Docker Compose 開発環境
+```
+
+---
+
+## Design Decisions
+
+| 設計判断 | 選択 | 理由 |
+|---------|------|------|
+| 認証方式 | Cookie JWT + BFF | XSS防止。フロントエンドにトークンを露出させない |
+| AI統合 | ポート&アダプター | 環境変数でOpenAI/Stub切替。テスト時に外部API不要 |
+| トランザクション | Unit of Work | 成功時commit/失敗時rollback を一元管理 |
+| フロントエンド状態 | TanStack Query | サーバー状態のキャッシュ・再検証を宣言的に管理 |
+| API通信 | BFFプロキシ | CORS回避 + Cookie中継 + バックエンドURL隠蔽 |
+| テスト | 3層構造 | 速度と信頼性のトレードオフを段階的に解決 |
+| 課金 | Stripe Checkout | PCI DSS準拠不要。Webhook で状態同期 |
+
+---
+
+## Getting Started
+
+### 前提条件
+
+- Docker & Docker Compose
+- Node.js 20+（pnpm 10+）
+- Python 3.11+（uv）
+
+### セットアップ
+
+```bash
+# リポジトリのクローン
+git clone https://github.com/{your-username}/nutrition-tracker.git
+cd nutrition-tracker
+
+# devcontainerで起動（推奨）
+# VSCodeで開く → "Reopen in Container" を選択
+
+# または手動起動
+docker compose up -d db minio
+
+# バックエンド
+cd backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --port 8000
+
+# フロントエンド
+cd frontend
+pnpm install
+pnpm dev
+```
+
+### テスト実行
+
+```bash
+# Unit Tests
+uv run pytest tests/unit/
+
+# Integration Tests（Fake Infra）
+uv run pytest tests/integration/
+
+# Real Integration Tests（要 PostgreSQL + MinIO）
+uv run pytest -m "real_integration"
+```
+
+---
+
+## 規模感
+
+| 項目 | 数値 |
+|------|------|
+| バックエンド ドメイン | 7 |
+| API エンドポイント | 35 |
+| DBテーブル | 14 |
+| ユースケース | 35 |
+| フロントエンド モジュール | 12 |
+| BFF Routes | 22 |
+| CI ワークフロー | 3 |
+| AI機能（ポート抽象化） | 4 |
