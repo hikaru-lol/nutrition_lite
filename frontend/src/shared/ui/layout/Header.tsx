@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Menu, Bell, Settings, LogOut, User } from 'lucide-react';
+import { Menu, Settings, LogOut, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -50,17 +50,11 @@ export function Header({ user, onMenuClick, showMenuButton = true }: HeaderProps
           </Link>
         </div>
 
-        {/* 右側: テーマ切り替え + 通知 + ユーザーメニュー */}
+        {/* 右側: テーマ切り替え + ユーザーメニュー */}
         <div className="flex items-center gap-2">
           {/* テーマ切り替え */}
           <ThemeToggle />
 
-          {/* 通知ベル（将来実装） */}
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="h-4 w-4" />
-            {/* 通知バッジ */}
-            <span className="absolute -top-1 -right-1 h-2 w-2 bg-destructive rounded-full"></span>
-          </Button>
 
           {/* ユーザーメニュー */}
           {user ? (
