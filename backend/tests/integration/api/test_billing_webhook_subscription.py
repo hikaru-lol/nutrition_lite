@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
+from stripe import error as stripe_error
 from app.main import app
 
 
@@ -62,8 +63,10 @@ class TestBillingWebhook:
     @patch('app.infra.billing.stripe_client.stripe.Webhook.construct_event')
     def test_webhook_invalid_signature(self, mock_construct_event, client):
         """不正なシグネチャでwebhookが拒否されること"""
-        # モックで例外を発生させる
-        mock_construct_event.side_effect = Exception("Invalid signature")
+        # モックで正しいStripeエラーを発生させる
+        mock_construct_event.side_effect = stripe_error.SignatureVerificationError(
+            "Invalid signature", "test_sig_header"
+        )
 
         # テスト実行
         response = client.post(
