@@ -2,27 +2,34 @@
 
 **AI駆動の栄養管理SaaS** — 日々の食事記録・栄養分析・目標管理・食事推薦を提供するフルスタックWebアプリケーション
 
-[![Backend Unit Tests](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-unit-tests.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
-[![Backend Integration Tests](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-integration-tests.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
-[![Backend Real Integration](https://github.com/{your-username}/nutrition-tracker/actions/workflows/backend-real-integration.yml/badge.svg)](https://github.com/{your-username}/nutrition-tracker/actions)
+[![Backend Unit Tests](https://github.com/hikaru-lol/nutrition_lite/actions/workflows/backend-unit-tests.yml/badge.svg)](https://github.com/hikaru-lol/nutrition_lite/actions)
+[![Backend Integration Tests](https://github.com/hikaru-lol/nutrition_lite/actions/workflows/backend-integration-tests.yml/badge.svg)](https://github.com/hikaru-lol/nutrition_lite/actions)
+[![Backend Real Integration](https://github.com/hikaru-lol/nutrition_lite/actions/workflows/backend-real-integration.yml/badge.svg)](https://github.com/hikaru-lol/nutrition_lite/actions)
 
 ---
 
-## Tech Stack
+## なぜこの規模なのか？
 
-**Frontend:** Next.js 16 (App Router) / React 19 / TypeScript 5 / TailwindCSS v4 / TanStack Query v5
+AI駆動開発（Claude Code, Cursor等）により、個人でもエンタープライズレベルのアーキテクチャと規模を実現できることを実証するプロジェクトです。
+APIエンドポイント35本・ユースケース35・DBテーブル14の規模を、4ヶ月で単独構築しています。
 
-**Backend:** FastAPI / SQLAlchemy 2.0 / PostgreSQL 16 / Pydantic v2
+---
+
+## 技術スタック
+
+**フロントエンド:** Next.js 16 (App Router) / React 19 / TypeScript 5 / TailwindCSS v4 / TanStack Query v5
+
+**バックエンド:** FastAPI / SQLAlchemy 2.0 / PostgreSQL 16 / Pydantic v2
 
 **AI:** OpenAI API（栄養推定・目標生成・日次レポート・食事推薦）
 
-**Infra:** Docker Compose / GitHub Actions (CI 3ワークフロー) / Vercel / Railway
+**インフラ:** Docker Compose / GitHub Actions (CI 3ワークフロー) / Vercel / Railway
 
-**Other:** Stripe（サブスクリプション課金） / MinIO（S3互換ストレージ） / JWT認証（Cookieベース）
+**その他:** Stripe（サブスクリプション課金） / MinIO（S3互換ストレージ） / JWT認証（Cookieベース）
 
 ---
 
-## Architecture
+## アーキテクチャ
 
 ### システム全体構成
 
@@ -74,7 +81,7 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 
 ---
 
-## Features
+## 主要機能
 
 | 機能 | 説明 | 技術的ポイント |
 |------|------|---------------|
@@ -88,7 +95,7 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 
 ---
 
-## Testing Strategy
+## テスト戦略
 
 **3層テストアーキテクチャ** で段階的に品質を検証。
 
@@ -111,7 +118,7 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 
 ---
 
-## Project Structure
+## プロジェクト構成
 
 ```
 /workspace
@@ -137,7 +144,7 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 
 ---
 
-## Design Decisions
+## 設計判断
 
 | 設計判断 | 選択 | 理由 |
 |---------|------|------|
@@ -151,7 +158,7 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 
 ---
 
-## Getting Started
+## セットアップ
 
 ### 前提条件
 
@@ -159,12 +166,12 @@ Layer 5: Domain Services      ← API呼び出し + ビジネスロジック
 - Node.js 20+（pnpm 10+）
 - Python 3.11+（uv）
 
-### セットアップ
+### 起動方法
 
 ```bash
 # リポジトリのクローン
-git clone https://github.com/{your-username}/nutrition-tracker.git
-cd nutrition-tracker
+git clone https://github.com/hikaru-lol/nutrition_lite.git
+cd nutrition_lite
 
 # devcontainerで起動（推奨）
 # VSCodeで開く → "Reopen in Container" を選択
@@ -187,13 +194,13 @@ pnpm dev
 ### テスト実行
 
 ```bash
-# Unit Tests
+# ユニットテスト
 uv run pytest tests/unit/
 
-# Integration Tests（Fake Infra）
+# 統合テスト（Fake Infra）
 uv run pytest tests/integration/
 
-# Real Integration Tests（要 PostgreSQL + MinIO）
+# 実インフラ統合テスト（要 PostgreSQL + MinIO）
 uv run pytest -m "real_integration"
 ```
 
