@@ -1,5 +1,5 @@
 ---
-description: 'FRONTEND BFF: Next.js Route Handlers proxy rules (params/cookies/set-cookie)'
+description: 'フロントエンドBFF: Next.js Route Handlersプロキシルール (params/cookies/set-cookie)'
 globs:
   [
     'frontend/src/app/api/**/*.{ts,tsx}',
@@ -8,27 +8,27 @@ globs:
 alwaysApply: false
 ---
 
-# BFF RULES (Next.js app/api)
+# BFFルール (Next.js app/api)
 
-## Proxy boundary
+## プロキシ境界
 
-- Frontend never calls backend directly. It calls `/api/*` (BFF).
-- BFF proxies to backend `/api/v1/*`.
+- フロントエンドは直接バックエンドを呼び出さない。`/api/*` (BFF)を呼び出す。
+- BFFはバックエンド `/api/v1/*` にプロキシ。
 
-## Route Handler params gotcha
+## Route Handler paramsの落とし穴
 
-- Treat params as potentially async:
-  - Always `const params = await ctx.params` (or equivalent)
-  - Keep this consistent across methods (GET/POST/etc.)
+- paramsを非同期の可能性ありとして扱う:
+  - 常に `const params = await ctx.params` (または同等品)
+  - メソッド間 (GET/POST等) で一貫性を保つ
 
-## Cookies
+## Cookie
 
-- Forward request cookies to backend (send `cookie` header).
-- Forward backend `set-cookie` back to the client.
-- Support multiple `set-cookie` headers.
+- リクエストcookieをバックエンドに転送 (`cookie`ヘッダー送信)。
+- バックエンドの`set-cookie`をクライアントに転送。
+- 複数の`set-cookie`ヘッダーをサポート。
 
-## Errors
+## エラー
 
-- Do not swallow backend errors.
-- Prefer pass-through of status + payload when safe.
-- Normalize errors in `frontend/src/shared/api/*` (unknown → typed/app-error).
+- バックエンドエラーを隠さない。
+- 安全な場合はステータス + ペイロードのパススルーを優先。
+- `frontend/src/shared/api/*`でエラーを正規化 (unknown → 型付き/アプリエラー)。

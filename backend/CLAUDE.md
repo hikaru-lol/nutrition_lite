@@ -2,7 +2,7 @@
 
 ## このディレクトリについて
 
-FastAPI ベースの RESTful API。クリーンアーキテクチャ + ポート&アダプターパターンを採用。
+FastAPI ベースの RESTful API。クリーンアーキテクチャ + ポート&アダプターパターンを採用。栄養管理アプリケーションのバックエンドAPIで、食事記録、栄養分析、AI推薦、Stripeサブスクリプション機能を提供。
 
 ## 技術スタック
 
@@ -10,11 +10,13 @@ FastAPI ベースの RESTful API。クリーンアーキテクチャ + ポート
 - **ORM**: SQLAlchemy 2.0, Alembic (マイグレーション)
 - **バリデーション**: Pydantic v2
 - **認証**: JWT (python-jose), bcrypt
-- **データベース**: PostgreSQL (本番), SQLite (開発/テスト)
+- **データベース**: PostgreSQL 16 (本番/開発), SQLite (テスト)
 - **ストレージ**: MinIO (S3 互換)
-- **AI**: OpenAI API
-- **決済**: Stripe
+- **AI**: OpenAI API (GPT-4)
+- **決済**: Stripe (Subscription, Checkout, Webhook)
 - **パッケージマネージャ**: uv
+- **テスト**: pytest, pytest-asyncio
+- **CI/CD**: GitHub Actions
 
 ## ディレクトリ構造
 
@@ -70,18 +72,36 @@ app/
 | `meal`      | 食事記録                   |
 | `nutrition` | 栄養計算・レポート         |
 | `billing`   | 課金・サブスクリプション   |
+| `calendar`  | カレンダー機能             |
+| `tutorial`  | チュートリアル             |
 
 ## コマンド
 
 ```bash
+# 依存関係管理
 uv sync                                    # 依存関係インストール
-uv run uvicorn app.main:app --reload       # 開発サーバー (localhost:8000)
+uv add <package>                           # パッケージ追加
+
+# 開発サーバー
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# データベース
 uv run alembic upgrade head                # マイグレーション実行
+uv run alembic revision --autogenerate -m "description"  # マイグレーション作成
+
+# テスト
 uv run pytest -m "not real_integration" tests/unit/        # ユニットテスト
 uv run pytest -m "not real_integration" tests/integration  # 統合テスト
 uv run pytest -m "real_integration" --maxfail=1            # 実インフラテスト
+uv run pytest tests/integration/api/test_billing_webhook_subscription.py  # 特定テスト実行
+
+# コード品質
 uv run ruff check                          # Lint
+uv run ruff format                         # フォーマット
 uv run mypy app                            # 型チェック
+
+# Stripe CLI (開発用)
+stripe listen --forward-to localhost:8000/api/v1/billing/stripe/webhook
 ```
 
 ## クリーンアーキテクチャ
@@ -352,7 +372,10 @@ OPENAI_API_KEY=sk-...
 # Stripe
 STRIPE_API_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID=price_...
+STRIPE_PRICE_ID_MONTHLY=price_...
+STRIPE_PRICE_ID_YEARLY=price_...
+STRIPE_SUCCESS_URL=http://localhost:3000/billing/success
+STRIPE_CANCEL_URL=http://localhost:3000/billing/plan
 
 # MinIO
 MINIO_ENDPOINT=minio:9000
@@ -365,12 +388,39 @@ MINIO_BUCKET_NAME=nutrition-dev
 
 | モジュール | エンドポイント                                    |
 | ---------- | ------------------------------------------------- |
-| auth       | POST /register, /login, /refresh, /logout, DELETE /account |
-| profile    | GET /profile, PUT /profile                        |
-| target     | GET/POST /targets, GET/PATCH/DELETE /targets/{id}, POST /targets/{id}/activate |
-| meal       | GET/POST /meals, PATCH/DELETE /meals/{id}         |
-| nutrition  | POST /nutrition/compute, GET /nutrition/daily     |
-| billing    | POST /billing/checkout, GET /billing/portal       |
+| auth       | POST /register, /login, /refresh, /logout, DELETE /me |
+| profile    | GET /profile/me, POST /profile, PUT /profile/{id} |
+| target     | GET/POST /targets, GET/PATCH/DELETE /targets/{id}, POST /targets/{id}/activate, GET /targets/active |
+| meal       | GET/POST /meals, GET /meals/{date}, PATCH/DELETE /meals/{id} |
+| nutrition  | POST /nutrition/compute, GET /nutrition/daily/{date}, GET /nutrition/summary |
+| billing    | POST /billing/checkout, POST /billing/create-checkout-session, GET /billing/portal, POST /billing/stripe/webhook |
+| calendar   | GET /calendar/records                             |
+| tutorial   | GET /tutorial/steps/{id}, POST /tutorial/steps/{id}/complete |
+| daily_report | GET /daily-reports/{date}, POST /daily-reports/generate |
+| meal_recommendation | POST /recommendations/meal, GET /recommendations/meal/history |
+
+## 主要機能
+
+### 食事管理
+- 日付別の食事記録 (朝食・昼食・夕食・間食)
+- カロリー・栄養素の自動計算
+- 画像アップロード対応
+
+### AI機能 (OpenAI GPT-4)
+- **栄養推定**: 食事名から栄養情報を自動推定
+- **日次レポート生成**: 1日の食事内容を分析し改善提案
+- **食事推薦**: 目標に基づく最適な食事提案
+- **栄養目標生成**: 個人情報から適切な栄養目標を自動生成
+
+### サブスクリプション (Stripe)
+- 月額・年額プランのサブスクリプション管理
+- Stripe Checkout によるセキュアな決済フロー
+- Webhook による状態同期（サブスクリプション更新・キャンセル）
+- Customer Portal による顧客自身での管理
+
+### チュートリアル
+- ステップバイステップのオンボーディング
+- 進捗トラッキング
 
 ## 新規機能実装の流れ
 

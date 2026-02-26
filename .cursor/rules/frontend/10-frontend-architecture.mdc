@@ -1,12 +1,12 @@
 ---
-description: 'FRONTEND: strict boundaries (UI→Model→API→shared/api→BFF) + server-only safety'
+description: 'フロントエンド: 厳格な境界 (UI→Model→API→shared/api→BFF) + サーバー専用安全性'
 globs: ['frontend/**/*']
 alwaysApply: false
 ---
 
-# FRONTEND ARCHITECTURE (STRICT)
+# フロントエンドアーキテクチャ (厳格)
 
-## Dependency direction (never break)
+## 依存方向 (絶対に破らない)
 
 ```
 UI (modules/*/ui)
@@ -17,101 +17,101 @@ UI (modules/*/ui)
           → Backend (/api/v1)
 ```
 
-## Directory structure
+## ディレクトリ構造
 
 ### `app/` — Next.js App Router
 
-| Path                | Role                                     |
+| パス                | 役割                                     |
 | ------------------- | ---------------------------------------- |
-| `app/(public)/`     | Public pages (auth/login, auth/register) |
-| `app/(onboarding)/` | First-time setup flow                    |
-| `app/(app)/`        | Authenticated main app                   |
-| `app/api/`          | **BFF** — proxy to backend               |
-| `app/layout.tsx`    | Root layout                              |
-| `app/providers.tsx` | Client providers (React Query, etc.)     |
+| `app/(public)/`     | 公開ページ (auth/login, auth/register) |
+| `app/(onboarding)/` | 初回セットアップフロー                    |
+| `app/(app)/`        | 認証済みメインアプリ                   |
+| `app/api/`          | **BFF** — バックエンドへのプロキシ               |
+| `app/layout.tsx`    | ルートレイアウト                              |
+| `app/providers.tsx` | クライアントプロバイダー (React Query等)     |
 
-- `(group)` does not appear in URL. Avoid URL collisions.
+- `(group)` はURLに表示されない。URLの衝突を防ぐ。
 
-### `modules/` — Feature modules
+### `modules/` — 機能モジュール
 
-Each feature has isolated subdirectories:
+各機能は分離されたサブディレクトリを持つ:
 
-| Subdir      | Role                                                      |
+| サブディレクトリ      | 役割                                                      |
 | ----------- | --------------------------------------------------------- |
-| `ui/`       | React components (UI layer)                               |
-| `model/`    | PageModel hooks (`useXxxPageModel`) + Zod schema          |
-| `api/`      | BFF calls via `clientApiFetch`                            |
-| `contract/` | Type definitions / Zod schemas                            |
-| `index.ts`  | **Client-safe exports only**                              |
-| `server.ts` | **Server-only exports** (`import 'server-only'` required) |
+| `ui/`       | Reactコンポーネント (UI層)                               |
+| `model/`    | PageModelフック (`useXxxPageModel`) + Zodスキーマ          |
+| `api/`      | `clientApiFetch`経由のBFF呼び出し                            |
+| `contract/` | 型定義 / Zodスキーマ                            |
+| `index.ts`  | **クライアントセーフなエクスポートのみ**                              |
+| `server.ts` | **サーバー専用エクスポート** (`import 'server-only'` 必須) |
 
-### `shared/` — Shared utilities
+### `shared/` — 共有ユーティリティ
 
-| Path                      | Role                                     |
+| パス                      | 役割                                     |
 | ------------------------- | ---------------------------------------- |
-| `shared/api/client.ts`    | Client fetch wrapper (to BFF `/api/*`)   |
-| `shared/api/bffServer.ts` | Server-side fetch                        |
-| `shared/api/proxy.ts`     | BFF proxy utility (server-only)          |
-| `shared/api/errors.ts`    | Error normalization                      |
-| `shared/api/contracts/`   | Shared Zod schemas                       |
-| `shared/lib/query/`       | TanStack Query config                    |
-| `shared/ui/`              | Common UI (EmptyState, ErrorState, etc.) |
+| `shared/api/client.ts`    | クライアントfetchラッパー (BFF `/api/*`へ)   |
+| `shared/api/bffServer.ts` | サーバーサイドfetch                        |
+| `shared/api/proxy.ts`     | BFFプロキシユーティリティ (サーバー専用)          |
+| `shared/api/errors.ts`    | エラー正規化                      |
+| `shared/api/contracts/`   | 共有Zodスキーマ                       |
+| `shared/lib/query/`       | TanStack Query設定                    |
+| `shared/ui/`              | 共通UI (EmptyState, ErrorState等) |
 
-### `components/ui/` — shadcn/ui components
+### `components/ui/` — shadcn/uiコンポーネント
 
-Reusable base UI components (button, card, input, etc.)
+再利用可能なベースUIコンポーネント (button, card, input等)
 
-## Layer rules (must)
+## レイヤールール (必須)
 
-### UI layer
+### UI層
 
-- Imports PageModel only. **Must not call API directly.**
+- PageModelのみをインポート。**APIを直接呼び出してはならない。**
 
-### PageModel layer
+### PageModel層
 
-- Contains `useXxxPageModel` hooks.
-- Orchestrates API calls + state.
+- `useXxxPageModel`フックを含む。
+- API呼び出し + 状態をオーケストレート。
 
-### API layer (`modules/*/api`)
+### API層 (`modules/*/api`)
 
-- All feature API calls live here.
-- Uses `clientApiFetch` from `shared/api/client.ts`.
+- すべての機能API呼び出しをここに配置。
+- `shared/api/client.ts`から`clientApiFetch`を使用。
 
-### shared/api layer
+### shared/api層
 
-- Fetch + error normalization only. **No feature logic.**
+- Fetchとエラー正規化のみ。**機能ロジックは含まない。**
 
-### BFF layer (`app/api`)
+### BFF層 (`app/api`)
 
-- Proxies requests to backend.
-- Forwards Cookie / Set-Cookie.
-- **No direct backend calls from frontend.** Always go through BFF `/api/*`.
+- バックエンドへのリクエストをプロキシ。
+- Cookie / Set-Cookieを転送。
+- **フロントエンドからバックエンドへの直接呼び出し禁止。** 常にBFF `/api/*`経由。
 
-## server/client mixing prevention (must)
+## サーバー/クライアント混在防止 (必須)
 
-- Server-only modules must start with `import 'server-only'`.
-- `modules/*/server.ts` is server-only only.
-- `modules/*/index.ts` exports client-safe only (do NOT export server-only).
-- Client components must not import `next/headers`, `server-only`, or server-only modules.
+- サーバー専用モジュールは`import 'server-only'`で開始。
+- `modules/*/server.ts`はサーバー専用のみ。
+- `modules/*/index.ts`はクライアントセーフのみをエクスポート (サーバー専用をエクスポートしてはならない)。
+- クライアントコンポーネントは`next/headers`、`server-only`、サーバー専用モジュールをインポートしてはならない。
 
-## Data flow
+## データフロー
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Browser                                                 │
+│ ブラウザ                                                │
 ├─────────────────────────────────────────────────────────┤
-│  UI Component (modules/*/ui/)                           │
-│       ↓ uses                                            │
-│  PageModel Hook (modules/*/model/useXxxPageModel.ts)    │
-│       ↓ calls                                           │
-│  Feature API (modules/*/api/xxxClient.ts)               │
-│       ↓ uses                                            │
+│  UIコンポーネント (modules/*/ui/)                        │
+│       ↓ 使用                                             │
+│  PageModelフック (modules/*/model/useXxxPageModel.ts)   │
+│       ↓ 呼び出し                                         │
+│  機能API (modules/*/api/xxxClient.ts)                   │
+│       ↓ 使用                                             │
 │  clientApiFetch (shared/api/client.ts)                  │
 │       ↓ fetch("/api/...")                               │
 ├─────────────────────────────────────────────────────────┤
-│  BFF Route Handler (app/api/.../route.ts)  ← Next.js    │
-│       ↓ proxy                                           │
+│  BFFルートハンドラー (app/api/.../route.ts)  ← Next.js   │
+│       ↓ プロキシ                                         │
 ├─────────────────────────────────────────────────────────┤
-│  Backend API (/api/v1/...)                 ← FastAPI    │
+│  バックエンドAPI (/api/v1/...)                ← FastAPI   │
 └─────────────────────────────────────────────────────────┘
 ```

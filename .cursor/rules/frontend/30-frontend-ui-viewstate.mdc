@@ -1,5 +1,5 @@
 ---
-description: 'FRONTEND UI: shadcn-first + ViewState-driven rendering + shared status UI'
+description: 'フロントエンドUI: shadcn優先 + ViewState駆動レンダリング + 共有ステータスUI'
 globs:
   [
     'frontend/src/app/**/*.{ts,tsx}',
@@ -10,21 +10,21 @@ globs:
 alwaysApply: false
 ---
 
-# UI RULES (shadcn + ViewState)
+# UIルール (shadcn + ViewState)
 
-## Components
+## コンポーネント
 
-- Prefer shadcn/ui components (`frontend/src/components/ui/*`) over raw HTML controls.
-- Keep styling consistent with Tailwind + Radix + shadcn patterns.
+- 生HTMLコントロールよりshadcn/uiコンポーネント (`frontend/src/components/ui/*`) を優先。
+- Tailwind + Radix + shadcnパターンと一貫したスタイリングを維持。
 
 ## ViewState
 
-- Pages render by switching ViewState (e.g., idle/loading/submitting/success/error).
-- UI should be “dumb”: render based on ViewState, no business logic.
+- ページはViewStateを切り替えてレンダリング (idle/loading/submitting/success/error等)。
+- UIは「ダム」であるべき: ViewStateに基づいてレンダリング、ビジネスロジックなし。
 
-## Shared status UI
+## 共有ステータスUI
 
-- Put common states in shared UI:
+- 共通状態は共有UIに配置:
   - `PageSkeleton`, `EmptyState`, `ErrorState`
-- Error message must use a single normalization helper:
-  - `toErrorMessage(err: unknown)` (no `any`)
+- エラーメッセージは単一の正規化ヘルパーを使用:
+  - `toErrorMessage(err: unknown)` (`any`は使用禁止)

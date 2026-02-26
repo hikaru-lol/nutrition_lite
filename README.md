@@ -191,6 +191,46 @@ pnpm install
 pnpm dev
 ```
 
+### 環境変数設定
+
+プロジェクトを正常に動作させるために、以下の環境変数を設定してください：
+
+#### バックエンド（`backend/.env`）
+```bash
+# 必須
+DATABASE_URL=postgresql+psycopg2://app:app@db:5432/app
+JWT_SECRET_KEY=your-secret-key
+
+# AI機能を使用する場合
+OPENAI_API_KEY=sk-...
+
+# Stripe決済を使用する場合
+STRIPE_API_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID=price_...
+```
+
+#### フロントエンド（`frontend/.env.local`）
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_USE_MOCK=true  # 開発時はモック使用を推奨
+```
+
+### CI/CD設定
+
+プロジェクトをフォークしてCI/CDを有効にするには、以下のGitHub Secretsを設定してください：
+
+| Secret名 | 説明 | 例 |
+|----------|------|-----|
+| `OPENAI_API_KEY` | OpenAI APIキー | `sk-...` |
+| `STRIPE_API_KEY` | Stripe APIキー | `sk_test_...` |
+| `STRIPE_WEBHOOK_SECRET` | Stripe Webhookシークレット | `whsec_...` |
+| `STRIPE_PRICE_ID` | Stripe価格ID | `price_...` |
+| `STRIPE_CHECKOUT_SUCCESS_URL` | 決済成功URL | `https://example.com/success` |
+| `STRIPE_CHECKOUT_CANCEL_URL` | 決済キャンセルURL | `https://example.com/cancel` |
+
+> **注意**: Real Integration テストを実行しない場合、これらのSecretsは不要です。
+
 ### テスト実行
 
 ```bash

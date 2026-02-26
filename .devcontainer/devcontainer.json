@@ -58,7 +58,7 @@
 
   "envFile": ".env",
 
-  "onCreateCommand": "git config --global --add safe.directory /workspace && git config --global --get user.name  || git config --global user.name  \"hikaru-lol\" && git config --global --get user.email || git config --global user.email \"mr.hkr0507ysd94@gmail.com\"",
+  "onCreateCommand": "git config --global --add safe.directory /workspace",
 
   "postCreateCommand": "bash -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=$HOME/.local/bin:$PATH && cd ${containerWorkspaceFolder}/backend && uv sync'",
 
