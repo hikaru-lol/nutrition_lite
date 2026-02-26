@@ -2,7 +2,7 @@
 
 ## このディレクトリについて
 
-Next.js 16 (App Router) + React 19 ベースのフロントエンド。5層レイヤードアーキテクチャを採用。
+Next.js 16 (App Router) + React 19 ベースのフロントエンド。5層レイヤードアーキテクチャを採用。栄養管理アプリケーションのUIを担当し、レスポンシブデザイン、ダークモード対応、リアルタイム更新を実現。
 
 ## 技術スタック
 
@@ -14,11 +14,10 @@ Next.js 16 (App Router) + React 19 ベースのフロントエンド。5層レ�
 - **通知**: Sonner (トースト)
 - **アイコン**: Lucide React
 - **モック**: MSW (Mock Service Worker)
+- **パッケージマネージャ**: pnpm
+- **コード品質**: ESLint, Prettier
+- **CI/CD**: GitHub Actions, Vercel
 
-## 重要: 実装前に必読
-
-- `docs/ai/DEPENDENCY_ANALYSIS`
-- `docs/ai/frontend/5-layer-architecture-guide.v2.md` - 5層レイヤードアーキテクチャガイド
 
 ## ディレクトリ構造
 
@@ -31,12 +30,16 @@ src/
 │   └── api/               # BFF API Routes（バックエンドへのプロキシ）
 ├── modules/               # 機能モジュール（ドメイン別）
 │   ├── auth/              # 認証
+│   ├── billing/           # 課金・サブスクリプション
+│   ├── calendar/          # カレンダー機能
+│   ├── meal/              # 食事管理
+│   ├── meal-recommendation/ # AI食事推薦
+│   ├── nutrition/         # 栄養計算
+│   ├── nutrition-progress/# 栄養進捗
 │   ├── profile/           # プロフィール
 │   ├── target/            # 栄養目標
-│   ├── meal/              # 食事管理
-│   ├── nutrition/         # 栄養計算
 │   ├── today/             # 今日のサマリー
-│   └── report/            # 日次レポート
+│   └── tutorial/          # チュートリアル
 ├── components/ui/         # 共通UIコンポーネント（shadcn/ui）
 ├── shared/                # 共有ユーティリティ
 │   ├── api/              # APIクライアント、プロキシ
@@ -99,22 +102,45 @@ modules/{moduleName}/
 ## コマンド
 
 ```bash
-pnpm dev      # 開発サーバー起動 (localhost:3000)
-pnpm build    # プロダクションビルド
-pnpm start    # プロダクションサーバー起動
-pnpm lint     # ESLint実行
+# 依存関係管理
+pnpm install              # 依存関係インストール
+pnpm add <package>        # パッケージ追加
+
+# 開発
+pnpm dev                  # 開発サーバー起動 (localhost:3000)
+pnpm dev:mock             # MSWモック有効で起動
+
+# ビルド
+pnpm build                # プロダクションビルド
+pnpm start                # プロダクションサーバー起動
+
+# コード品質
+pnpm lint                 # ESLint実行
+pnpm lint:fix             # ESLint自動修正
+pnpm format               # Prettierフォーマット
+pnpm type-check           # TypeScript型チェック
 ```
 
-## ルートグループ
+## ルートグループ & ページ
 
-| グループ       | パス             | 用途                 |
-| -------------- | ---------------- | -------------------- |
-| `(public)`     | `/auth/login`    | ログイン             |
-|                | `/auth/register` | 新規登録             |
-| `(onboarding)` | `/profile`       | プロフィール設定     |
-|                | `/target`        | 目標設定             |
-| `(app)`        | `/today`         | 今日のダッシュボード |
-|                | `/billing/plan`  | 課金プラン           |
+### 公開ページ `(public)`
+- `/auth/login` - ログインページ（デモアカウント機能付き）
+- `/auth/register` - 新規アカウント登録
+
+### オンボーディング `(onboarding)`
+- `/profile` - プロフィール初期設定
+- `/target` - 栄養目標設定
+- `/tutorial` - チュートリアル
+
+### メインアプリ `(app)`
+- `/today` - 今日のダッシュボード（ホーム）
+- `/meal` - 食事記録管理
+- `/targets` - 栄養目標一覧・編集
+- `/calendar` - カレンダービュー
+- `/meal-recommendation` - AI食事推薦
+- `/billing/plan` - 課金プラン選択
+- `/billing/success` - 決済完了ページ
+- `/settings` - 設定ページ
 
 ## API 通信パターン
 
@@ -276,12 +302,33 @@ try {
 
 `components/ui/` に以下のコンポーネントが用意されている:
 
+### フォーム関連
 - `Button` - バリアント: default, destructive, outline, secondary, ghost, link
-- `Card` - CardHeader, CardContent, CardTitle
-- `Input`, `Textarea`, `Label`
-- `Select` - Radix UI ベース
+- `Input`, `Textarea` - テキスト入力
+- `Label` - フォームラベル
+- `Select` - ドロップダウン選択
+- `RadioGroup` - ラジオボタングループ
+- `Checkbox` - チェックボックス
+- `Form` - react-hook-form統合
+
+### レイアウト
+- `Card` - CardHeader, CardContent, CardTitle, CardFooter
+- `Dialog` - モーダルダイアログ
+- `Drawer` - ドロワー
+- `Tabs` - タブコンテナ
+- `Separator` - 区切り線
+
+### フィードバック
+- `Alert` - アラート表示
 - `Progress` - プログレスバー
-- `Alert`, `Skeleton`, `Separator`
+- `Skeleton` - ローディングスケルトン
+- `Toast` - トースト通知（Sonner）
+- `Badge` - バッジ表示
+
+### ナビゲーション
+- `DropdownMenu` - ドロップダウンメニュー
+- `NavigationMenu` - ナビゲーションメニュー
+- `Breadcrumb` - パンくずリスト
 
 ### ユーティリティ
 
@@ -336,6 +383,40 @@ const mutation = useMutation({
 });
 ```
 
+## 主要機能
+
+### 食事管理
+- **記録**: 朝食・昼食・夕食・間食の登録
+- **編集・削除**: リアルタイムでの食事内容更新
+- **栄養計算**: 自動的な栄養素計算と表示
+- **カレンダー表示**: 月次での記録状況確認
+
+### AI機能連携
+- **栄養推定**: 食事名から自動栄養情報取得
+- **日次レポート**: AIによる1日の振り返り
+- **食事推薦**: 個人目標に基づく最適な食事提案
+- **目標生成**: プロフィール情報から最適目標を自動生成
+
+### 進捗トラッキング
+- **リアルタイム更新**: 食事追加時の即座な進捗反映
+- **視覚的表現**: プログレスバーとパーセンテージ表示
+- **色分け表示**: 達成度に応じた色変化（緑/黄/赤）
+
+### サブスクリプション管理
+- **プラン選択**: 月額・年額プランの選択UI
+- **Stripe決済**: セキュアな決済フロー
+- **ポータル管理**: サブスクリプション状況確認
+
+### レスポンシブデザイン
+- **モバイル対応**: スマートフォン最適化UI
+- **タブレット対応**: 中間サイズデバイス対応
+- **デスクトップ**: フル機能表示
+
+### ダークモード
+- **自動切り替え**: システム設定に追従
+- **手動切り替え**: ユーザー選択保存
+- **一貫性**: 全画面でのテーマ適用
+
 ## 環境変数
 
 ```bash
@@ -344,6 +425,10 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1  # オプション（デ�
 NEXT_PUBLIC_USE_MOCK=true                              # MSWモック有効化
 NEXT_PUBLIC_API_MOCKING=enabled                        # APIモッキング
 BACKEND_INTERNAL_ORIGIN=http://127.0.0.1:8000          # サーバーサイド用
+
+# デモアカウント情報（ログイン画面で利用可能）
+# Email: demo@example.com
+# Password: demo1234demo
 ```
 
 ## パスエイリアス
@@ -381,7 +466,24 @@ import { cn } from '@/lib/utils'; // src/lib/utils
 - **並行稼働**: 既存システムを壊さずに新アーキテクチャを検証
 - **漸進的改善**: 一度に全体を書き換えるのではなく、継続的に改善
 
-## BFF API Route 実装例
+## BFF API Routes
+
+### 実装されているAPI Routes
+
+| パス | 対応バックエンドAPI | 説明 |
+|------|-------------------|------|
+| `/api/auth/*` | `/api/v1/auth/*` | 認証関連（login, register, logout, refresh） |
+| `/api/profile/*` | `/api/v1/profile/*` | プロフィール管理 |
+| `/api/targets/*` | `/api/v1/targets/*` | 栄養目標管理 |
+| `/api/meal-items/*` | `/api/v1/meals/*` | 食事記録管理 |
+| `/api/nutrition/*` | `/api/v1/nutrition/*` | 栄養計算 |
+| `/api/calendar/*` | `/api/v1/calendar/*` | カレンダー記録 |
+| `/api/meal-recommendations/*` | `/api/v1/recommendations/*` | AI食事推薦 |
+| `/api/billing/*` | `/api/v1/billing/*` | Stripe課金 |
+| `/api/tutorials/*` | `/api/v1/tutorial/*` | チュートリアル |
+| `/api/today/*` | `/api/v1/daily-reports/*` | 日次レポート |
+
+### 実装例
 
 ```typescript
 // app/api/targets/route.ts
@@ -401,3 +503,10 @@ export async function POST(req: NextRequest) {
   return proxyToBackend(req, `${BACKEND}${PREFIX}/targets`);
 }
 ```
+
+### Cookie中継
+
+BFF層では認証Cookieを自動的に中継:
+- `ACCESS_TOKEN` - アクセストークン
+- `REFRESH_TOKEN` - リフレッシュトークン
+- HttpOnly, SameSite=Lax設定で XSS対策

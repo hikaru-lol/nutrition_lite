@@ -1,25 +1,25 @@
 ---
-description: 'BACKEND: Clean Architecture boundaries + ports/adapters discipline'
+description: 'バックエンド: クリーンアーキテクチャ境界 + ポート&アダプターの規律'
 globs: ['backend/**/*']
 alwaysApply: false
 ---
 
-# BACKEND RULES (Clean Architecture)
+# バックエンドルール (クリーンアーキテクチャ)
 
-## Layering (never break)
+## レイヤリング (絶対に破らない)
 
-API (FastAPI routers, DI)
-→ Application (usecases, DTOs, ports)
-→ Domain (entities, value objects, domain errors)
-→ Infrastructure (DB/LLM/storage/security adapters)
+API (FastAPIルーター, DI)
+→ Application (ユースケース, DTO, ポート)
+→ Domain (エンティティ, 値オブジェクト, ドメインエラー)
+→ Infrastructure (DB/LLM/ストレージ/セキュリティアダプター)
 
-## Rules
+## ルール
 
-- Domain must not depend on external I/O frameworks (FastAPI/DB clients/etc.).
-- Application depends on ports (interfaces), not concrete infra.
-- Infra implements ports. API wires dependencies via DI container.
+- Domainは外部I/Oフレームワーク (FastAPI/DBクライアント等) に依存しない。
+- Applicationはポート (インターフェース) に依存し、具体的なインフラには依存しない。
+- Infraはポートを実装。APIはDIコンテナ経由で依存性を結線。
 
-## Changes
+## 変更
 
-- Minimal diff. No unrelated refactors.
-- For any behavior change: specify impacted usecase(s) + add/update tests.
+- 最小差分。無関係なリファクタリングはしない。
+- 動作変更の際: 影響を受けるユースケースを特定 + テストの追加/更新。

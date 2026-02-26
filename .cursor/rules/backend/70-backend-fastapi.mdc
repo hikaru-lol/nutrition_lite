@@ -1,23 +1,23 @@
 ---
-description: 'BACKEND: FastAPI conventions (routing, schemas, errors, auth boundary)'
+description: 'バックエンド: FastAPI規約 (ルーティング、スキーマ、エラー、認証境界)'
 globs: ['backend/app/**/*', 'backend/tests/**/*']
 alwaysApply: false
 ---
 
-# FastAPI CONVENTIONS
+# FastAPI 規約
 
-## API boundary
+## API境界
 
-- Routers live under `backend/app/api/http/*` (or existing convention).
-- Schemas/DTOs: keep at the boundary (API/App) and avoid leaking infra models.
+- ルーターは `backend/app/api/http/*` (または既存の規約) に配置。
+- スキーマ/DTO: 境界 (API/App) に置き、インフラモデルのリークを避ける。
 
-## Error handling
+## エラー処理
 
-- Prefer explicit error mapping:
-  - Domain/Application errors → HTTP status + structured payload
-- Do not return raw exceptions or stack traces.
+- 明示的なエラーマッピングを優先:
+  - ドメイン/アプリケーションエラー → HTTPステータス + 構造化ペイロード
+- 生の例外やスタックトレースを返さない。
 
-## Auth boundary
+## 認証境界
 
-- Keep auth/session handling consistent with existing approach.
-- If changing auth endpoints, update OpenAPI + integration tests accordingly.
+- 認証/セッション処理は既存のアプローチと一貫性を保つ。
+- 認証エンドポイントを変更する場合は、OpenAPI + 統合テストも更新。

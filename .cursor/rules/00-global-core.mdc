@@ -1,27 +1,27 @@
 ---
-description: 'GLOBAL (always): plan-first, minimal-diff, no-any, verify'
+description: 'グローバル (常時適用): 計画優先、最小差分、any禁止、検証必須'
 globs: ['**/*']
 alwaysApply: true
 ---
 
-# GLOBAL RULES (ALWAYS)
+# グローバルルール (常時適用)
 
-## Response format (must)
+## レスポンス形式 (必須)
 
-When asked to implement/change anything:
+実装・変更依頼を受けた場合:
 
-1. Plan (files + approach + risks)
-2. Patch (smallest diffs)
-3. Verify (commands/tests)
+1. 計画 (ファイル + アプローチ + リスク)
+2. パッチ (最小限の差分)
+3. 検証 (コマンド/テスト)
 
-## Change policy (must)
+## 変更ポリシー (必須)
 
-- Minimal diff. No unrelated refactors/renames/moves/formatting.
-- Never introduce `any`. Use `unknown` + normalization.
-- Preserve existing architecture and naming conventions.
-- If unsure, state assumptions explicitly and choose the safest default.
+- 最小差分。無関係なリファクタリング/名前変更/移動/フォーマットは行わない。
+- `any`型は絶対に導入しない。`unknown` + 正規化を使用。
+- 既存のアーキテクチャと命名規則を維持。
+- 不明な場合は、仮定を明示的に述べ、最も安全なデフォルトを選択。
 
-## Quality gate (must)
+## 品質ゲート (必須)
 
-- Behavior change => tests updated/added (or explain why not applicable).
-- Ensure TypeScript typecheck/build (FE) and pytest (BE) still pass.
+- 動作変更 => テストの更新/追加 (または適用外の理由を説明)。
+- TypeScript型チェック/ビルド (FE) と pytest (BE) が通ることを確認。

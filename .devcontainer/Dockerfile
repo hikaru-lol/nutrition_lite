@@ -78,6 +78,7 @@
 "    Host github.com" \
 "    HostName github.com" \
 "    User git" \
+"    IdentityFile /host-ssh/id_ed25519" \
 "    IdentityFile /host-ssh/id_rsa" \
 "    IdentitiesOnly yes" \
 "    AddKeysToAgent yes" \

@@ -1,15 +1,15 @@
 ---
-description: 'BACKEND testing: pytest first, keep unit/integration discipline'
+description: 'バックエンドテスト: pytest優先、ユニット/統合の規律を維持'
 globs: ['backend/**/*']
 alwaysApply: false
 ---
 
-# TESTING RULES (Backend)
+# テストルール (バックエンド)
 
-- Prefer unit tests for domain/application logic.
-- Integration tests for API routing/DI/db boundaries.
-- When changing behavior, update:
-  - unit tests (if logic changed)
-  - integration tests (if endpoints/contracts changed)
-- Always show how to run relevant tests:
+- ドメイン/アプリケーションロジックはユニットテストを優先。
+- APIルーティング/DI/DB境界は統合テスト。
+- 動作変更時の更新:
+  - ユニットテスト (ロジック変更時)
+  - 統合テスト (エンドポイント/コントラクト変更時)
+- 関連テストの実行方法を常に示す:
   - `cd backend && pytest ...`

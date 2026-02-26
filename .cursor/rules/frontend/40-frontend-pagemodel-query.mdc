@@ -1,5 +1,5 @@
 ---
-description: 'FRONTEND PageModel: TanStack Query usage + UI isolation'
+description: 'フロントエンドPageModel: TanStack Query使用法 + UI分離'
 globs:
   [
     'frontend/src/modules/**/model/**/*.{ts,tsx}',
@@ -8,16 +8,16 @@ globs:
 alwaysApply: false
 ---
 
-# PageModel (TanStack Query) RULES
+# PageModel (TanStack Query) ルール
 
-## Responsibilities
+## 責務
 
-- PageModel owns `useQuery`/`useMutation`.
-- UI consumes PageModel outputs only (ViewState + handlers).
-- UI must not import `modules/*/api` or `shared/api` directly.
+- PageModelは`useQuery`/`useMutation`を所有。
+- UIはPageModelの出力のみを消費 (ViewState + ハンドラー)。
+- UIは`modules/*/api`や`shared/api`を直接インポートしてはならない。
 
-## Types
+## 型
 
-- Avoid `any`. Use explicit generics:
+- `any`を避ける。明示的なジェネリクスを使用:
   - `useMutation<TData, TError, TVariables>()`
-- Query keys / invalidation remain feature-local (do not scatter in shared).
+- クエリキー/無効化は機能ローカルに保つ (sharedに散乱させない)。

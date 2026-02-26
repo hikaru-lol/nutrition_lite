@@ -1,8 +1,8 @@
-# Nutrition Tracker
+# 🥗 Nutrition Tracker
 
 ## 概要
 
-栄養管理アプリケーション。フロントエンド（Next.js 15）とバックエンド（FastAPI）のモノレポ構成。
+**AI駆動の栄養管理SaaS** — 日々の食事記録・栄養分析・目標管理・食事推薦を提供するフルスタックWebアプリケーション。フロントエンド（Next.js 16）とバックエンド（FastAPI）のモノレポ構成。
 
 ## 技術スタック
 
@@ -23,8 +23,8 @@
 - **バリデーション**: Pydantic v2
 - **認証**: JWT (python-jose), bcrypt
 - **ストレージ**: MinIO (S3 互換)
-- **AI**: OpenAI API
-- **決済**: Stripe
+- **AI**: OpenAI API (GPT-4)
+- **決済**: Stripe (Subscription, Checkout, Webhook)
 - **パッケージマネージャ**: uv
 
 ## 開発時の参照ドキュメント
@@ -61,13 +61,19 @@ frontend/src/
 │   ├── (onboarding)/  # オンボーディングフロー
 │   ├── (public)/      # 公開ページ (ログイン等)
 │   └── api/           # BFF API ルート (バックエンドへのプロキシ)
-├── modules/           # 機能モジュール (ドメイン別)
-│   ├── auth/          # 認証
+├── modules/           # 機能モジュール (12モジュール)
+│   ├── auth/          # 認証・ユーザー管理
+│   ├── billing/       # 課金・サブスクリプション
+│   ├── calendar/      # カレンダー表示
 │   ├── meal/          # 食事管理
+│   ├── meal-recommendation/  # AI食事推薦
 │   ├── nutrition/     # 栄養トラッキング
+│   ├── nutrition-progress/    # 栄養推移グラフ
 │   ├── profile/       # ユーザープロフィール
+│   ├── reports/       # AI日次レポート
 │   ├── target/        # 栄養目標
-│   └── today/         # 今日のサマリー
+│   ├── today/         # 今日のサマリー
+│   └── tutorial/      # チュートリアル
 ├── components/ui/     # 共通 UI コンポーネント (Radix UI)
 └── shared/            # 共有ユーティリティ
 ```
@@ -83,7 +89,8 @@ backend/app/
 │   ├── db/           # SQLAlchemy モデル、リポジトリ
 │   ├── security/     # JWT、パスワードハッシュ
 │   ├── storage/      # MinIO/S3
-│   └── llm/          # OpenAI 統合
+│   ├── llm/          # OpenAI 統合
+│   └── billing/      # Stripe 統合
 └── di/                # 依存性注入コンテナ
 ```
 
@@ -138,12 +145,16 @@ uv run mypy app                            # 型チェック
 
 | 機能         | エンドポイント                                           |
 | ------------ | -------------------------------------------------------- |
-| 認証         | `POST /auth/register`, `/login`, `/refresh`, `/logout`   |
-| プロフィール | `GET /profile/me`, `POST /profile`, `PUT /profile`       |
-| 目標         | `GET /targets`, `POST /targets`, `GET /targets/active`   |
-| 食事         | `POST /meals`, `GET /meals/{date}`, `DELETE /meals/{id}` |
-| 栄養         | `GET /nutrition/daily`, `GET /nutrition/summary`         |
-| 課金         | `POST /billing/checkout`, `GET /billing/portal`          |
+| 認証         | `POST /auth/register`, `/login`, `/refresh`, `/logout`, `DELETE /auth/me`   |
+| プロフィール | `GET /profile/me`, `POST /profile`, `PUT /profile/{id}`       |
+| 目標         | `GET /targets`, `POST /targets`, `GET /targets/active`, `PATCH/DELETE /targets/{id}`, `POST /targets/{id}/activate`   |
+| 食事         | `GET/POST /meals`, `GET /meals/{date}`, `PATCH/DELETE /meals/{id}` |
+| 栄養         | `POST /nutrition/compute`, `GET /nutrition/daily/{date}`, `GET /nutrition/summary`         |
+| 課金         | `POST /billing/checkout`, `POST /billing/create-checkout-session`, `GET /billing/portal`, `POST /billing/stripe/webhook`          |
+| レポート     | `GET /daily-reports/{date}`, `POST /daily-reports/generate` |
+| 食事推薦     | `POST /recommendations/meal`, `GET /recommendations/meal/history` |
+| カレンダー   | `GET /calendar/records` |
+| チュートリアル | `GET /tutorial/steps/{id}`, `POST /tutorial/steps/{id}/complete` |
 
 ## 認証
 
@@ -174,6 +185,7 @@ JWT_SECRET_KEY=your-secret-key
 USE_FAKE_INFRA=true           # true: インメモリ実装, false: 実インフラ
 OPENAI_API_KEY=sk-...
 STRIPE_API_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 MINIO_ENDPOINT=minio:9000
 ```
 
@@ -190,5 +202,70 @@ NEXT_PUBLIC_API_MOCKING=enabled
 GitHub Actions で以下を実行:
 
 - `backend-unit-tests.yml` - バックエンドユニットテスト
-- `backend-integration-tests.yml` - バックエンド統合テスト
+- `backend-integration-tests.yml` - バックエンド統合テスト (フェイクインフラ)
 - `backend-real-integration.yml` - 実インフラ統合テスト (PostgreSQL, MinIO)
+
+## 主要機能
+
+| 機能 | 説明 | 技術的ポイント |
+|------|------|---------------|
+| 🔐 認証 | Cookie JWT + BFFプロキシ | HttpOnly / SameSite=Lax / XSS防止 |
+| 🎯 栄養目標 | AI生成 + 手動設定 | OpenAI → ポート抽象化 → Stub切替 |
+| 🍽️ 食事記録 | 日次記録 + AI栄養推定 | 10種栄養素の自動計算 |
+| 📊 日次レポート | AI分析レポート生成 | 目標との差分分析 + 改善提案 |
+| 🤖 食事推薦 | 個人最適化された提案 | レート制限（30分間隔 / 日次5回） |
+| 💳 課金 | Stripe サブスクリプション | Checkout / Portal / Webhook |
+| 📅 カレンダー | 月間記録一覧 | 記録完了ステータス可視化 |
+| 📈 進捗グラフ | 栄養推移可視化 | Chart.js による週間/月間推移 |
+
+## アーキテクチャ
+
+### バックエンド: クリーンアーキテクチャ + ポート&アダプター
+
+```
+┌──────────────────────────────────────────────┐
+│  api/http    ← HTTP層（Router / Schema）      │
+├──────────────────────────────────────────────┤
+│  application ← ユースケース層（UseCase / DTO） │
+├──────────────────────────────────────────────┤
+│  domain      ← ドメイン層（Entity / VO）       │
+├──────────────────────────────────────────────┤
+│  infra       ← インフラ層（DB / LLM / Stripe）│
+└──────────────────────────────────────────────┘
+
+依存方向:  api/http → application → domain ← infra
+```
+
+- **Unit of Work** でトランザクション管理
+- **Repository パターン** でポート定義 → SQLAlchemy実装
+- **DI（依存性注入）** で FastAPI Depends() による自動解決
+- **Feature Flags** で環境変数により OpenAI / Stub 実装を切替
+
+### フロントエンド: 5層レイヤードアーキテクチャ
+
+```
+Layer 1: UI Presentation     ← 純粋な表現コンポーネント
+Layer 2: UI Orchestration    ← イベントハンドリング
+Layer 3: Page Aggregation    ← ページレベルの機能統合
+Layer 4: Feature Logic       ← React Query + 状態管理
+Layer 5: Domain Services     ← API呼び出し + ビジネスロジック
+```
+
+## デモアカウント
+
+開発環境で以下のアカウントが利用可能:
+- Email: `demo@example.com`
+- Password: `demo1234demo`
+
+## プロジェクト規模
+
+| 項目 | 数値 |
+|------|------|
+| バックエンド ドメイン | 8 |
+| API エンドポイント | 35+ |
+| DBテーブル | 14 |
+| ユースケース | 35+ |
+| フロントエンド モジュール | 12 |
+| BFF Routes | 22 |
+| CI ワークフロー | 3 |
+| AI機能（ポート抽象化） | 4 |

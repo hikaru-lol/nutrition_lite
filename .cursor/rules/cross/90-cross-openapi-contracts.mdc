@@ -1,23 +1,23 @@
 ---
-description: 'CROSS: OpenAPI / contracts sync, FE(BFF)↔BE changes checklist'
+description: 'クロスプラットフォーム: OpenAPI/コントラクト同期、FE(BFF)↔BE変更チェックリスト'
 globs: ['docs/openapi/**/*', 'backend/**/*', 'frontend/**/*']
 alwaysApply: false
 ---
 
-# CROSS-CUTTING RULES (FE ↔ BE)
+# クロスカッティングルール (FE ↔ BE)
 
-## When backend API changes
+## バックエンドAPI変更時
 
-Do this checklist (in order):
+以下のチェックリストを順番に実行:
 
-1. Update OpenAPI (`docs/openapi/openapi.yaml` if used as source)
-2. Update backend implementation + tests
-3. Update frontend BFF proxy (/api/\*) if needed
-4. Update frontend contracts (Zod) and clients
-5. Update UI/PageModel usage + E2E/manual verification
+1. OpenAPIを更新 (`docs/openapi/openapi.yaml`をソースとして使用する場合)
+2. バックエンド実装 + テストを更新
+3. フロントエンドBFFプロキシ (/api/\*) を必要に応じて更新
+4. フロントエンドコントラクト (Zod) とクライアントを更新
+5. UI/PageModel使用法 + E2E/手動検証を更新
 
-## Breaking changes
+## 破壊的変更
 
-- Propose compatibility strategy:
-  - versioning OR migration plan OR fallback behavior
-- Clearly list impacted routes and clients.
+- 互換性戦略を提案:
+  - バージョニング OR マイグレーション計画 OR フォールバック動作
+- 影響を受けるルートとクライアントを明確にリスト化。

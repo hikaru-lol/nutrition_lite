@@ -1,5 +1,5 @@
 ---
-description: 'FRONTEND Contracts: Zod schema as source of truth (no casts)'
+description: 'フロントエンドContract: Zodスキーマを真実の源とする (キャスト禁止)'
 globs:
   [
     'frontend/src/modules/**/contract/**/*.{ts,tsx}',
@@ -8,10 +8,10 @@ globs:
 alwaysApply: false
 ---
 
-# Contract RULES (Zod)
+# Contractルール (Zod)
 
-- Request/response types are derived from Zod schema.
-- No `as` casting to force types.
-- Numeric inputs:
-  - Use RHF `valueAsNumber: true`
-  - Prefer `z.number()` in schema (refine if needed)
+- リクエスト/レスポンス型はZodスキーマから導出。
+- 型を強制する`as`キャストは使用禁止。
+- 数値入力:
+  - RHF `valueAsNumber: true`を使用
+  - スキーマでは`z.number()`を優先 (必要に応じてrefine)
